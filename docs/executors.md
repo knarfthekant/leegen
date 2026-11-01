@@ -82,6 +82,16 @@ toolkit is a minor version newer than the driver.
 - Outbound HTTPS to PyPI on first use of each environment (or a reachable mirror set with
   `LEETCLAUDE_PACKAGE_INDEX`).
 
+## Per-cluster setup notes
+
+Every cluster is different: filesystems, `noexec` mounts, modules, drivers, partitions,
+network access. Environments are therefore resolved fresh on each cluster from the unpinned
+specs in `environments/`, rather than shipped as pinned lockfiles or prebuilt venvs.
+
+When adding a cluster, an agent probes it, writes the executor entry, and records what it found
+in `docs/clusters/<name>.md`. [`docs/clusters/watgpu.md`](clusters/watgpu.md) is the worked
+example and contains the onboarding checklist.
+
 ## Adding an executor kind
 
 Subclass `leetclaude.executors.base.Executor` and implement:
