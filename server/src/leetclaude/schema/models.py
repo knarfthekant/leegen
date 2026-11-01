@@ -149,7 +149,10 @@ class TestCase(_Strict):
 
     name: str
     visible: bool = Field(True, description="Visible tests show inputs before running.")
-    description: str | None = None
+    description: str | None = Field(None, description="Shown with the case; Markdown allowed.")
+    section: str | None = Field(
+        None, description="Id of an entry in the problem's `sections`; groups this case."
+    )
     input: TestInput | None = Field(None, description="function kind only.")
     expected: Any = Field(
         FROM_REFERENCE,
@@ -160,6 +163,14 @@ class TestCase(_Strict):
     @property
     def needs_reference(self) -> bool:
         return isinstance(self.expected, str) and self.expected == FROM_REFERENCE
+
+
+class TestSection(_Strict):
+    __test__ = False
+
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$", description="Slug that tests reference.")
+    title: str
+    description: str | None = Field(None, description="Shown under the section header.")
 
 
 class Limits(_Strict):
@@ -196,6 +207,10 @@ class Problem(_Strict):
         "`expected: from_reference` and user-added tests."
     )
     judge: Judge
+    sections: list[TestSection] = Field(
+        default_factory=list,
+        description="Optional groups for tests. Each test opts in with `section: <id>`.",
+    )
     tests: list[TestCase] = Field(default_factory=list)
     limits: Limits = Field(default_factory=Limits)
     benchmark: Benchmark | None = None
@@ -210,6 +225,12 @@ class Problem(_Strict):
         names = [t.name for t in self.tests]
         if len(names) != len(set(names)):
             raise ValueError("duplicate test names")
+        section_ids = [s.id for s in self.sections]
+        if len(section_ids) != len(set(section_ids)):
+            raise ValueError("duplicate section ids")
+        for t in self.tests:
+            if t.section is not None and t.section not in section_ids:
+                raise ValueError(f"test {t.name!r}: unknown section {t.section!r}")
         editable = {f.path for f in self.files if f.role == "editable"}
         if self.reference:
             for rf in self.reference.files:
@@ -288,6 +309,7 @@ class TestResult(BaseModel):
     visible: bool = True
     custom: bool = False
     description: str | None = None
+    section: str | None = None
     input: Any = None
     expected: Any = None
     actual: Any = None

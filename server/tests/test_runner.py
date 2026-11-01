@@ -131,3 +131,30 @@ async def test_gpu_problem_on_local_accelerator():
     r = await run("kv-cache-basics", mode="reference")
     assert r.status == "passed", r.error
     assert r.device in ("mps", "cuda")
+
+
+async def test_section_and_description_reach_results():
+    r = await run("merge-ranges", mode="reference")
+    by = {t.name: t for t in r.tests}
+    assert by["Example"].section == "basics" and "statement" in by["Example"].description
+    assert by["Large random"].section == "scale"
+
+
+async def test_custom_tests_are_named_test_n_without_collisions():
+    r = await run("merge-ranges", files={"solution.py": GOOD}, custom_tests=[
+        {"input": {"args": [[[1, 2]]]}},
+        {"input": {"args": [[[3, 4]]]}, "description": "mine", "section": "scale"},
+        {"input": {"args": [[[5, 6]]]}, "name": "Example", "section": "bogus"},
+    ])
+    custom = [t for t in r.tests if t.custom]
+    assert [t.name for t in custom] == ["Test 1", "Test 2", "Example (2)"]
+    assert custom[1].description == "mine" and custom[1].section == "scale"
+    assert custom[2].section is None
+
+
+def test_unique_test_name():
+    from leetclaude.runner.orchestrator import unique_test_name
+    assert unique_test_name(None, set()) == "Test 1"
+    assert unique_test_name(None, {"Test 1", "Test 2"}) == "Test 3"
+    assert unique_test_name("Mine", {"Mine"}) == "Mine (2)"
+    assert unique_test_name("  ", {"Test 1"}) == "Test 2"

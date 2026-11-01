@@ -22,7 +22,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
 import { Brand, ConnectionDot, ThemeToggle } from "../components/Chrome";
-import { Editor, type CursorInfo, type EditorFile, type SaveState } from "../components/Editor";
+import { Editor, type CursorInfo, type EditorFile, type RevealTarget, type SaveState } from "../components/Editor";
 import { Markdown } from "../components/Markdown";
 import { ProblemDrawer } from "../components/ProblemDrawer";
 import { hardware } from "../components/ProblemRow";
@@ -79,7 +79,8 @@ export function WorkspacePage({ id }: { id: string }) {
   const [executors, setExecutors] = useState<ExecutorInfo[]>([]);
   const [executor, setExecutor] = useState<string | null>(null);
   const [cursor, setCursor] = useState<CursorInfo | null>(null);
-  const [revealLine, setRevealLine] = useState<{ path: string; line: number; nonce: number } | null>(null);
+  const [revealLine, setRevealLine] = useState<RevealTarget | null>(null);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bottomCollapsed, setBottomCollapsed] = useState(false);
@@ -481,6 +482,11 @@ export function WorkspacePage({ id }: { id: string }) {
                   onCursor={setCursor}
                   onReset={reset}
                   revealLine={revealLine}
+                  selectedAnnotationId={selectedAnnotationId}
+                  onSelectAnnotation={(aid) => {
+                    setSelectedAnnotationId(aid);
+                    showBottom("review");
+                  }}
                   dark={dark}
                   saveState={saveState}
                   cursor={cursor}
@@ -539,6 +545,7 @@ export function WorkspacePage({ id }: { id: string }) {
                       running={running}
                       phase={runPhase}
                       params={problem.judge.params ?? []}
+                      sections={problem.sections}
                       onCancel={() => runId.current && api.cancel(runId.current)}
                     />
                   )}
@@ -546,11 +553,22 @@ export function WorkspacePage({ id }: { id: string }) {
                     <ReviewPanel
                       annotations={annotations}
                       proposals={proposals}
-                      onJump={(file, line) => {
-                        setActive(file);
-                        setRevealLine({ path: file, line, nonce: Date.now() });
+                      selectedId={selectedAnnotationId}
+                      onSelect={(a) => {
+                        setSelectedAnnotationId(a.id);
+                        if (!a.file || a.start_line == null) return;
+                        setActive(a.file);
+                        setRevealLine({
+                          path: a.file,
+                          line: a.start_line,
+                          endLine: a.end_line ?? a.start_line,
+                          col: a.start_col ?? undefined,
+                          endCol: a.end_col ?? undefined,
+                          nonce: Date.now(),
+                        });
                       }}
                       onDismiss={(a) => {
+                        setSelectedAnnotationId((cur) => (cur === a.id ? null : cur));
                         setAnnotations((xs) => xs.filter((x) => x.id !== a.id));
                         api.deleteAnnotation(id, a.id);
                       }}

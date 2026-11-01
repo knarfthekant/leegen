@@ -25,7 +25,8 @@ def public_problem(p: Problem) -> dict[str, Any]:
     """Problem without hidden files, the reference, or hidden test data."""
     tests = []
     for t in p.tests:
-        item: dict[str, Any] = {"name": t.name, "visible": t.visible, "description": t.description}
+        item: dict[str, Any] = {"name": t.name, "visible": t.visible,
+                                "description": t.description, "section": t.section}
         if t.visible:
             item["input"] = t.input.model_dump(exclude_defaults=True) if t.input else None
             item["expected"] = None if t.needs_reference else t.expected
@@ -41,6 +42,7 @@ def public_problem(p: Problem) -> dict[str, Any]:
             "params": p.judge.params,
             "compare": p.judge.compare.kind,
         },
+        "sections": [s.model_dump() for s in p.sections],
         "tests": tests,
         "has_reference": p.reference is not None,
         "limits": p.limits.model_dump(),

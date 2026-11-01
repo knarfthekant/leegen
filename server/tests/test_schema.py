@@ -69,3 +69,32 @@ def test_json_schema_exports():
     assert schema["title"] == "Problem"
     assert "judge" in schema["properties"]
     yaml.safe_dump(schema)
+
+
+def test_sections_round_trip_and_validate():
+    data = base(
+        sections=[{"id": "basics", "title": "Basics", "description": "d"}, {"id": "edge", "title": "Edge"}],
+        tests=[{"name": "a", "section": "basics", "description": "x", "input": {"args": [1]}, "expected": 1},
+               {"name": "b", "input": {"args": [2]}, "expected": 2}],
+    )
+    p = Problem.model_validate(data)
+    assert parse_problem_yaml(dump_problem_yaml(p)) == p
+    view = public_problem(p)
+    assert [s["id"] for s in view["sections"]] == ["basics", "edge"]
+    assert view["tests"][0]["section"] == "basics" and view["tests"][1]["section"] is None
+
+
+@pytest.mark.parametrize("over,needle", [
+    ({"tests": [{"name": "a", "section": "nope", "input": {"args": [1]}, "expected": 1}]}, "unknown section"),
+    ({"sections": [{"id": "a", "title": "A"}, {"id": "a", "title": "B"}]}, "duplicate section"),
+    ({"sections": [{"id": "Bad Id", "title": "A"}]}, "id"),
+])
+def test_invalid_sections_rejected(over, needle):
+    with pytest.raises(ValidationError) as exc:
+        Problem.model_validate(base(**over))
+    assert needle.lower() in str(exc.value).lower()
+
+
+def test_seed_problem_without_sections_still_loads():
+    p = ProblemStore().get("kv-cache-basics")
+    assert p is not None and p.sections == [] and all(t.section is None for t in p.tests)

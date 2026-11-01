@@ -1,6 +1,6 @@
 import { DiffEditor, Editor as MonacoEditor, type OnMount } from "@monaco-editor/react";
-import { Check, CircleAlert, CloudCheck, CodeXml, LoaderCircle, Lock, Maximize2, Minimize2, RotateCcw, Sparkles, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Check, CircleAlert, CloudCheck, CodeXml, LoaderCircle, Lock, Maximize2, Minimize2, Redo2, RotateCcw, Sparkles, Undo2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { Annotation, Proposal } from "../lib/api";
 import { languageFor, monaco } from "../lib/monaco";
 import { Button, cx, IconButton } from "./ui";
@@ -12,6 +12,16 @@ export interface EditorFile {
   role: "editable" | "readonly";
   content: string;
   language: string | null;
+}
+
+/** Where to move the editor. With columns (end exclusive) the exact characters get selected. */
+export interface RevealTarget {
+  path: string;
+  line: number;
+  endLine?: number;
+  col?: number;
+  endCol?: number;
+  nonce: number;
 }
 
 export interface CursorInfo {
@@ -32,7 +42,11 @@ interface Props {
   onRun: () => void;
   onCursor: (info: CursorInfo) => void;
   onReset: () => void;
-  revealLine: { path: string; line: number; nonce: number } | null;
+  revealLine: RevealTarget | null;
+  /** annotation highlighted in the editor and in the Review panel */
+  selectedAnnotationId: string | null;
+  /** the user clicked an annotation in the editor (gutter dot or highlighted text) */
+  onSelectAnnotation: (id: string) => void;
   dark: boolean;
   saveState: SaveState;
   cursor: CursorInfo | null;
@@ -44,12 +58,61 @@ const EDITOR_FONT = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, m
 
 type Ed = monaco.editor.IStandaloneCodeEditor;
 
+// --- annotation hover peek -------------------------------------------------------------------
+// One provider for every model. Each editor publishes its annotations here, keyed by model URI,
+// so overlapping ranges all show up in a single peek.
+
+const annotationsByModel = new Map<string, Annotation[]>();
+
+function annotationRange(a: Annotation): monaco.Range {
+  const startLine = a.start_line ?? 1;
+  const endLine = a.end_line ?? startLine;
+  return a.start_col == null || a.end_col == null
+    ? new monaco.Range(startLine, 1, endLine, Number.MAX_SAFE_INTEGER)
+    : new monaco.Range(startLine, a.start_col, endLine, a.end_col);
+}
+
+const isPrecise = (a: Annotation) => a.start_col != null && a.end_col != null;
+
+/** Annotations covering a position, smallest range first (the most specific one wins a click). */
+function annotationsAt(uri: string, pos: monaco.IPosition): Annotation[] {
+  return (annotationsByModel.get(uri) ?? [])
+    .filter((a) => annotationRange(a).containsPosition(pos))
+    .sort((a, b) => size(a) - size(b));
+}
+
+function size(a: Annotation) {
+  const startLine = a.start_line ?? 1;
+  const endLine = a.end_line ?? startLine;
+  return isPrecise(a) && startLine === endLine ? a.end_col! - a.start_col! : (endLine - startLine + 1) * 1000;
+}
+
+let hoverRegistered = false;
+function registerAnnotationHover() {
+  if (hoverRegistered) return;
+  hoverRegistered = true;
+  monaco.languages.registerHoverProvider("*", {
+    provideHover(model, position) {
+      const hits = annotationsAt(model.uri.toString(), position);
+      if (!hits.length) return null;
+      return {
+        range: annotationRange(hits[0]).intersectRanges(model.getFullModelRange()) ?? undefined,
+        contents: hits.flatMap((a) => [
+          { value: `**${a.severity}** · ${a.author}\n\n${a.message}` },
+          { value: `_${isPrecise(a) ? "Click" : "Click the dot in the gutter"} to open in Review_` },
+        ]),
+      };
+    },
+  });
+}
+
 export function Editor(props: Props) {
   const { files, active, annotations, proposal, dark, problemId } = props;
   const editorRef = useRef<Ed | null>(null);
   const decorations = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
   const handlers = useRef(props);
   handlers.current = props;
+  const [undoState, setUndoState] = useState({ undo: false, redo: false });
 
   const file = files.find((f) => f.path === active) ?? files[0];
 
@@ -72,7 +135,25 @@ export function Editor(props: Props) {
   const onMount: OnMount = (editor) => {
     editorRef.current = editor as unknown as Ed;
     decorations.current = editor.createDecorationsCollection();
+    registerAnnotationHover();
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => handlers.current.onRun());
+    const syncUndo = () => {
+      const model = editor.getModel();
+      setUndoState({ undo: !!model?.canUndo(), redo: !!model?.canRedo() });
+    };
+    editor.onDidChangeModelContent(syncUndo);
+    syncUndo();
+    editor.onMouseDown((e) => {
+      const model = editor.getModel();
+      if (!model || !e.target.position || !e.event.leftButton) return;
+      const inGutter = e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN;
+      const onText = e.target.type === monaco.editor.MouseTargetType.CONTENT_TEXT;
+      if (!inGutter && !onText) return;
+      // Text clicks only count on exact-range highlights, so editing a whole-line one never
+      // yanks the user into the Review tab. The gutter dot selects any annotation.
+      const hit = annotationsAt(model.uri.toString(), e.target.position).find((a) => inGutter || isPrecise(a));
+      if (hit) handlers.current.onSelectAnnotation(hit.id);
+    });
     editor.onDidChangeCursorSelection((e) => {
       const sel = e.selection;
       const model = editor.getModel();
@@ -95,42 +176,60 @@ export function Editor(props: Props) {
 
   function applyDecorations() {
     const coll = decorations.current;
+    const model = editorRef.current?.getModel();
     if (!coll || !file) return;
-    const items = annotations
-      .filter((a) => a.file === file.path && a.start_line != null)
-      .map((a) => {
-        const startLine = a.start_line!;
-        const endLine = a.end_line ?? startLine;
-        const whole = a.start_col == null || a.end_col == null;
-        return {
-          range: new monaco.Range(startLine, whole ? 1 : a.start_col!, endLine, whole ? 1 : a.end_col!),
-          options: {
-            isWholeLine: whole,
-            className: `lc-ann lc-ann-${a.severity}`,
-            glyphMarginClassName: `lc-glyph lc-glyph-${a.severity}`,
-            hoverMessage: { value: `**${a.severity}** · ${a.author}\n\n${a.message}` },
-            glyphMarginHoverMessage: { value: a.message },
-            overviewRuler: { color: severityColor(a.severity), position: monaco.editor.OverviewRulerLane.Right },
-            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
-          },
-        };
-      });
+    const mine = annotations.filter((a) => a.file === file.path && a.start_line != null);
+    if (model) annotationsByModel.set(model.uri.toString(), mine);
+    const items = mine.map((a) => {
+      const precise = isPrecise(a);
+      const picked = a.id === props.selectedAnnotationId;
+      return {
+        range: annotationRange(a),
+        options: {
+          isWholeLine: !precise,
+          // exact ranges: a tinted, underlined span; whole lines: a tinted band
+          // `className` paints a layer behind the text (fine for line bands); exact ranges use
+          // `inlineClassName` so the styled span wraps the characters themselves.
+          ...(precise
+            ? { inlineClassName: cx("lc-ann-text", `lc-ann-${a.severity}`, picked && "lc-ann-selected") }
+            : { className: cx("lc-ann", `lc-ann-${a.severity}`, picked && "lc-ann-selected") }),
+          glyphMarginClassName: `lc-glyph lc-glyph-${a.severity}${picked ? " lc-glyph-selected" : ""}`,
+          glyphMarginHoverMessage: { value: a.message },
+          overviewRuler: { color: severityColor(a.severity), position: monaco.editor.OverviewRulerLane.Right },
+          stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+        },
+      };
+    });
     coll.set(items);
   }
 
-  useEffect(applyDecorations, [annotations, file?.path]);
+  useEffect(applyDecorations, [annotations, file?.path, props.selectedAnnotationId]);
+  useEffect(
+    () => () => {
+      const uri = editorRef.current?.getModel()?.uri.toString();
+      if (uri) annotationsByModel.delete(uri);
+    },
+    [file?.path],
+  );
 
   useEffect(() => {
     const r = props.revealLine;
     const ed = editorRef.current;
     if (!r || !ed || r.path !== file?.path) return;
-    ed.revealLineInCenter(r.line);
-    ed.setPosition({ lineNumber: r.line, column: 1 });
+    if (r.col != null && r.endCol != null) {
+      const range = new monaco.Range(r.line, r.col, r.endLine ?? r.line, r.endCol);
+      ed.revealRangeInCenter(range);
+      ed.setSelection(range);
+    } else {
+      ed.revealLineInCenter(r.line);
+      ed.setPosition({ lineNumber: r.line, column: 1 });
+    }
     ed.focus();
   }, [props.revealLine?.nonce, file?.path]);
 
   if (!file) return <div className="editor-empty">No files</div>;
 
+  const canEdit = file.role === "editable";
   const pendingFor = (path: string) => proposal?.file === path;
   const showingProposal = proposal && proposal.file === file.path;
 
@@ -160,6 +259,18 @@ export function Editor(props: Props) {
           ))}
         </div>
         <div className="toolbar">
+          <IconButton
+            icon={Undo2}
+            label="Undo (⌘Z)"
+            disabled={!canEdit || !!showingProposal || !undoState.undo}
+            onClick={() => editorRef.current?.trigger("toolbar", "undo", null)}
+          />
+          <IconButton
+            icon={Redo2}
+            label="Redo (⇧⌘Z)"
+            disabled={!canEdit || !!showingProposal || !undoState.redo}
+            onClick={() => editorRef.current?.trigger("toolbar", "redo", null)}
+          />
           <IconButton icon={RotateCcw} label="Reset to starter code" onClick={props.onReset} />
           <IconButton
             icon={props.maximized ? Minimize2 : Maximize2}

@@ -80,6 +80,50 @@ async def test_tutoring_flow():
         assert cleared["removed"] == 2
 
 
+async def test_annotation_columns():
+    async with connect() as client:
+        st = app_state()
+        st.session.update(problem_id="merge-ranges",
+                          buffers={"solution.py": "def merge_ranges(b):\n    return b\n"})
+        await client.call_tool("clear_annotations", {})
+
+        async def annotate(**a):
+            return await client.call_tool("annotate", {"annotations": [
+                {"file": "solution.py", "message": "m", **a}]})
+
+        ok = await annotate(start_line=2, start_col=12, end_col=13)
+        assert not ok.is_error
+        await annotate(start_line=2, start_col=5)  # end_col defaults to end of line 2
+        saved = st.workspace.read_state("merge-ranges", "annotations", [])
+        assert (saved[0]["start_col"], saved[0]["end_col"]) == (12, 13)
+        assert (saved[1]["start_col"], saved[1]["end_col"]) == (5, 13)
+        for bad, needle in [
+            ({"start_line": 2, "start_col": 99}, "start_col 99"),
+            ({"start_line": 2, "start_col": 5, "end_col": 99}, "end_col 99"),
+            ({"start_line": 2, "start_col": 8, "end_col": 8}, "greater than start_col"),
+            ({"start_line": 2, "end_col": 8}, "needs start_col"),
+        ]:
+            r = await annotate(**bad)
+            assert r.is_error and needle in r.content[0].text, (bad, r)
+        await client.call_tool("clear_annotations", {})
+
+
+async def test_add_test_case_sections_and_names():
+    async with connect() as client:
+        st = app_state()
+        st.session.update(problem_id="merge-ranges")
+        st.workspace.write_state("merge-ranges", "custom_tests", [])
+        data(await client.call_tool("add_test_case", {"args": [[[1, 2]]]}))
+        data(await client.call_tool("add_test_case", {
+            "args": [[[3, 4]]], "description": "touching", "section": "edge-cases"}))
+        tests = st.workspace.read_state("merge-ranges", "custom_tests", [])
+        assert [t["name"] for t in tests] == ["Test 1", "Test 2"]
+        assert tests[1]["description"] == "touching" and tests[1]["section"] == "edge-cases"
+        bad = await client.call_tool("add_test_case", {"args": [[]], "section": "nope"})
+        assert bad.is_error and "unknown section" in bad.content[0].text
+        st.workspace.write_state("merge-ranges", "custom_tests", [])
+
+
 async def test_resolve_proposal_accept_writes_file():
     from leetclaude import tutor
 

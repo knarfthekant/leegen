@@ -27,6 +27,12 @@ def _name(nodeid: str) -> str:
     return nodeid.split("::", 1)[-1].replace("::", ".")
 
 
+def _section(nodeid: str) -> str | None:
+    """Tests inside a class are grouped under the class name (`TestFoo::test_bar`)."""
+    parts = nodeid.split("::")
+    return parts[1] if len(parts) > 2 else None
+
+
 def _file(nodeid: str) -> str:
     return nodeid.split("::", 1)[0]
 
@@ -78,6 +84,7 @@ def pytest_runtest_logreport(report: Any) -> None:
         out = "\n".join(c for _, c in report.sections if c) or None
         emit({"type": "test", "name": _name(report.nodeid), "status": status, "visible": visible,
               "description": getattr(report, "_lc_doc", None),
+              "section": _section(report.nodeid),
               "message": truncate(message), "stdout": truncate(out),
               "duration_ms": round(report.duration * 1000, 3)})
 

@@ -550,3 +550,37 @@ button.loc:hover { background: var(--accent-soft); color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* test sections */
+.case-groups { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.case-group .case-tabs { margin: 6px 0 0 20px; }
+.group-head {
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px; margin-left: -6px; border: 0;
+  background: none; color: var(--text-2); font: inherit; font-weight: 600; cursor: pointer;
+  border-radius: var(--r-sm); transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.group-head:hover { background: var(--surface-2); color: var(--text); }
+.group-count { font-weight: 500; font-size: 12px; color: var(--text-3); }
+.group-desc { margin: 2px 0 0 20px; font-size: 13px; }
+.group-desc > * { margin: 0; }
+.pill-note { margin-left: 6px; font-size: 11px; font-weight: 500; color: var(--text-3); }
+
+/* exact-range annotations: a stronger tint plus an underline, so they read apart from line bands */
+.lc-ann-text { border-radius: 2px; }
+.lc-ann-text.lc-ann-info { background: rgba(128, 128, 124, 0.22); box-shadow: inset 0 -2px 0 #8a8a86; }
+.lc-ann-text.lc-ann-hint { background: rgba(74, 111, 208, 0.2); box-shadow: inset 0 -2px 0 #5b7fd6; }
+.lc-ann-text.lc-ann-warning { background: rgba(214, 152, 30, 0.26); box-shadow: inset 0 -2px 0 #d19a2a; }
+.lc-ann-text.lc-ann-error { background: rgba(209, 72, 72, 0.22); box-shadow: inset 0 -2px 0 #d9534f; }
+.lc-ann-text.lc-ann-praise { background: rgba(46, 154, 92, 0.22); box-shadow: inset 0 -2px 0 #3f9a63; }
+.lc-ann-text { cursor: pointer; }
+.lc-ann-selected { outline: 1.5px solid var(--accent); outline-offset: -1px; }
+.lc-glyph { cursor: pointer; transition: transform var(--fast) var(--ease); }
+.lc-glyph:hover, .lc-glyph-selected { transform: scale(1.35); }
+.lc-glyph-selected { box-shadow: 0 0 0 2px var(--accent-soft); }
+@media (prefers-reduced-motion: reduce) { .lc-glyph { transition: none; } }
+
+/* review list: click to jump, and highlight the one picked in the editor */
+.review-item { border: 1.5px solid transparent; transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease); }
+.review-item.clickable { cursor: pointer; }
+.review-item.clickable:hover { background: var(--surface-3); }
+.review-item.selected { border-color: var(--accent); background: var(--accent-soft); }

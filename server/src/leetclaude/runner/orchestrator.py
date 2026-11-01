@@ -58,20 +58,42 @@ def _test_payload(problem: Problem, req: RunRequest) -> list[dict[str, Any]]:
             continue
         tests.append({
             "name": t.name, "visible": t.visible, "custom": False,
+            "description": t.description, "section": t.section,
             "input": t.input.model_dump(mode="json") if t.input else None,
             "expected": None if t.needs_reference else t.expected,
             "needs_reference": t.needs_reference,
         })
     if problem.judge.kind == "function":
-        for i, ct in enumerate(req.custom_tests):
+        taken = {t["name"] for t in tests}
+        section_ids = {s.id for s in problem.sections}
+        for ct in req.custom_tests:
             expected = ct.get("expected", FROM_REFERENCE)
             needs_ref = expected == FROM_REFERENCE
+            name = unique_test_name(ct.get("name"), taken)
+            taken.add(name)
+            section = ct.get("section")
             tests.append({
-                "name": ct.get("name") or f"Custom {i + 1}", "visible": True, "custom": True,
+                "name": name, "visible": True, "custom": True,
+                "description": ct.get("description"),
+                "section": section if section in section_ids else None,
                 "input": ct.get("input") or {}, "needs_reference": needs_ref,
                 "expected": None if needs_ref else expected,
             })
     return tests
+
+
+def unique_test_name(wanted: str | None, taken: set[str]) -> str:
+    """`wanted` if free; otherwise suffix it. Unnamed tests become `Test <n>` (n = next free)."""
+    wanted = (wanted or "").strip()
+    if wanted and wanted not in taken:
+        return wanted
+    base = wanted or "Test"
+    n = 1
+    while True:
+        name = f"{base} {n}" if not wanted else f"{wanted} ({n + 1})"
+        if name not in taken:
+            return name
+        n += 1
 
 
 def parse_events(raw: str) -> list[dict[str, Any]]:
@@ -220,6 +242,7 @@ class Orchestrator:
                            f"process exited (code {outcome.exit_code}) before this test ran"))
                 ordered.append(TestResult(
                     name=t["name"], visible=t.get("visible", True), custom=t.get("custom", False),
+                    description=t.get("description"), section=t.get("section"),
                     status="timeout" if outcome.timed_out else "error", message=reason))
         ordered.extend(by_name.values())  # pytest/script tests aren't declared up front
         result.tests = ordered

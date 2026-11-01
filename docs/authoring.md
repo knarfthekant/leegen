@@ -35,6 +35,7 @@ hints:                         # revealed one at a time, most general first
 files: [...]                   # section 2
 reference: {files: [...]}      # section 2
 judge: {...}                   # section 3
+sections: [...]                # optional groups for tests, section 4
 tests: [...]                   # section 4
 limits: {timeout_s: 10}        # whole run; GPU problems usually need 30-60
 benchmark: {...}               # optional, section 3.4
@@ -109,6 +110,8 @@ tests:
     input: {args: [[1, 2, 3, 4], 5]}          # count_pairs([1,2,3,4], 5)
     expected: 4
   - name: Keyword args
+    description: Same call with `budget` passed by keyword.   # optional, Markdown
+    section: basics                                           # optional, see section 4
     input: {args: [[1, 1]], kwargs: {budget: 2}}
     expected: 1
   - name: Large random
@@ -179,6 +182,8 @@ files:
 - Use it for async code, stateful classes, error behaviour (`pytest.raises`), multi-file
   applications, and anything that needs fixtures or several assertions per scenario.
 - The `tests:` list is not used. pytest discovers tests.
+- Tests inside a class (`class TestRetries:`) are grouped under that class name in the UI. Plain
+  functions stay ungrouped.
 
 ### 3.3 `script`: bring your own harness
 
@@ -200,7 +205,8 @@ judge:
   {"type": "metric", "name": "kernel_ms", "value": 0.42, "unit": "ms", "reference": 0.40}
   ```
 
-  `status` is one of `pass | fail | error | timeout | skipped`.
+  `status` is one of `pass | fail | error | timeout | skipped`. Test events may also carry a
+  `description` and a `section` (a free-form group name; the result panel groups by it).
 - Validation runs the script with the reference files swapped in.
 
 ### 3.4 Benchmarks (`function` judge)
@@ -229,7 +235,30 @@ benchmark: {against: reference, repeats: 20, max_slowdown: 3.0}
   - large inputs that need the intended complexity (set `limits.timeout_s` so a brute-force
     solution actually times out)
   - error paths
-- Name tests by **what they check** ("Touching ranges merge"), not "Test 3".
+- Name tests by **what they check** ("Touching ranges merge"). The UI labels the pills
+  `Test 1..N` by position and shows the name as the heading and in the tooltip, so the name is
+  for you and the Review/result detail, not for the pill.
+- Give a case a one-line `description` when the point of it isn't obvious from the input.
+- **Sections** group related cases. Declare them once, then tag tests:
+
+  ```yaml
+  sections:
+    - id: basics                       # slug that tests reference
+      title: Basics
+      description: The examples from the statement.   # optional, Markdown
+    - {id: edge-cases, title: Edge cases}
+  tests:
+    - {name: Example, section: basics, input: {...}, expected: ...}
+    - {name: Empty, section: edge-cases, input: {...}, expected: ...}
+  ```
+
+  Sections appear in the Testcase and Test Result panels in declaration order, each with its
+  description. Tests without a `section` land in an "Other" group. Use sections once a problem
+  has more than ~5 tests, or when cases fall into clear themes (basics, edge cases, scale).
+  Unknown section ids and duplicate ids fail validation. Hidden tests may use sections too; a
+  section of only hidden tests is shown in the result panel after a run.
+- The user's own cases (Testcase panel `+`, or the `add_test_case` tool) are named `Test <n>`
+  automatically. They can carry a `description` and a `section` too.
 - Keep tests deterministic: seed everything and avoid wall-clock assertions.
 - Floats: `float` or `allclose`. Typical tolerances:
   - CPU float64: `rtol 1e-9`
@@ -291,6 +320,7 @@ A good description has:
 
 - [ ] `id` is a slug and equals the intended file name.
 - [ ] The description states the signature, I/O format, constraints and a worked example.
+- [ ] Related tests share a `section` (with a description) when there are more than ~5 tests.
 - [ ] The starter code imports cleanly and keeps exact signatures.
 - [ ] The reference is correct, and validation reports it passing every test.
 - [ ] 2–3 visible tests plus hidden edge cases, all named by what they check.

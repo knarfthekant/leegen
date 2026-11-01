@@ -1,6 +1,9 @@
 import { Clock, Cpu, Gauge, ListChecks, Square, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { RunResult, TestResult } from "../lib/api";
+import type { PublicSection, RunResult, TestResult } from "../lib/api";
+import { bareSection, groupBySection } from "../lib/sections";
+import { CaseGroups } from "./CaseGroups";
+import { Markdown } from "./Markdown";
 import { Button, Chip, cx } from "./ui";
 import { Value } from "./Value";
 
@@ -35,12 +38,14 @@ export function ResultPanel({
   running,
   onCancel,
   params = [],
+  sections = [],
   phase = null,
 }: {
   result: RunResult | null;
   running: boolean;
   onCancel: () => void;
   params?: string[];
+  sections?: PublicSection[];
   phase?: { phase: string; detail: string } | null;
 }) {
   const [sel, setSel] = useState(0);
@@ -127,19 +132,26 @@ export function ResultPanel({
       )}
 
       {result.tests.length > 0 && (
-        <div className="case-tabs">
-          {result.tests.map((x, i) => (
+        <CaseGroups
+          groups={groupBySection(
+            result.tests.map((x, index) => ({ ...x, index })),
+            sections,
+            bareSection,
+          )}
+          sectioned={sections.length > 0 || result.tests.some((x) => x.section)}
+          render={(x) => (
             <button
-              key={x.name + i}
-              className={cx("pill", x.status === "pass" ? "pass" : "fail", sel === i && "active")}
-              onClick={() => setSel(i)}
-              title={x.name}
+              key={x.name + x.index}
+              className={cx("pill", x.status === "pass" ? "pass" : "fail", sel === x.index && "active")}
+              onClick={() => setSel(x.index)}
+              title={x.visible || x.custom ? x.name : `${x.name} (hidden)`}
             >
               <span className="status-dot" />
-              {x.custom ? x.name : x.visible ? x.name : `${x.name} (hidden)`}
+              Test {x.index + 1}
+              {!x.visible && !x.custom && <span className="pill-note">hidden</span>}
             </button>
-          ))}
-        </div>
+          )}
+        />
       )}
 
       {t && (
@@ -150,7 +162,12 @@ export function ResultPanel({
               <span className="cap">{t.status}</span>
             </Chip>
           </div>
-          {t.description && <p className="muted">{t.description}</p>}
+          {t.section && (
+            <div className="muted small">
+              {sections.find((x) => x.id === t.section)?.title ?? t.section}
+            </div>
+          )}
+          {t.description && <div className="muted"><Markdown source={t.description} /></div>}
           {!t.visible && t.status === "pass" && <p className="muted small">Hidden test: details are shown only when it fails.</p>}
           {t.input != null && <InputView input={t.input} params={params} />}
           {t.actual != null || t.expected != null ? (

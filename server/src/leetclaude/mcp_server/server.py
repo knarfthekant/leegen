@@ -17,6 +17,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel, Field
 
 from leetclaude import tutor
+from leetclaude.runner.orchestrator import unique_test_name
 from leetclaude.schema.export import problem_json_schema
 from leetclaude.schema.models import Problem
 from leetclaude.schema.views import problem_summary, public_problem
@@ -61,8 +62,8 @@ def _brief_run(result: dict[str, Any] | None, *, full: bool = False) -> dict[str
         "device": result.get("device"), "error": result.get("error"),
         "compile_output": result.get("compile_output"), "metrics": result.get("metrics"),
         "tests" if full else "failing_tests": [
-            {k: t.get(k) for k in ("name", "status", "visible", "input", "expected", "actual",
-                                   "message", "stdout") if t.get(k) is not None}
+            {k: t.get(k) for k in ("name", "section", "description", "status", "visible", "input",
+                                   "expected", "actual", "message", "stdout") if t.get(k) is not None}
             for t in shown
         ],
     }
@@ -72,8 +73,12 @@ class AnnotationIn(BaseModel):
     file: str | None = Field(None, description="Visible file path; omit for a general comment.")
     start_line: int | None = Field(None, description="1-based first line (required with file).")
     end_line: int | None = Field(None, description="1-based last line; defaults to start_line.")
-    start_col: int | None = Field(None, description="Optional 1-based column for a precise range.")
-    end_col: int | None = None
+    start_col: int | None = Field(
+        None, description="Optional 1-based column where the highlight starts on start_line. "
+        "Omit both columns to highlight whole lines.")
+    end_col: int | None = Field(
+        None, description="Optional 1-based column on end_line, exclusive (one past the last "
+        "highlighted character). Defaults to the end of end_line when start_col is given.")
     severity: Literal["info", "hint", "warning", "error", "praise"] = "info"
     message: str = Field(description="Markdown. Keep it short and specific.")
 
@@ -105,7 +110,7 @@ def _agent_errors(fn: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def build_mcp() -> MCPServer:
-    mcp = MCPServer(name="leetclaude", instructions=INSTRUCTIONS, version="0.1.0")
+    mcp = MCPServer(name="leetclaude", instructions=INSTRUCTIONS, version="1.2.0")
     _tool = mcp.tool
 
     def tool() -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -272,9 +277,12 @@ def build_mcp() -> MCPServer:
     @tool()
     async def annotate(annotations: list[AnnotationIn], problem_id: str | None = None,
                        author: str = "assistant") -> dict[str, Any]:
-        """Comment on the user's code. Each annotation highlights a line range in a visible file
-        (or is a general comment when file is omitted) and shows up in the editor and the
-        Review tab. Line numbers are 1-based and refer to the current code from get_session."""
+        """Comment on the user's code. Each annotation highlights a line range, or an exact
+        character range when start_col/end_col are given, in a visible file (or is a general
+        comment when file is omitted). It shows up in the editor (hover to peek, click to open
+        it in Review) and in the Review tab. Lines and columns are 1-based and refer to the
+        current code from get_session; end_col is exclusive. Prefer a precise range over a
+        whole line when the problem is one expression or token."""
         p = _problem(problem_id)
         created = await tutor.add_annotations(p, [a.model_dump() for a in annotations], author)
         return {"created": [c["id"] for c in created]}
@@ -301,10 +309,12 @@ def build_mcp() -> MCPServer:
 
     @tool()
     async def add_test_case(args: list[Any], kwargs: dict[str, Any] | None = None,
-                            name: str | None = None,
+                            name: str | None = None, description: str | None = None,
+                            section: str | None = None,
                             problem_id: str | None = None) -> dict[str, Any]:
         """Add a custom test case to the user's Testcase panel (function-judge problems only).
-        The expected output is computed by the reference solution."""
+        The expected output is computed by the reference solution. Unnamed cases are called
+        `Test <n>`. `section` must be one of the problem's section ids (see get_problem)."""
         p = _problem(problem_id)
         if p.judge.kind != "function":
             raise ValueError("custom test cases are only supported for function-judge problems")
@@ -312,9 +322,16 @@ def build_mcp() -> MCPServer:
             raise ValueError("this problem has no reference solution to compute expected output")
         st = app_state()
         tests = st.workspace.read_state(p.id, "custom_tests", [])
-        test: dict[str, Any] = {"input": {"args": args, "kwargs": kwargs or {}}}
-        if name:
-            test["name"] = name
+        if section is not None and section not in {s.id for s in p.sections}:
+            raise ValueError(f"unknown section {section!r}; "
+                             f"sections: {[s.id for s in p.sections]}")
+        taken = {t.name for t in p.tests} | {t.get("name") for t in tests if t.get("name")}
+        test: dict[str, Any] = {"input": {"args": args, "kwargs": kwargs or {}},
+                                "name": unique_test_name(name, taken)}
+        if description:
+            test["description"] = description
+        if section:
+            test["section"] = section
         tests.append(test)
         st.workspace.write_state(p.id, "custom_tests", tests)
         await st.hub.broadcast({"type": "custom_tests_changed", "problem_id": p.id,

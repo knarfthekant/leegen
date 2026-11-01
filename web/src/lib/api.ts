@@ -30,10 +30,17 @@ export interface TestInput {
   calls?: { method: string; args?: unknown[]; kwargs?: Record<string, unknown> }[];
 }
 
+export interface PublicSection {
+  id: string;
+  title: string;
+  description: string | null;
+}
+
 export interface PublicTest {
   name: string;
   visible: boolean;
   description: string | null;
+  section?: string | null;
   input?: TestInput | null;
   expected?: unknown;
 }
@@ -43,6 +50,7 @@ export interface Problem extends Omit<ProblemSummary, "judge" | "status"> {
   hints: string[];
   files: ProblemFile[];
   judge: { kind: string; entry: string | null; params: string[] | null; compare: string };
+  sections: PublicSection[];
   tests: PublicTest[];
   has_reference: boolean;
   limits: { timeout_s: number; memory_mb: number | null };
@@ -60,6 +68,7 @@ export interface TestResult {
   stdout: string | null;
   duration_ms: number | null;
   description?: string | null;
+  section?: string | null;
 }
 
 export interface RunResult {
@@ -87,6 +96,7 @@ export interface Annotation {
   file: string | null; // null = general comment
   start_line: number | null;
   end_line: number | null;
+  /** 1-based; with end_col the annotation marks exact characters. end_col is exclusive. */
   start_col?: number | null;
   end_col?: number | null;
   severity: Severity;
@@ -107,6 +117,8 @@ export interface Proposal {
 
 export interface CustomTest {
   name?: string;
+  description?: string;
+  section?: string;
   input: TestInput;
 }
 

@@ -161,7 +161,8 @@ def run(cfg: dict[str, Any]) -> None:
         for t in tests:
             name = t["name"]
             base = {"type": "test", "name": name, "visible": t.get("visible", True),
-                    "custom": t.get("custom", False)}
+                    "custom": t.get("custom", False), "description": t.get("description"),
+                    "section": t.get("section")}
             shown_input = display_input(t, inputs.get(name))
             if name in input_errors or name in ref_errors:
                 emit({**base, "status": "error", "input": shown_input,

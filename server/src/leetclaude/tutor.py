@@ -44,6 +44,29 @@ async def _save_annotations(problem_id: str, items: list[dict[str, Any]]) -> Non
                                      "annotations": items})
 
 
+def _resolve_columns(start_col: int | None, end_col: int | None, start: int, end: int,
+                     lines: list[str], file: str) -> tuple[int | None, int | None]:
+    """Columns are 1-based and `end_col` is exclusive (the position just after the last
+    character), like an editor selection. No columns means a whole-line highlight. A start
+    column alone runs to the end of the last line."""
+    if start_col is None:
+        if end_col is not None:
+            raise ValueError("end_col needs start_col")
+        return None, None
+    last_len = len(lines[end - 1])
+    if end_col is None:
+        end_col = last_len + 1
+    if not (1 <= start_col <= len(lines[start - 1]) + 1):
+        raise ValueError(f"start_col {start_col} is outside line {start} of {file} "
+                         f"(1-{len(lines[start - 1]) + 1})")
+    if not (1 <= end_col <= last_len + 1):
+        raise ValueError(f"end_col {end_col} is outside line {end} of {file} (1-{last_len + 1})")
+    if start == end and end_col <= start_col:
+        raise ValueError("end_col must be greater than start_col on a single line "
+                         "(end_col is exclusive)")
+    return start_col, end_col
+
+
 async def add_annotations(problem: Problem, items: list[dict[str, Any]],
                           author: str = "assistant") -> list[dict[str, Any]]:
     files = current_files(problem)
@@ -67,10 +90,15 @@ async def add_annotations(problem: Problem, items: list[dict[str, Any]],
                 raise ValueError("annotations on a file need start_line (1-based)")
             if not (1 <= start <= n_lines) or not (start <= end <= n_lines):
                 raise ValueError(f"line range {start}-{end} is outside {file} (1-{n_lines})")
+            lines = content.split("\n")
+            start_col, end_col = _resolve_columns(
+                item.get("start_col"), item.get("end_col"), start, end, lines, file)
+        else:
+            start_col = end_col = None
         created.append({
             "id": uuid.uuid4().hex[:10], "file": file, "start_line": start,
-            "end_line": end if file else None, "start_col": item.get("start_col"),
-            "end_col": item.get("end_col"), "severity": severity, "message": item["message"],
+            "end_line": end if file else None, "start_col": start_col,
+            "end_col": end_col, "severity": severity, "message": item["message"],
             "author": item.get("author") or author, "created_at": time.time(),
         })
     all_items = list_annotations(problem.id) + created
