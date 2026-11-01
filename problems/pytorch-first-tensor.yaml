@@ -1,0 +1,208 @@
+schema_version: 1
+id: pytorch-first-tensor
+title: Build a Small Neural Network Layer
+difficulty: easy
+tags:
+- pytorch
+- tensors
+- matrix-multiplication
+- gpu
+track: pytorch-101
+order: 1
+environment: pytorch
+requires:
+- gpu
+description: |
+  A neural network layer combines a matrix multiplication, a bias, and an activation function.
+  The test setup supplies small float32 tensors on the available GPU backend (CUDA on NVIDIA or
+  MPS on Apple silicon), so you can focus on how PyTorch combines tensors of different shapes.
+
+  ### Your task
+
+  Implement `linear_relu(x, weight, bias)` for a batch of input rows:
+
+  - `x` has shape `[batch, in_features]`.
+  - `weight` has shape `[out_features, in_features]`.
+  - `bias` has shape `[out_features]`.
+  - Return a tensor with shape `[batch, out_features]` on the same device and with the same
+    dtype as `x`.
+
+  For each input row, compute a linear transformation and then apply ReLU:
+
+  $$y = \operatorname{ReLU}(x W^\top + b)$$
+
+  ReLU replaces negative values with zero. For example:
+
+  ```text
+  x      = [[1, 2], [-1, 3]]
+  weight = [[1, -1], [2, 1], [0.5, 0.5]]
+  bias   = [0, 0.5, -2]
+
+  output = [[0, 4.5, 0],
+            [0, 1.5, 0]]
+  ```
+
+  In PyTorch, `@` performs matrix multiplication, `.T` transposes a 2D tensor, and adding
+  `bias` broadcasts its values across all rows. `torch.relu(...)` applies the activation.
+  The inputs are already tensors on the right device; preserve that device instead of moving
+  data to the CPU.
+
+  **Constraints:** `1 <= batch <= 16`, `1 <= in_features <= 32`, and
+  `1 <= out_features <= 32`. All tensors contain finite float32 values.
+hints:
+- 'Check the shapes: the last dimension of x must match the last dimension of weight.'
+- Transpose weight so its shape is [in_features, out_features] before multiplying by x.
+- Add bias to the matrix product; PyTorch broadcasts [out_features] across the batch. Then apply torch.relu.
+files:
+- path: solution.py
+  content: |
+    import torch
+
+
+    def linear_relu(
+        x: torch.Tensor,
+        weight: torch.Tensor,
+        bias: torch.Tensor,
+    ) -> torch.Tensor:
+        """Apply a linear layer followed by ReLU to a batch of rows."""
+        # TODO: matrix multiply, add the bias, then apply ReLU.
+        raise NotImplementedError
+- path: _setup.py
+  role: hidden
+  content: |
+    import torch
+
+    from leetclaude_harness import device
+
+
+    def make_inputs(seed, x, weight, bias):
+        dev = device()
+        return {
+            "x": torch.tensor(x, dtype=torch.float32, device=dev),
+            "weight": torch.tensor(weight, dtype=torch.float32, device=dev),
+            "bias": torch.tensor(bias, dtype=torch.float32, device=dev),
+        }
+reference:
+  files:
+  - path: solution.py
+    content: |
+      import torch
+
+
+      def linear_relu(
+          x: torch.Tensor,
+          weight: torch.Tensor,
+          bias: torch.Tensor,
+      ) -> torch.Tensor:
+          return torch.relu(x @ weight.T + bias)
+judge:
+  kind: function
+  entry: solution.py:linear_relu
+  params:
+  - x
+  - weight
+  - bias
+  compare:
+    kind: allclose
+    rtol: 0.0001
+    atol: 1.0e-05
+tests:
+- name: Mixed activations in a batch
+  description: Each row uses the same weight matrix, bias broadcasts, and negative outputs become zero.
+  input:
+    kwargs:
+      x:
+      - - 1
+        - 2
+      - - -1
+        - 3
+      weight:
+      - - 1
+        - -1
+      - - 2
+        - 1
+      - - 0.5
+        - 0.5
+      bias:
+      - 0
+      - 0.5
+      - -2
+    gen: _setup.py:make_inputs
+  expected:
+  - - 0
+    - 4.5
+    - 0
+  - - 0
+    - 1.5
+    - 0
+- name: One input row and two output features
+  description: Matrix multiplication works when the batch has one row and output width differs from input
+    width.
+  input:
+    kwargs:
+      x:
+      - - 2
+        - 0
+        - -1
+      weight:
+      - - 1
+        - 0
+        - 1
+      - - -1
+        - 2
+        - 0
+      bias:
+      - 0.5
+      - -1
+    gen: _setup.py:make_inputs
+  expected:
+  - - 1.5
+    - 0
+- name: Single output feature
+  visible: false
+  description: The output keeps both batch and feature dimensions when there is one output feature.
+  input:
+    kwargs:
+      x:
+      - - -2
+        - 1
+      - - 3
+        - -1
+      - - 0
+        - 0
+      weight:
+      - - 2
+        - 1
+      bias:
+      - -1
+    gen: _setup.py:make_inputs
+  expected:
+  - - 0
+  - - 4
+  - - 0
+- name: Bias turns a negative product positive
+  visible: false
+  description: Add bias before ReLU so a negative matrix product can become positive.
+  input:
+    kwargs:
+      x:
+      - - -2
+        - 1
+      - - 1
+        - 1
+      weight:
+      - - 1
+        - -1
+      - - -1
+        - -1
+      bias:
+      - 3
+      - 0
+    gen: _setup.py:make_inputs
+  expected:
+  - - 0
+    - 1
+  - - 3
+    - 0
+limits:
+  timeout_s: 60.0

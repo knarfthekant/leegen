@@ -9,4 +9,7 @@ __pycache__/
 .pytest_cache/
 # local executor config, if kept in the repo
 config/executors.yaml
+# local cluster notes; keep only the shared setup guide
+/docs/clusters/*.md
+!/docs/clusters/README.md
 .DS_Store

@@ -57,7 +57,8 @@ environments/<id>.yaml      runtimes: language, python version, dependencies, ha
 workspace/<id>/             the user's code (real files) + .leetclaude/*.json state (gitignored)
 docs/authoring.md           full authoring guide (also served by the get_authoring_guide tool)
 docs/executors.md           executor kinds and executors.yaml
-docs/clusters/<name>.md     per-cluster setup notes (watgpu.md = worked example + checklist)
+docs/clusters/README.md     shared guide for setting up remote cluster backends
+docs/clusters/<name>.md     local per-cluster notes (gitignored)
 schema/problem.schema.json  generated JSON Schema for problem YAML
 server/src/leetclaude/      FastAPI backend, runner, MCP server (Python package `leetclaude`)
 web/src/                    React + Vite + Monaco frontend (primitives in components/ui.tsx)
@@ -180,8 +181,8 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
     ssh setup.
   - **Setting up a new remote cluster:** don't copy another cluster's config or pin packages.
     Probe the cluster (mounts, `noexec`, modules, driver/CUDA version, uv, PyPI access), write
-    its executor entry, and record the findings in `docs/clusters/<name>.md`. Follow the
-    checklist in `docs/clusters/watgpu.md`.
+    its executor entry, and record the findings in the gitignored `docs/clusters/<name>.md`.
+    Follow the shared setup guide in `docs/clusters/README.md`.
 - **State:**
   - `store/problems.py` reads and writes YAML.
   - `store/workspace.py` holds the user's files and JSON state.
