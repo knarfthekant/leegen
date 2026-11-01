@@ -1,8 +1,8 @@
-// End-to-end smoke test against a running server (default http://127.0.0.1:8000).
+// End-to-end smoke test against a running server (default http://127.0.0.1:13370).
 // Uses the locally installed Chrome via playwright-core (no browser download).
 import { chromium } from "playwright-core";
 
-const BASE = process.env.LEETCLAUDE_URL ?? "http://127.0.0.1:8000";
+const BASE = process.env.LEETCLAUDE_URL ?? "http://127.0.0.1:13370";
 const SHOTS = process.env.SHOTS ?? "/tmp";
 const PID = "merge-ranges";
 const SOLUTION = `def merge_ranges(bookings):
@@ -59,12 +59,12 @@ try {
   const status = await page.locator(".result-status").innerText();
   const summary = await page.locator(".result-head").innerText();
   console.log("  result:", summary.replace(/\s+/g, " "));
-  if (status !== "Passed") throw new Error(`expected Passed, got ${status}`);
+  if (status !== "Accepted") throw new Error(`expected Accepted, got ${status}`);
   await page.screenshot({ path: `${SHOTS}/lc-smoke-passed.png` });
 
   step("add a custom test case (expected comes from the reference)");
-  await page.getByRole("button", { name: "Testcase" }).click();
-  await page.getByRole("button", { name: "+" }).click();
+  await page.getByRole("tab", { name: "Testcase" }).click();
+  await page.getByRole("button", { name: "Add test case" }).click();
   const ta = page.locator("textarea.field-input").first();
   await ta.fill("[[4, 5], [1, 4]]");
   await page.waitForTimeout(300);
@@ -80,7 +80,7 @@ try {
   await fetch(`${BASE}/mcp`, { method: "GET" }).catch(() => undefined);
   const ann = await fetch(`${BASE}/api/workspace/${PID}`).then((r) => r.json());
   console.log("  annotations on server:", ann.annotations.length);
-  await page.getByRole("button", { name: /Review/ }).click();
+  await page.getByRole("tab", { name: /Review/ }).click();
   await page.screenshot({ path: `${SHOTS}/lc-smoke-review.png` });
 
   console.log("SMOKE OK");

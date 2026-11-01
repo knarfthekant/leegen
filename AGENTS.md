@@ -14,21 +14,35 @@ This file is for any agent working in this repo. There are three jobs:
 ## Running
 
 ```bash
-cd server && uv sync                      # backend deps (Python 3.13, uv)
-cd web && npm install && npm run build    # frontend -> web/dist, served by the backend
-cd server && uv run leetclaude serve      # http://127.0.0.1:8000 (UI) and /mcp (MCP)
+make start    # installs deps if missing, rebuilds the UI if stale, serves UI + API + MCP
+make dev      # backend with --reload + Vite hot reload, together; Ctrl-C stops both
+make stop     # stop the server started by start/dev, from any terminal (make restart = stop + start)
 ```
 
-Frontend development: `uv run leetclaude serve --reload` plus `cd web && npm run dev`
-(http://localhost:5173, which proxies /api to :8000).
+| Port | What | Override |
+|---|---|---|
+| 13370 | UI, REST API, WebSocket and MCP (`/mcp`), all served by the backend | `LEETCLAUDE_PORT` (or `--port`) |
+| 13371 | Vite dev server (`make dev` only); proxies `/api` and `/mcp` to 13370 | `LEETCLAUDE_WEB_PORT` |
 
-Connect an agent: `claude mcp add --transport http leetclaude http://127.0.0.1:8000/mcp`
+Without make, from `server/`: `uv run leetclaude start` (`--no-build` skips the UI build),
+`uv run leetclaude dev` and `uv run leetclaude stop [--port N]`. `uv run leetclaude serve` serves
+without building. If a port is taken, startup fails with a message naming the variable to change;
+ports never drift silently.
+
+`stop` is PID-exact: launchers record their PID in `~/.cache/leetclaude/run/server-<port>.json`,
+and `stop` signals only that process (SIGTERM, then SIGKILL after `--timeout`) after checking that
+its command line is a leetclaude entry point. Without a pidfile it falls back to the leetclaude
+process listening on the port. Any other program on the port is reported and never touched.
+
+Connect an agent: the repo's `.mcp.json` registers `http://127.0.0.1:13370/mcp` for Claude Code
+automatically. Elsewhere: `claude mcp add --transport http leetclaude http://127.0.0.1:13370/mcp`
 (Codex and other clients use the same URL).
 
 CLI, for agents without MCP. Run from `server/`:
 
 | Command | What it does |
 |---|---|
+| `uv run leetclaude start` / `dev` / `stop` / `serve` | Launch or stop the server (see [Running](#running)) |
 | `uv run leetclaude list` | List problems; invalid YAML files are reported |
 | `uv run leetclaude validate --all` / `<id>` / `--file x.yaml` | Schema check + reference must pass every test + starter must fail |
 | `uv run leetclaude run <id> [--reference] [--json]` | Run the user's workspace code (or the reference) |
@@ -46,7 +60,7 @@ docs/executors.md           executor kinds and executors.yaml
 docs/clusters/<name>.md     per-cluster setup notes (watgpu.md = worked example + checklist)
 schema/problem.schema.json  generated JSON Schema for problem YAML
 server/src/leetclaude/      FastAPI backend, runner, MCP server (Python package `leetclaude`)
-web/src/                    React + Vite + Monaco frontend
+web/src/                    React + Vite + Monaco frontend (primitives in components/ui.tsx)
 ```
 
 ## Authoring protocol
@@ -189,9 +203,15 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
 - Backend: `cd server && uv run pytest`. All seed problems must stay valid
   (`uv run leetclaude validate --all`).
 - Frontend: `cd web && npm run typecheck && npm run build`. Browser smoke test against a running
-  server: `node tests/smoke.mjs` (uses the installed Chrome through playwright-core).
-- UI style is minimal: neutral greys, one accent colour, green/red only for pass/fail, 1px
-  borders. No gradients, shadows or decorative colour.
+  server: `make smoke` / `node tests/smoke.mjs` (uses the installed Chrome through playwright-core).
+  `make check` runs the backend tests, problem validation and the frontend build.
+- UI style: minimal, tonal surfaces. Rounded cards (`--r-*` tokens) sit on a soft canvas and
+  sections are separated by shade, not borders (at most a low-alpha `--line` hairline). One
+  accent colour; pass/warn/fail appear only as faded tints (`.tone-*` classes). lucide-react
+  icons in tabs and toolbars; 150–250ms eased transitions; respect `prefers-reduced-motion`.
+  No gradients or decorative colour; a soft shadow only on overlays (the problem drawer).
+  Both light and dark themes must work (`[data-theme]` on `<html>`, toggle in the top bar).
+  Reuse the primitives in `web/src/components/ui.tsx` instead of new one-off styles.
 - Problem content written by agents is untrusted input to the UI. The Markdown renderer
   sanitizes it (SVG allowed, scripts and event handlers stripped), so don't loosen
   `components/Markdown.tsx`'s schema without a reason.

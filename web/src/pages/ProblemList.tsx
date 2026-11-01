@@ -1,12 +1,21 @@
+import { CircleAlert, Inbox, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { api, type ProblemSummary } from "../lib/api";
+import { Brand, ConnectionDot, ThemeToggle } from "../components/Chrome";
+import { filterProblems, ProblemRow } from "../components/ProblemRow";
+import { Chip, DIFFICULTY_TONE, IconButton, Skeleton } from "../components/ui";
+import { api, type Difficulty, type ProblemSummary } from "../lib/api";
 import { useServerEvents } from "../lib/events";
 import { navigate } from "../lib/router";
+
+const DIFFICULTIES: Difficulty[] = ["intro", "easy", "medium", "hard"];
 
 export function ProblemList() {
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [errors, setErrors] = useState<{ path: string; error: string }[]>([]);
+  const [errorsHidden, setErrorsHidden] = useState(false);
   const [query, setQuery] = useState("");
+  const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
+  const [track, setTrack] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = () =>
@@ -23,78 +32,143 @@ export function ProblemList() {
     if (e.type === "navigate" && typeof e.problem_id === "string") navigate(`/p/${e.problem_id}`);
   });
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return problems;
-    return problems.filter((p) =>
-      [p.title, p.id, p.track ?? "", p.environment, ...p.tags].some((s) => s.toLowerCase().includes(q)),
-    );
-  }, [problems, query]);
+  const tracks = useMemo(() => [...new Set(problems.map((p) => p.track).filter((t): t is string => !!t))], [problems]);
+  const filtered = useMemo(
+    () =>
+      filterProblems(problems, query).filter(
+        (p) => (!difficulty || p.difficulty === difficulty) && (!track || p.track === track),
+      ),
+    [problems, query, difficulty, track],
+  );
 
   return (
     <div className="list-page">
       <header className="topbar">
-        <span className="brand">leetclaude</span>
+        <Brand />
         <div className="spacer" />
-        <input className="search" placeholder="Filter problems" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <ConnectionDot />
+        <ThemeToggle />
       </header>
       <main className="list-main">
-        {errors.length > 0 && (
-          <div className="error-block">
-            {errors.map((e) => (
-              <div key={e.path}>
-                <strong>{e.path}</strong>
-                <pre>{e.error}</pre>
-              </div>
-            ))}
+        <div className="list-hero">
+          <div>
+            <h1 className="page-title">Problems</h1>
+            <p className="muted">Written by your agents through MCP. Solved by you.</p>
+          </div>
+          <Progress problems={problems} loading={loading} />
+        </div>
+
+        {errors.length > 0 && !errorsHidden && (
+          <div className="soft-alert tone-fail">
+            <CircleAlert size={16} strokeWidth={1.9} />
+            <div className="soft-alert-body">
+              <strong>
+                {errors.length} problem file{errors.length > 1 ? "s" : ""} could not be loaded
+              </strong>
+              {errors.map((e) => (
+                <details key={e.path}>
+                  <summary>{e.path}</summary>
+                  <pre>{e.error}</pre>
+                </details>
+              ))}
+            </div>
+            <IconButton icon={X} label="Dismiss" onClick={() => setErrorsHidden(true)} />
           </div>
         )}
-        <table className="problem-table">
-          <thead>
-            <tr>
-              <th style={{ width: 28 }} />
-              <th>Title</th>
-              <th>Track</th>
-              <th>Difficulty</th>
-              <th>Environment</th>
-              <th>Tags</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p) => (
-              <tr key={p.id} onClick={() => navigate(`/p/${p.id}`)}>
-                <td className="status-cell">
-                  {p.status === "passed" ? <span className="check" title="Passed">✓</span> : p.status === "attempted" ? <span className="attempt" title="Attempted">○</span> : null}
-                </td>
-                <td>
-                  <a
-                    href={`/p/${p.id}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate(`/p/${p.id}`);
-                    }}
-                  >
-                    {p.title}
-                  </a>
-                </td>
-                <td className="muted">{p.track ?? ""}</td>
-                <td className={`diff diff-${p.difficulty}`}>{p.difficulty}</td>
-                <td className="muted">
-                  {p.environment}
-                  {p.requires.some((r) => r !== "cpu") && <span className="tag">{p.requires.filter((r) => r !== "cpu").join(", ")}</span>}
-                </td>
-                <td className="muted small">{p.tags.join(", ")}</td>
-              </tr>
+
+        <div className="list-toolbar">
+          <label className="search-field">
+            <Search size={15} strokeWidth={1.8} />
+            <input placeholder="Search problems, tags, environments" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </label>
+          <div className="chip-row">
+            {DIFFICULTIES.filter((d) => problems.some((p) => p.difficulty === d)).map((d) => (
+              <Chip
+                key={d}
+                tone={difficulty === d ? DIFFICULTY_TONE[d] : "neutral"}
+                active={difficulty === d}
+                onClick={() => setDifficulty(difficulty === d ? null : d)}
+              >
+                <span className="cap">{d}</span>
+              </Chip>
             ))}
-          </tbody>
-        </table>
-        {!loading && problems.length === 0 && (
-          <p className="muted">
-            No problems yet. Ask an agent to create one through the leetclaude MCP server, or add a YAML file to{" "}
-            <code>problems/</code>.
-          </p>
-        )}
+            {tracks.length > 0 && <span className="chip-sep" />}
+            {tracks.map((t) => (
+              <Chip key={t} tone={track === t ? "accent" : "neutral"} active={track === t} onClick={() => setTrack(track === t ? null : t)}>
+                {t}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        <div className="card list-card zebra">
+          {loading &&
+            Array.from({ length: 5 }, (_, i) => (
+              <div key={i} className="problem-row">
+                <Skeleton w={16} h={16} r={8} />
+                <Skeleton w={`${40 + ((i * 17) % 30)}%`} />
+              </div>
+            ))}
+          {filtered.map((p) => (
+            <ProblemRow key={p.id} p={p} index={problems.indexOf(p)} />
+          ))}
+          {!loading && problems.length > 0 && filtered.length === 0 && (
+            <div className="empty">
+              <Search size={20} strokeWidth={1.6} />
+              <span>No problems match these filters.</span>
+            </div>
+          )}
+          {!loading && problems.length === 0 && (
+            <div className="empty">
+              <Inbox size={22} strokeWidth={1.6} />
+              <span>
+                No problems yet. Ask an agent to create one through the leetclaude MCP server, or add a YAML file to{" "}
+                <code>problems/</code>.
+              </span>
+            </div>
+          )}
+        </div>
       </main>
+    </div>
+  );
+}
+
+function Progress({ problems, loading }: { problems: ProblemSummary[]; loading: boolean }) {
+  const solved = problems.filter((p) => p.status === "passed").length;
+  const total = problems.length;
+  const pct = total ? solved / total : 0;
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="card progress-card">
+      <div className="ring">
+        <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden>
+          <circle cx="32" cy="32" r={r} className="ring-track" />
+          <circle cx="32" cy="32" r={r} className="ring-fill" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} />
+        </svg>
+        <div className="ring-label tabular">
+          <strong>{loading ? "–" : solved}</strong>
+          <span>/{total}</span>
+        </div>
+      </div>
+      <div className="bars">
+        {DIFFICULTIES.filter((d) => problems.some((p) => p.difficulty === d)).map((d) => {
+          const all = problems.filter((p) => p.difficulty === d);
+          const done = all.filter((p) => p.status === "passed").length;
+          return (
+            <div key={d} className="bar-row">
+              <span className={`cap tone-text-${DIFFICULTY_TONE[d]}`}>{d}</span>
+              <span className={`bar tone-${DIFFICULTY_TONE[d]}`}>
+                <span style={{ width: `${(done / all.length) * 100}%` }} />
+              </span>
+              <span className="tabular muted small">
+                {done}/{all.length}
+              </span>
+            </div>
+          );
+        })}
+        {!loading && total === 0 && <span className="muted small">Nothing solved yet</span>}
+      </div>
     </div>
   );
 }

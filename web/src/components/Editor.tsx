@@ -1,7 +1,11 @@
 import { DiffEditor, Editor as MonacoEditor, type OnMount } from "@monaco-editor/react";
+import { Check, CircleAlert, CloudCheck, CodeXml, LoaderCircle, Lock, Maximize2, Minimize2, RotateCcw, Sparkles, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { Annotation, Proposal } from "../lib/api";
 import { languageFor, monaco } from "../lib/monaco";
+import { Button, cx, IconButton } from "./ui";
+
+export type SaveState = "saved" | "saving" | "error";
 
 export interface EditorFile {
   path: string;
@@ -30,7 +34,13 @@ interface Props {
   onReset: () => void;
   revealLine: { path: string; line: number; nonce: number } | null;
   dark: boolean;
+  saveState: SaveState;
+  cursor: CursorInfo | null;
+  maximized: boolean;
+  onToggleMaximize: () => void;
 }
+
+const EDITOR_FONT = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace";
 
 type Ed = monaco.editor.IStandaloneCodeEditor;
 
@@ -122,42 +132,61 @@ export function Editor(props: Props) {
   if (!file) return <div className="editor-empty">No files</div>;
 
   const pendingFor = (path: string) => proposal?.file === path;
+  const showingProposal = proposal && proposal.file === file.path;
 
   return (
     <div className="editor">
-      <div className="editor-tabs">
-        {files.map((f) => (
-          <button
-            key={f.path}
-            className={"tab" + (f.path === file.path ? " active" : "")}
-            onClick={() => props.onSelect(f.path)}
-            title={f.role === "readonly" ? "Read-only" : undefined}
-          >
-            {f.path}
-            {f.role === "readonly" && <span className="lock">read-only</span>}
-            {pendingFor(f.path) && <span className="dot" title="Pending AI suggestion" />}
-          </button>
-        ))}
-        <div className="spacer" />
-        <button className="link small" onClick={props.onReset} title="Restore the starter code">
-          Reset
-        </button>
+      <div className="card-head">
+        <span className="card-title">
+          <CodeXml size={16} strokeWidth={1.9} className="accent-icon" />
+          Code
+        </span>
+      </div>
+      <div className="editor-sub">
+        <div className="file-tabs" role="tablist">
+          {files.map((f) => (
+            <button
+              key={f.path}
+              role="tab"
+              aria-selected={f.path === file.path}
+              className={cx("file-tab", f.path === file.path && "active")}
+              onClick={() => props.onSelect(f.path)}
+              title={f.role === "readonly" ? `${f.path} (read-only)` : f.path}
+            >
+              {f.role === "readonly" && <Lock size={12} strokeWidth={2} />}
+              {f.path}
+              {pendingFor(f.path) && <Sparkles size={12} strokeWidth={2} className="accent-icon" aria-label="Pending AI suggestion" />}
+            </button>
+          ))}
+        </div>
+        <div className="toolbar">
+          <IconButton icon={RotateCcw} label="Reset to starter code" onClick={props.onReset} />
+          <IconButton
+            icon={props.maximized ? Minimize2 : Maximize2}
+            label={props.maximized ? "Restore layout" : "Maximize editor"}
+            onClick={props.onToggleMaximize}
+          />
+        </div>
       </div>
 
-      {proposal && proposal.file === file.path ? (
+      {showingProposal ? (
         <div className="proposal">
           <div className="proposal-bar">
-            <div>
-              <strong>Suggested change</strong> by {proposal.author}
-              {proposal.source === "disk" && " (edited on disk)"}
-              {proposal.rationale && <span className="muted"> · {proposal.rationale}</span>}
+            <Sparkles size={16} strokeWidth={1.8} className="accent-icon" />
+            <div className="proposal-text">
+              <strong>Suggested change</strong>
+              <span className="muted">
+                {" "}by {proposal.author}
+                {proposal.source === "disk" && " (edited on disk)"}
+              </span>
+              {proposal.rationale && <div className="muted small">{proposal.rationale}</div>}
             </div>
-            <div className="row">
-              <button onClick={() => props.onResolveProposal(proposal, "reject")}>Reject</button>
-              <button className="primary" onClick={() => props.onResolveProposal(proposal, "accept")}>
-                Accept
-              </button>
-            </div>
+            <Button variant="ghost" icon={X} onClick={() => props.onResolveProposal(proposal, "reject")}>
+              Reject
+            </Button>
+            <Button variant="primary" icon={Check} onClick={() => props.onResolveProposal(proposal, "accept")}>
+              Accept
+            </Button>
           </div>
           <DiffEditor
             key={proposal.id}
@@ -174,12 +203,19 @@ export function Editor(props: Props) {
               renderSideBySide: false,
               minimap: { enabled: false },
               fontSize: 13,
+              fontFamily: EDITOR_FONT,
               scrollBeyondLastLine: false,
+              padding: { top: 8 },
             }}
           />
         </div>
       ) : (
         <MonacoEditor
+          // One editor instance per file. @monaco-editor/react applies the new `value` before it
+          // swaps the model for the new `path`, so a shared instance writes the next tab's content
+          // into the previous file's model; for an editable file that fires onChange and saves
+          // (e.g. test_visible.py's text ends up in solution.py).
+          key={file.path}
           path={`inmemory://${problemId}/${file.path}`}
           value={file.content}
           language={languageFor(file.path, file.language)}
@@ -190,16 +226,49 @@ export function Editor(props: Props) {
             readOnly: file.role !== "editable",
             minimap: { enabled: false },
             fontSize: 13,
-            lineHeight: 20,
+            lineHeight: 21,
             glyphMargin: true,
             scrollBeyondLastLine: false,
             tabSize: 4,
             renderLineHighlight: "line",
             automaticLayout: true,
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+            fontFamily: EDITOR_FONT,
+            padding: { top: 8, bottom: 8 },
+            smoothScrolling: true,
+            cursorSmoothCaretAnimation: "on",
+            cursorBlinking: "smooth",
+            scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8, useShadows: false },
+            overviewRulerBorder: false,
+            hideCursorInOverviewRuler: true,
           }}
         />
       )}
+
+      <div className="statusbar">
+        <span className={cx("save-state", props.saveState)}>
+          {file.role === "readonly" ? (
+            <>
+              <Lock size={12} /> Read-only
+            </>
+          ) : props.saveState === "saving" ? (
+            <>
+              <LoaderCircle size={12} className="spin" /> Saving…
+            </>
+          ) : props.saveState === "error" ? (
+            <>
+              <CircleAlert size={12} /> Not saved
+            </>
+          ) : (
+            <>
+              <CloudCheck size={12} /> Saved
+            </>
+          )}
+        </span>
+        <span className="tabular">
+          {props.cursor ? `Ln ${props.cursor.line}, Col ${props.cursor.column}` : ""}
+          {props.cursor?.selection ? ` (${props.cursor.selection.end_line - props.cursor.selection.start_line + 1} lines selected)` : ""}
+        </span>
+      </div>
     </div>
   );
 }
@@ -209,5 +278,5 @@ function diffUri(problemId: string, proposalId: string, side: "original" | "modi
 }
 
 function severityColor(s: Annotation["severity"]): string {
-  return { info: "#737373", hint: "#2563eb", warning: "#ca8a04", error: "#dc2626", praise: "#16a34a" }[s];
+  return { info: "#8a8a86", hint: "#5b7fd6", warning: "#d19a2a", error: "#d9534f", praise: "#3f9a63" }[s];
 }

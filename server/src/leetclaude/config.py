@@ -22,14 +22,21 @@ class Settings:
     cache_dir: Path
     executors_file: Path
     package_index: str
+    host: str = "127.0.0.1"
+    port: int = 13370
+    web_port: int = 13371
 
     @property
     def docs_dir(self) -> Path:
         return self.root / "docs"
 
     @property
+    def web_dir(self) -> Path:
+        return self.root / "web"
+
+    @property
     def web_dist(self) -> Path:
-        return self.root / "web" / "dist"
+        return self.web_dir / "dist"
 
 
 @lru_cache
@@ -49,4 +56,8 @@ def settings() -> Settings:
         # Index used when provisioning sandbox environments. Defaults to public PyPI so a
         # private global pip/uv config doesn't leak into problem environments.
         package_index=os.environ.get("LEETCLAUDE_PACKAGE_INDEX", "https://pypi.org/simple"),
+        # 13370 = "leet" + 0, chosen to stay clear of the usual 3000/5173/8000/8080 dev ports.
+        host=os.environ.get("LEETCLAUDE_HOST", "127.0.0.1"),
+        port=int(os.environ.get("LEETCLAUDE_PORT", "13370")),
+        web_port=int(os.environ.get("LEETCLAUDE_WEB_PORT", "13371")),
     )

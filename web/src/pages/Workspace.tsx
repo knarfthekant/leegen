@@ -1,10 +1,35 @@
+import {
+  Box,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  CircleAlert,
+  Cpu,
+  FileText,
+  Lightbulb,
+  List,
+  Lock,
+  MessageSquare,
+  Play,
+  Shuffle,
+  Square,
+  SquareCheck,
+  Tag,
+  Terminal,
+  Zap,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Group, Panel, Separator } from "react-resizable-panels";
-import { Editor, type CursorInfo, type EditorFile } from "../components/Editor";
+import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
+import { Brand, ConnectionDot, ThemeToggle } from "../components/Chrome";
+import { Editor, type CursorInfo, type EditorFile, type SaveState } from "../components/Editor";
 import { Markdown } from "../components/Markdown";
+import { ProblemDrawer } from "../components/ProblemDrawer";
+import { hardware } from "../components/ProblemRow";
 import { ResultPanel } from "../components/ResultPanel";
 import { ReviewPanel } from "../components/ReviewPanel";
 import { TestcasePanel } from "../components/TestcasePanel";
+import { Button, Chip, DifficultyChip, IconButton, Select, Skeleton, Tabs } from "../components/ui";
 import {
   api,
   newRunId,
@@ -21,6 +46,9 @@ import { navigate } from "../lib/router";
 import { useDark } from "../lib/theme";
 
 type BottomTab = "testcase" | "result" | "review";
+type LeftTab = "description" | "hints";
+
+const BOTTOM_HEAD_PX = 42; // height of the bottom card's tab strip; the collapsed size
 
 function useDebounced(fn: () => void, deps: unknown[], ms: number) {
   useEffect(() => {
@@ -29,6 +57,8 @@ function useDebounced(fn: () => void, deps: unknown[], ms: number) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }
+
+const isGpu = (device: string | null | undefined) => !!device && !/^cpu/i.test(device);
 
 export function WorkspacePage({ id }: { id: string }) {
   const dark = useDark();
@@ -45,15 +75,30 @@ export function WorkspacePage({ id }: { id: string }) {
   const [running, setRunning] = useState(false);
   const [runPhase, setRunPhase] = useState<{ phase: string; detail: string } | null>(null);
   const [bottomTab, setBottomTab] = useState<BottomTab>("testcase");
-  const [leftTab, setLeftTab] = useState<"description" | "hints">("description");
+  const [leftTab, setLeftTab] = useState<LeftTab>("description");
   const [executors, setExecutors] = useState<ExecutorInfo[]>([]);
   const [executor, setExecutor] = useState<string | null>(null);
   const [cursor, setCursor] = useState<CursorInfo | null>(null);
   const [revealLine, setRevealLine] = useState<{ path: string; line: number; nonce: number } | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [bottomCollapsed, setBottomCollapsed] = useState(false);
+  const [maximized, setMaximized] = useState(false);
 
   const runId = useRef<string | null>(null);
   const saved = useRef<Record<string, string>>({});
   const loaded = useRef<string | null>(null);
+  const leftPanel = usePanelRef();
+  const bottomPanel = usePanelRef();
+
+  /** Switch the bottom card to a tab, expanding it if it was collapsed. */
+  const showBottom = useCallback(
+    (tab: BottomTab) => {
+      setBottomTab(tab);
+      if (bottomPanel.current?.isCollapsed()) bottomPanel.current.expand();
+    },
+    [bottomPanel],
+  );
 
   // ---------------------------------------------------------------- loading
   const loadProblem = useCallback(
@@ -72,6 +117,7 @@ export function WorkspacePage({ id }: { id: string }) {
     setResult(null);
     setBottomTab("testcase");
     setLeftTab("description");
+    setSaveState("saved");
     Promise.all([api.problem(id), api.workspace(id), api.executors(id), api.problems()])
       .then(([p, w, ex, list]) => {
         if (!alive) return;
@@ -101,8 +147,18 @@ export function WorkspacePage({ id }: { id: string }) {
     () => {
       if (loaded.current !== id) return;
       const changed = Object.fromEntries(Object.entries(buffers).filter(([k, v]) => saved.current[k] !== v));
-      if (Object.keys(changed).length === 0) return;
-      api.saveFiles(id, changed).then(() => Object.assign(saved.current, changed));
+      if (Object.keys(changed).length === 0) {
+        setSaveState((s) => (s === "saving" ? "saved" : s));
+        return;
+      }
+      setSaveState("saving");
+      api.saveFiles(id, changed).then(
+        () => {
+          Object.assign(saved.current, changed);
+          setSaveState("saved");
+        },
+        () => setSaveState("error"),
+      );
     },
     [buffers, id],
     500,
@@ -137,10 +193,11 @@ export function WorkspacePage({ id }: { id: string }) {
     const rid = newRunId();
     runId.current = rid;
     setRunning(true);
-    setBottomTab("result");
+    showBottom("result");
     try {
       const r = await api.run(id, buffers, executor, rid);
       Object.assign(saved.current, buffers);
+      setSaveState("saved");
       setResult(r);
     } catch (e) {
       setResult({
@@ -152,7 +209,7 @@ export function WorkspacePage({ id }: { id: string }) {
       runId.current = null;
       setRunning(false);
     }
-  }, [running, problem, id, buffers, executor]);
+  }, [running, problem, id, buffers, executor, showBottom]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -171,7 +228,7 @@ export function WorkspacePage({ id }: { id: string }) {
       navigate(`/p/${e.problem_id}`);
       return;
     }
-    if (e.type === "problems_changed") {
+    if (e.type === "problems_changed" || e.type === "run_finished") {
       api.problems().then((r) => setProblems(r.problems));
     }
     if (e.problem_id !== id) return;
@@ -180,7 +237,7 @@ export function WorkspacePage({ id }: { id: string }) {
         setRunPhase(null);
         if (e.run_id !== runId.current) {
           setRunning(true);
-          setBottomTab("result");
+          showBottom("result");
         }
         break;
       case "run_status":
@@ -196,7 +253,7 @@ export function WorkspacePage({ id }: { id: string }) {
       case "annotations_changed": {
         const next = e.annotations as Annotation[];
         setAnnotations((prev) => {
-          if (next.length > prev.length) setBottomTab("review");
+          if (next.length > prev.length) showBottom("review");
           return next;
         });
         break;
@@ -235,6 +292,28 @@ export function WorkspacePage({ id }: { id: string }) {
     [problem, buffers],
   );
   const activeProposal = proposals.find((p) => p.file === active) ?? null;
+  const index = problems.findIndex((p) => p.id === id);
+
+  const go = (offset: number) => {
+    if (!problems.length) return;
+    const next = problems[(index + offset + problems.length) % problems.length];
+    if (next && next.id !== id) navigate(`/p/${next.id}`);
+  };
+  const shuffle = () => {
+    const others = problems.filter((p) => p.id !== id);
+    if (others.length) navigate(`/p/${others[Math.floor(Math.random() * others.length)].id}`);
+  };
+
+  const toggleMaximize = () => {
+    if (maximized) {
+      leftPanel.current?.expand();
+      bottomPanel.current?.expand();
+    } else {
+      leftPanel.current?.collapse();
+      bottomPanel.current?.collapse();
+    }
+    setMaximized(!maximized);
+  };
 
   const resolveProposal = async (p: Proposal, action: "accept" | "reject") => {
     const r = await api.resolveProposal(id, p.id, action);
@@ -257,178 +336,329 @@ export function WorkspacePage({ id }: { id: string }) {
     return (
       <div className="list-page">
         <header className="topbar">
-          <button className="brand link" onClick={() => navigate("/")}>leetclaude</button>
+          <Brand />
         </header>
         <main className="list-main">
-          <pre className="error-block">{loadError}</pre>
+          <div className="soft-alert tone-fail">
+            <CircleAlert size={16} strokeWidth={1.9} />
+            <div className="soft-alert-body">
+              <strong>Could not open “{id}”</strong>
+              <pre>{loadError}</pre>
+            </div>
+          </div>
         </main>
       </div>
     );
-  if (!problem) return <div className="loading-page muted">Loading…</div>;
+  if (!problem) return <WorkspaceSkeleton />;
 
   const compatible = executors.filter((e) => e.compatible);
+  const selected = compatible.find((e) => e.id === executor);
   const reviewCount = annotations.length + proposals.length;
+  const hw = hardware(problem);
 
   return (
     <div className="ws-page">
       <header className="topbar">
-        <button className="brand link" onClick={() => navigate("/")}>leetclaude</button>
-        <select className="picker" value={id} onChange={(e) => navigate(`/p/${e.target.value}`)}>
-          {problems.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.title}
-            </option>
-          ))}
-        </select>
-        <div className="spacer" />
-        <select
-          className="executor"
-          value={executor ?? ""}
-          onChange={(e) => setExecutor(e.target.value)}
-          title="Where the code runs"
-          disabled={compatible.length === 0}
-        >
-          {compatible.length === 0 && <option value="">No executor provides {problem.requires.join(", ")}</option>}
-          {compatible.map((e) => (
-            <option key={e.id} value={e.id}>
-              {problem.environment} · {e.id} ({e.device})
-            </option>
-          ))}
-        </select>
-        <button className="primary run" onClick={run} disabled={running || compatible.length === 0} title="Run (⌘↵)">
-          {running ? (runPhase?.phase === "queued" ? "Queued…" : "Running…") : "Run"}
-        </button>
+        <div className="topbar-side">
+          <Brand />
+          <span className="topbar-divider" />
+          <Button variant="ghost" icon={List} onClick={() => setDrawerOpen(true)}>
+            Problem List
+          </Button>
+          <IconButton icon={ChevronLeft} label="Previous problem" onClick={() => go(-1)} disabled={problems.length < 2} />
+          <IconButton icon={ChevronRight} label="Next problem" onClick={() => go(1)} disabled={problems.length < 2} />
+          <IconButton icon={Shuffle} label="Random problem" onClick={shuffle} disabled={problems.length < 2} />
+        </div>
+
+        <div className="run-cluster">
+          <Select
+            icon={isGpu(selected?.device) ? Zap : Cpu}
+            className="executor"
+            value={executor ?? ""}
+            onChange={(e) => setExecutor(e.target.value)}
+            title="Where the code runs"
+            disabled={compatible.length === 0}
+          >
+            {compatible.length === 0 && <option value="">No executor provides {problem.requires.join(", ")}</option>}
+            {compatible.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.id} · {e.device}
+              </option>
+            ))}
+          </Select>
+          <Button
+            variant="primary"
+            className="run"
+            icon={Play}
+            loading={running}
+            onClick={run}
+            disabled={running || compatible.length === 0}
+            title="Run (⌘↵)"
+          >
+            {running ? (runPhase?.phase === "queued" ? "Queued…" : "Running…") : "Run"}
+          </Button>
+          {running && (
+            <IconButton icon={Square} label="Cancel run" size={14} onClick={() => runId.current && api.cancel(runId.current)} />
+          )}
+        </div>
+
+        <div className="topbar-side end">
+          <ConnectionDot />
+          <ThemeToggle />
+        </div>
       </header>
 
       <Group orientation="horizontal" className="ws-main">
-        <Panel defaultSize="42%" minSize="20%" className="pane">
-          <div className="pane-tabs">
-            <button className={"tab" + (leftTab === "description" ? " active" : "")} onClick={() => setLeftTab("description")}>
-              Description
-            </button>
-            <button className={"tab" + (leftTab === "hints" ? " active" : "")} onClick={() => setLeftTab("hints")}>
-              Hints{problem.hints.length ? ` (${hintsRevealed}/${problem.hints.length})` : ""}
-            </button>
-          </div>
-          <div className="pane-body description">
-            {leftTab === "description" ? (
-              <>
-                <h1 className="title">{problem.title}</h1>
-                <div className="meta">
-                  <span className={`diff diff-${problem.difficulty}`}>{problem.difficulty}</span>
-                  <span className="tag">{problem.environment}</span>
-                  {problem.requires.filter((r) => r !== "cpu").map((r) => (
-                    <span key={r} className="tag">{r}</span>
-                  ))}
-                  {problem.tags.filter((t) => t !== problem.environment).map((t) => (
-                    <span key={t} className="tag subtle">{t}</span>
-                  ))}
-                </div>
-                <Markdown source={problem.description} problemId={problem.id} />
-              </>
-            ) : (
-              <Hints
-                hints={problem.hints}
-                revealed={hintsRevealed}
-                onReveal={() => {
-                  const n = Math.min(hintsRevealed + 1, problem.hints.length);
-                  setHintsRevealed(n);
-                  api.saveHints(id, n);
-                }}
-              />
-            )}
-          </div>
+        <Panel
+          panelRef={leftPanel}
+          defaultSize="42%"
+          minSize="20%"
+          collapsible
+          collapsedSize={0}
+          className="pane"
+          onResize={() => {
+            if (maximized && !leftPanel.current?.isCollapsed()) setMaximized(false);
+          }}
+        >
+          <section className="card">
+            <Tabs<LeftTab>
+              className="card-head"
+              value={leftTab}
+              onChange={setLeftTab}
+              items={[
+                { id: "description", label: "Description", icon: FileText },
+                {
+                  id: "hints",
+                  label: "Hints",
+                  icon: Lightbulb,
+                  badge: problem.hints.length ? `${hintsRevealed}/${problem.hints.length}` : null,
+                },
+              ]}
+            />
+            <div className="card-body description" key={leftTab}>
+              {leftTab === "description" ? (
+                <>
+                  <h1 className="title">
+                    {index >= 0 && <span className="title-index">{index + 1}.</span>} {problem.title}
+                  </h1>
+                  <MetaChips problem={problem} hw={hw} />
+                  <Markdown source={problem.description} problemId={problem.id} />
+                </>
+              ) : (
+                <Hints
+                  hints={problem.hints}
+                  revealed={hintsRevealed}
+                  onReveal={() => {
+                    const n = Math.min(hintsRevealed + 1, problem.hints.length);
+                    setHintsRevealed(n);
+                    api.saveHints(id, n);
+                  }}
+                />
+              )}
+            </div>
+          </section>
         </Panel>
-        <Separator className="sep sep-v" />
+        <Separator className="sep sep-v">
+          <span className="grip" />
+        </Separator>
         <Panel minSize="30%" className="pane">
           <Group orientation="vertical">
             <Panel defaultSize="62%" minSize="15%" className="pane">
-              <Editor
-                problemId={problem.id}
-                files={editorFiles}
-                active={active}
-                onSelect={setActive}
-                onChange={(path, value) => setBuffers((b) => ({ ...b, [path]: value }))}
-                annotations={annotations}
-                proposal={activeProposal}
-                onResolveProposal={resolveProposal}
-                onRun={run}
-                onCursor={setCursor}
-                onReset={reset}
-                revealLine={revealLine}
-                dark={dark}
-              />
+              <section className="card">
+                <Editor
+                  problemId={problem.id}
+                  files={editorFiles}
+                  active={active}
+                  onSelect={setActive}
+                  onChange={(path, value) => {
+                    setBuffers((b) => ({ ...b, [path]: value }));
+                    setSaveState("saving");
+                  }}
+                  annotations={annotations}
+                  proposal={activeProposal}
+                  onResolveProposal={resolveProposal}
+                  onRun={run}
+                  onCursor={setCursor}
+                  onReset={reset}
+                  revealLine={revealLine}
+                  dark={dark}
+                  saveState={saveState}
+                  cursor={cursor}
+                  maximized={maximized}
+                  onToggleMaximize={toggleMaximize}
+                />
+              </section>
             </Panel>
-            <Separator className="sep sep-h" />
-            <Panel minSize="12%" className="pane">
-              <div className="pane-tabs">
-                {(["testcase", "result", "review"] as BottomTab[]).map((t) => (
-                  <button key={t} className={"tab" + (bottomTab === t ? " active" : "")} onClick={() => setBottomTab(t)}>
-                    {t === "testcase" ? "Testcase" : t === "result" ? "Result" : "Review"}
-                    {t === "review" && reviewCount > 0 && <span className="count">{reviewCount}</span>}
-                    {t === "result" && result && !running && (
-                      <span className={"status-dot " + (result.status === "passed" ? "pass" : "fail")} />
-                    )}
-                  </button>
-                ))}
-              </div>
-              <div className="pane-body">
-                {bottomTab === "testcase" && (
-                  <TestcasePanel
-                    problem={problem}
-                    customTests={customTests}
-                    onChangeCustom={changeCustomTests}
-                    onOpenFile={setActive}
-                  />
-                )}
-                {bottomTab === "result" && (
-                  <ResultPanel
-                    result={result}
-                    running={running}
-                    phase={runPhase}
-                    params={problem.judge.params ?? []}
-                    onCancel={() => runId.current && api.cancel(runId.current)}
-                  />
-                )}
-                {bottomTab === "review" && (
-                  <ReviewPanel
-                    annotations={annotations}
-                    proposals={proposals}
-                    onJump={(file, line) => {
-                      setActive(file);
-                      setRevealLine({ path: file, line, nonce: Date.now() });
-                    }}
-                    onDismiss={(a) => {
-                      setAnnotations((xs) => xs.filter((x) => x.id !== a.id));
-                      api.deleteAnnotation(id, a.id);
-                    }}
-                    onOpenProposal={(p) => setActive(p.file)}
-                  />
-                )}
-              </div>
+            <Separator className="sep sep-h">
+              <span className="grip" />
+            </Separator>
+            <Panel
+              panelRef={bottomPanel}
+              minSize="14%"
+              collapsible
+              collapsedSize={BOTTOM_HEAD_PX}
+              className="pane"
+              onResize={() => setBottomCollapsed(!!bottomPanel.current?.isCollapsed())}
+            >
+              <section className={"card" + (bottomCollapsed ? " collapsed" : "")}>
+                <Tabs<BottomTab>
+                  className="card-head"
+                  value={bottomTab}
+                  onChange={showBottom}
+                  onActiveClick={() => bottomPanel.current?.isCollapsed() && bottomPanel.current.expand()}
+                  items={[
+                    { id: "testcase", label: "Testcase", icon: SquareCheck },
+                    {
+                      id: "result",
+                      label: "Test Result",
+                      icon: Terminal,
+                      dot: result && !running ? (result.status === "passed" ? "pass" : "fail") : null,
+                    },
+                    { id: "review", label: "Review", icon: MessageSquare, badge: reviewCount > 0 ? reviewCount : null },
+                  ]}
+                  trailing={
+                    <IconButton
+                      icon={bottomCollapsed ? ChevronUp : ChevronDown}
+                      label={bottomCollapsed ? "Expand panel" : "Collapse panel"}
+                      onClick={() => (bottomCollapsed ? bottomPanel.current?.expand() : bottomPanel.current?.collapse())}
+                    />
+                  }
+                />
+                <div className="card-body" key={bottomTab}>
+                  {bottomTab === "testcase" && (
+                    <TestcasePanel
+                      problem={problem}
+                      customTests={customTests}
+                      onChangeCustom={changeCustomTests}
+                      onOpenFile={setActive}
+                    />
+                  )}
+                  {bottomTab === "result" && (
+                    <ResultPanel
+                      result={result}
+                      running={running}
+                      phase={runPhase}
+                      params={problem.judge.params ?? []}
+                      onCancel={() => runId.current && api.cancel(runId.current)}
+                    />
+                  )}
+                  {bottomTab === "review" && (
+                    <ReviewPanel
+                      annotations={annotations}
+                      proposals={proposals}
+                      onJump={(file, line) => {
+                        setActive(file);
+                        setRevealLine({ path: file, line, nonce: Date.now() });
+                      }}
+                      onDismiss={(a) => {
+                        setAnnotations((xs) => xs.filter((x) => x.id !== a.id));
+                        api.deleteAnnotation(id, a.id);
+                      }}
+                      onOpenProposal={(p) => setActive(p.file)}
+                    />
+                  )}
+                </div>
+              </section>
             </Panel>
           </Group>
         </Panel>
       </Group>
+
+      <ProblemDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} problems={problems} currentId={id} />
+    </div>
+  );
+}
+
+function MetaChips({ problem, hw }: { problem: Problem; hw: string[] }) {
+  const tags = problem.tags.filter((t) => t !== problem.environment);
+  const [showTopics, setShowTopics] = useState(tags.length <= 3);
+  return (
+    <div className="meta">
+      <DifficultyChip value={problem.difficulty} />
+      <Chip icon={Box} title="Environment">
+        {problem.environment}
+      </Chip>
+      {hw.map((r) => (
+        <Chip key={r} icon={Zap} title="Required hardware">
+          {r}
+        </Chip>
+      ))}
+      {tags.length > 0 &&
+        (showTopics ? (
+          tags.map((t) => (
+            <Chip key={t} icon={Tag}>
+              {t}
+            </Chip>
+          ))
+        ) : (
+          <Chip icon={Tag} onClick={() => setShowTopics(true)} title={tags.join(", ")}>
+            Topics · {tags.length}
+          </Chip>
+        ))}
     </div>
   );
 }
 
 function Hints({ hints, revealed, onReveal }: { hints: string[]; revealed: number; onReveal: () => void }) {
-  if (!hints.length) return <p className="muted">This problem has no hints. Ask your AI assistant for one.</p>;
+  if (!hints.length)
+    return (
+      <div className="empty">
+        <Lightbulb size={20} strokeWidth={1.6} />
+        <span>This problem has no hints. Ask your AI assistant for one.</span>
+      </div>
+    );
   return (
     <div className="hints">
-      {hints.slice(0, revealed).map((h, i) => (
-        <div key={i} className="hint">
-          <div className="field-label">Hint {i + 1}</div>
-          <Markdown source={h} />
-        </div>
-      ))}
-      {revealed < hints.length ? (
-        <button onClick={onReveal}>Show hint {revealed + 1} of {hints.length}</button>
-      ) : (
-        <p className="muted small">All hints shown.</p>
+      {hints.map((h, i) =>
+        i < revealed ? (
+          <details key={i} className="hint" open>
+            <summary>
+              <Lightbulb size={15} strokeWidth={1.8} />
+              Hint {i + 1}
+              <ChevronDown size={15} className="hint-chevron" />
+            </summary>
+            <div className="hint-body">
+              <Markdown source={h} />
+            </div>
+          </details>
+        ) : i === revealed ? (
+          <button key={i} className="hint locked next" onClick={onReveal}>
+            <Lightbulb size={15} strokeWidth={1.8} />
+            Reveal hint {i + 1} of {hints.length}
+          </button>
+        ) : (
+          <div key={i} className="hint locked">
+            <Lock size={14} strokeWidth={1.8} />
+            Hint {i + 1}
+          </div>
+        ),
       )}
+      {revealed >= hints.length && <p className="muted small">All hints shown.</p>}
+    </div>
+  );
+}
+
+function WorkspaceSkeleton() {
+  return (
+    <div className="ws-page">
+      <header className="topbar">
+        <Brand />
+      </header>
+      <div className="ws-skeleton">
+        <section className="card">
+          <div className="card-body description skeleton-stack">
+            <Skeleton w="55%" h={24} />
+            <Skeleton w="30%" h={20} r={10} />
+            <Skeleton />
+            <Skeleton w="92%" />
+            <Skeleton w="80%" />
+          </div>
+        </section>
+        <div className="ws-skeleton-right">
+          <section className="card" style={{ flex: 62 }} />
+          <section className="card" style={{ flex: 38 }} />
+        </div>
+      </div>
     </div>
   );
 }

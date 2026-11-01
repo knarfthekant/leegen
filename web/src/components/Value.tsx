@@ -28,11 +28,23 @@ function spaced(json: string): string {
   return out;
 }
 
-export function Value({ label, value, mono = true, raw = false }: { label: string; value: unknown; mono?: boolean; raw?: boolean }) {
+export function Value({
+  label,
+  value,
+  mono = true,
+  raw = false,
+  tone,
+}: {
+  label: string;
+  value: unknown;
+  mono?: boolean;
+  raw?: boolean;
+  tone?: "fail";
+}) {
   return (
     <div className="field">
       <div className="field-label">{label}</div>
-      <pre className={"field-value" + (mono ? " mono" : "")}>{raw && typeof value === "string" ? value : formatValue(value)}</pre>
+      <pre className={"field-value" + (mono ? " mono" : "") + (tone ? ` tone-${tone}` : "")}>{raw && typeof value === "string" ? value : formatValue(value)}</pre>
     </div>
   );
 }

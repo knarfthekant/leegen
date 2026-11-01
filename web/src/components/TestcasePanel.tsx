@@ -1,5 +1,7 @@
+import { FlaskConical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { CustomTest, Problem, TestInput } from "../lib/api";
+import { cx, IconButton } from "./ui";
 import { formatValue, Value } from "./Value";
 
 interface Props {
@@ -20,7 +22,9 @@ export function TestcasePanel({ problem, customTests, onChangeCustom, onOpenFile
     const testFiles = problem.files.filter((f) => /(^|\/)test_[^/]*\.py$/.test(f.path));
     return (
       <div className="panel-body">
-        <p className="muted">
+        <p className="muted suite-note">
+          <FlaskConical size={16} strokeWidth={1.7} />
+          <span>
           This problem is checked by a test suite. Visible tests are in{" "}
           {testFiles.length ? (
             testFiles.map((f, i) => (
@@ -35,6 +39,7 @@ export function TestcasePanel({ problem, customTests, onChangeCustom, onOpenFile
             "the read-only files"
           )}
           . Hidden tests also run when you click Run.
+          </span>
         </p>
       </div>
     );
@@ -78,23 +83,27 @@ function FunctionCases({
     <div className="panel-body">
       <div className="case-tabs">
         {visible.map((t, i) => (
-          <button key={t.name} className={"pill" + (sel === i ? " active" : "")} onClick={() => setSel(i)} title={t.name}>
+          <button key={t.name} className={cx("pill", sel === i && "active")} onClick={() => setSel(i)} title={t.name}>
             Case {i + 1}
           </button>
         ))}
         {customTests.map((_, i) => (
           <button
             key={`c${i}`}
-            className={"pill" + (sel === visible.length + i ? " active" : "")}
+            className={cx("pill", sel === visible.length + i && "active")}
             onClick={() => setSel(visible.length + i)}
           >
             Custom {i + 1}
           </button>
         ))}
         {problem.has_reference && (
-          <button className="pill add" onClick={addCase} title="Add a custom test case. The expected output comes from the reference solution.">
-            +
-          </button>
+          <IconButton
+            icon={Plus}
+            label="Add test case"
+            className="pill-add"
+            onClick={addCase}
+            title="Add a custom test case. The expected output comes from the reference solution."
+          />
         )}
       </div>
 
@@ -164,9 +173,7 @@ function CustomCase({
     <div className="case">
       <div className="row between">
         <span className="case-name">Custom case</span>
-        <button className="link small" onClick={onDelete}>
-          Remove
-        </button>
+        <IconButton icon={Trash2} label="Remove custom case" size={15} onClick={onDelete} />
       </div>
       {names.map((name, i) => (
         <div className="field" key={name}>

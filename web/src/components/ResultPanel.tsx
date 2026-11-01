@@ -1,10 +1,12 @@
+import { Clock, Cpu, Gauge, ListChecks, Square, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RunResult, TestResult } from "../lib/api";
+import { Button, Chip, cx } from "./ui";
 import { Value } from "./Value";
 
 const STATUS_TEXT: Record<RunResult["status"], string> = {
-  passed: "Passed",
-  failed: "Failed",
+  passed: "Accepted",
+  failed: "Wrong Answer",
   error: "Error",
   timeout: "Time Limit Exceeded",
   compile_error: "Compile Error",
@@ -51,23 +53,34 @@ export function ResultPanel({
   if (running)
     return (
       <div className="panel-body">
-        <div className="row between">
-          <span className="muted">
-            {phase?.phase === "preparing"
-              ? `Preparing ${phase.detail}… (the first run of an environment installs its packages)`
-              : phase?.phase === "queued"
-                ? `Queued: ${phase.detail}, waiting for resources…`
-                : phase?.detail
-                  ? `Running on ${phase.detail}…`
-                  : "Running…"}
-          </span>
-          <button className="link small" onClick={onCancel}>
-            Cancel
-          </button>
+        <div className="running">
+          <div className="running-bar" />
+          <div className="row between">
+            <span className="muted">
+              {phase?.phase === "preparing"
+                ? `Preparing ${phase.detail}… (the first run of an environment installs its packages)`
+                : phase?.phase === "queued"
+                  ? `Queued: ${phase.detail}, waiting for resources…`
+                  : phase?.detail
+                    ? `Running on ${phase.detail}…`
+                    : "Running…"}
+            </span>
+            <Button variant="ghost" icon={Square} onClick={onCancel}>
+              Cancel
+            </Button>
+          </div>
         </div>
       </div>
     );
-  if (!result) return <div className="panel-body muted">Run your code to see results.</div>;
+  if (!result)
+    return (
+      <div className="empty">
+        <Terminal size={20} strokeWidth={1.6} />
+        <span>
+          Run your code to see results. <kbd>⌘</kbd> <kbd>↵</kbd>
+        </span>
+      </div>
+    );
 
   const t: TestResult | undefined = result.tests[sel];
   const ok = result.status === "passed";
@@ -76,13 +89,18 @@ export function ResultPanel({
       <div className="result-head">
         <span className={"result-status " + (ok ? "ok" : "bad")}>{STATUS_TEXT[result.status]}</span>
         {result.total > 0 && (
-          <span className="muted">
+          <Chip icon={ListChecks} tone={ok ? "pass" : "neutral"}>
             {result.passed} / {result.total} tests passed
-          </span>
+          </Chip>
         )}
-        <span className="muted small right">
-          {result.executor} · {result.device} · {(result.duration_ms / 1000).toFixed(2)}s
-        </span>
+        <span className="spacer" />
+        <Chip icon={Cpu} title="Executor · device">
+          {result.executor}
+          {result.device ? ` · ${result.device}` : ""}
+        </Chip>
+        <Chip icon={Clock} title="Wall time">
+          {(result.duration_ms / 1000).toFixed(2)}s
+        </Chip>
       </div>
 
       {result.error && <pre className="error-block">{result.error}</pre>}
@@ -91,10 +109,19 @@ export function ResultPanel({
       {result.metrics.length > 0 && (
         <div className="metrics">
           {result.metrics.map((m) => (
-            <span key={m.name} className="metric">
-              {m.name}: {m.value.toFixed(3)} {m.unit}
-              {m.reference != null && <span className="muted"> (reference {m.reference.toFixed(3)} {m.unit})</span>}
-            </span>
+            <div key={m.name} className="metric">
+              <span className="metric-label">
+                <Gauge size={13} strokeWidth={1.9} /> {m.name}
+              </span>
+              <span className="metric-value tabular">
+                {m.value.toFixed(3)} <small>{m.unit}</small>
+              </span>
+              {m.reference != null && (
+                <span className="metric-ref tabular">
+                  reference {m.reference.toFixed(3)} {m.unit}
+                </span>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -104,7 +131,7 @@ export function ResultPanel({
           {result.tests.map((x, i) => (
             <button
               key={x.name + i}
-              className={"pill " + (x.status === "pass" ? "pass" : "fail") + (sel === i ? " active" : "")}
+              className={cx("pill", x.status === "pass" ? "pass" : "fail", sel === i && "active")}
               onClick={() => setSel(i)}
               title={x.name}
             >
@@ -119,20 +146,22 @@ export function ResultPanel({
         <div className="case">
           <div className="row between">
             <span className="case-name">{t.name}</span>
-            <span className={"tag " + (t.status === "pass" ? "ok" : "bad")}>{t.status}</span>
+            <Chip tone={t.status === "pass" ? "pass" : "fail"}>
+              <span className="cap">{t.status}</span>
+            </Chip>
           </div>
           {t.description && <p className="muted">{t.description}</p>}
           {!t.visible && t.status === "pass" && <p className="muted small">Hidden test: details are shown only when it fails.</p>}
           {t.input != null && <InputView input={t.input} params={params} />}
           {t.actual != null || t.expected != null ? (
             <>
-              <Value label="Output" value={t.actual} />
+              <Value label="Output" value={t.actual} tone={t.status === "pass" ? undefined : "fail"} />
               <Value label="Expected" value={t.expected} />
             </>
           ) : null}
           {t.message && <Value label="Message" value={t.message} raw />}
           {t.stdout && <Value label="Stdout" value={t.stdout} raw />}
-          {t.duration_ms != null && <div className="muted small">{t.duration_ms.toFixed(1)} ms</div>}
+          {t.duration_ms != null && <div className="muted small tabular">{t.duration_ms.toFixed(1)} ms</div>}
         </div>
       )}
       {!t && result.stderr && <Value label="stderr" value={result.stderr} raw />}

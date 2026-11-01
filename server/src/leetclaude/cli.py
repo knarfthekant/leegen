@@ -1,4 +1,4 @@
-"""leetclaude CLI: serve | validate | run | schema | list."""
+"""leetclaude CLI: start | dev | stop | serve | validate | run | schema | list."""
 
 from __future__ import annotations
 
@@ -12,11 +12,27 @@ from leetclaude.config import settings
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
-    import uvicorn
+    from leetclaude.devserver import serve
 
-    uvicorn.run("leetclaude.app:app", host=args.host, port=args.port, reload=args.reload,
-                reload_dirs=[str(Path(__file__).parent)] if args.reload else None)
-    return 0
+    return serve(args.host, args.port, reload=args.reload)
+
+
+def _cmd_start(args: argparse.Namespace) -> int:
+    from leetclaude.devserver import start
+
+    return start(args.host, args.port, build=not args.no_build)
+
+
+def _cmd_stop(args: argparse.Namespace) -> int:
+    from leetclaude.devserver import stop
+
+    return stop(args.port, timeout=args.timeout)
+
+
+def _cmd_dev(args: argparse.Namespace) -> int:
+    from leetclaude.devserver import dev
+
+    return dev(args.host, args.port, args.web_port)
 
 
 def _cmd_schema(args: argparse.Namespace) -> int:
@@ -111,9 +127,28 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="leetclaude", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    s = sub.add_parser("serve", help="run the web app + MCP server")
-    s.add_argument("--host", default="127.0.0.1")
-    s.add_argument("--port", type=int, default=8000)
+    cfg = settings()
+
+    s = sub.add_parser("start", help="build the web UI if needed, then serve UI + API + MCP")
+    s.add_argument("--host", default=cfg.host)
+    s.add_argument("--port", type=int, default=cfg.port)
+    s.add_argument("--no-build", action="store_true", help="serve web/dist as is")
+    s.set_defaults(fn=_cmd_start)
+
+    s = sub.add_parser("dev", help="backend with --reload + Vite dev server with hot reload")
+    s.add_argument("--host", default=cfg.host)
+    s.add_argument("--port", type=int, default=cfg.port)
+    s.add_argument("--web-port", type=int, default=cfg.web_port)
+    s.set_defaults(fn=_cmd_dev)
+
+    s = sub.add_parser("stop", help="stop the server started by start / dev / serve")
+    s.add_argument("--port", type=int, default=cfg.port)
+    s.add_argument("--timeout", type=float, default=10.0, help="seconds before SIGKILL")
+    s.set_defaults(fn=_cmd_stop)
+
+    s = sub.add_parser("serve", help="serve UI + API + MCP without building (see start)")
+    s.add_argument("--host", default=cfg.host)
+    s.add_argument("--port", type=int, default=cfg.port)
     s.add_argument("--reload", action="store_true")
     s.set_defaults(fn=_cmd_serve)
 
@@ -139,7 +174,6 @@ def main(argv: list[str] | None = None) -> int:
     s.set_defaults(fn=_cmd_run)
 
     args = parser.parse_args(argv)
-    settings()
     return args.fn(args)
 
 
