@@ -1,0 +1,71 @@
+import pytest
+import yaml
+from pydantic import ValidationError
+
+from leetclaude.schema.export import problem_json_schema
+from leetclaude.schema.models import Problem
+from leetclaude.schema.views import public_problem
+from leetclaude.store.problems import ProblemStore, dump_problem_yaml, parse_problem_yaml
+
+
+def test_seed_problems_load():
+    store = ProblemStore()
+    assert store.errors() == []
+    ids = {p.id for p in store.list()}
+    assert {"merge-ranges", "py-async-generators", "rate-limiter-service", "kv-cache-basics",
+            "cuda-vector-add"} <= ids
+
+
+def test_yaml_round_trip():
+    for p in ProblemStore().list():
+        again = parse_problem_yaml(dump_problem_yaml(p))
+        assert again == p
+
+
+def base(**over):
+    data = {
+        "id": "x-problem", "title": "X", "environment": "python", "description": "d",
+        "files": [{"path": "solution.py", "content": "def f(x):\n    pass\n"}],
+        "judge": {"kind": "function", "entry": "solution.py:f"},
+        "tests": [{"name": "t", "input": {"args": [1]}, "expected": 1}],
+    }
+    data.update(over)
+    return data
+
+
+def test_minimal_problem_is_valid():
+    Problem.model_validate(base())
+
+
+@pytest.mark.parametrize("over,needle", [
+    ({"id": "Bad Id"}, "id"),
+    ({"files": [{"path": "../x.py", "content": ""}]}, "relative"),
+    ({"files": [{"path": "s.py", "role": "readonly", "content": ""}]}, "editable"),
+    ({"judge": {"kind": "function"}}, "entry"),
+    ({"judge": {"kind": "function", "entry": "missing.py:f"}}, "not in files"),
+    ({"tests": [{"name": "t", "input": {"args": [1]}}]}, "reference"),
+    ({"tests": [{"name": "t", "input": {}, "expected": 1}, {"name": "t", "input": {}, "expected": 1}]},
+     "duplicate test"),
+    ({"judge": {"kind": "pytest"}}, "test files"),
+    ({"unknown_field": 1}, "extra"),
+])
+def test_invalid_problems_rejected(over, needle):
+    with pytest.raises(ValidationError) as exc:
+        Problem.model_validate(base(**over))
+    assert needle.lower() in str(exc.value).lower()
+
+
+def test_public_view_hides_secrets():
+    p = ProblemStore().get("merge-ranges")
+    view = public_problem(p)
+    assert "reference" not in view
+    assert all(f["role"] != "hidden" for f in view["files"])
+    hidden = [t for t in view["tests"] if not t["visible"]]
+    assert hidden and all("input" not in t for t in hidden)
+
+
+def test_json_schema_exports():
+    schema = problem_json_schema()
+    assert schema["title"] == "Problem"
+    assert "judge" in schema["properties"]
+    yaml.safe_dump(schema)

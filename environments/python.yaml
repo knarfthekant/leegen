@@ -1,0 +1,6 @@
+id: python
+description: CPython 3.13 with the standard library and pytest.
+language: python
+python: "3.13"
+dependencies: [pytest]
+requires: [cpu]

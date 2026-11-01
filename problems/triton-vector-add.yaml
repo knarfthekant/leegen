@@ -1,0 +1,118 @@
+schema_version: 1
+id: triton-vector-add
+title: Your First Triton Kernel
+difficulty: intro
+tags: [triton, gpu, kernels]
+track: triton-101
+order: 1
+environment: triton
+requires: [cuda]
+description: |
+  [Triton](https://triton-lang.org) lets you write GPU kernels in Python. You don't program
+  individual threads as in CUDA. Each **program instance** processes a whole **block** of
+  elements with vectorised loads and stores.
+
+  ```python
+  @triton.jit
+  def kernel(x_ptr, ..., n, BLOCK: tl.constexpr):
+      pid = tl.program_id(axis=0)                 # which block am I?
+      offs = pid * BLOCK + tl.arange(0, BLOCK)    # the BLOCK indices this program owns
+      mask = offs < n                             # the last block may run past the end
+      x = tl.load(x_ptr + offs, mask=mask)
+      ...
+  ```
+
+  The launch grid says how many program instances run: $\lceil n / \text{BLOCK} \rceil$ for a
+  1-D problem, written `triton.cdiv(n, BLOCK)`.
+
+  ### Your task
+
+  Complete `solution.py`:
+
+  1. `add_kernel`: each program loads its block of `x` and `y` (masked), adds them, and stores
+     the result to `out`.
+  2. `add(x, y)`: allocate `out = torch.empty_like(x)`, launch `add_kernel` over a 1-D grid
+     with `BLOCK=1024`, and return `out`.
+
+  Inputs are 1-D `float32` CUDA tensors of the same length, which may not be a multiple of the
+  block size.
+
+  :::note
+  The point is the kernel. Computing `x + y` in PyTorch would pass the tests, but you'd learn
+  nothing. Ask your AI assistant to review your kernel once it passes.
+  :::
+hints:
+  - "`offs = pid * BLOCK + tl.arange(0, BLOCK)` and `mask = offs < n`; pass `mask=mask` to both `tl.load` and `tl.store`."
+  - "Launch with `add_kernel[(triton.cdiv(n, 1024),)](x, y, out, n, BLOCK=1024)`."
+files:
+  - path: solution.py
+    role: editable
+    content: |
+      import torch
+      import triton
+      import triton.language as tl
+
+
+      @triton.jit
+      def add_kernel(x_ptr, y_ptr, out_ptr, n, BLOCK: tl.constexpr):
+          pid = tl.program_id(axis=0)
+          # TODO: compute this program's offsets and mask, load x and y, store x + y
+          pass
+
+
+      def add(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+          out = torch.empty_like(x)
+          # TODO: launch add_kernel over a 1-D grid with BLOCK=1024
+          return out
+  - path: _setup.py
+    role: hidden
+    content: |
+      import torch
+
+      from leetclaude_harness import device
+
+
+      def pair(seed: int, n: int):
+          g = torch.Generator().manual_seed(seed)
+          return [torch.randn(n, generator=g).to(device()), torch.randn(n, generator=g).to(device())]
+reference:
+  files:
+    - path: solution.py
+      content: |
+        import torch
+        import triton
+        import triton.language as tl
+
+
+        @triton.jit
+        def add_kernel(x_ptr, y_ptr, out_ptr, n, BLOCK: tl.constexpr):
+            pid = tl.program_id(axis=0)
+            offs = pid * BLOCK + tl.arange(0, BLOCK)
+            mask = offs < n
+            x = tl.load(x_ptr + offs, mask=mask)
+            y = tl.load(y_ptr + offs, mask=mask)
+            tl.store(out_ptr + offs, x + y, mask=mask)
+
+
+        def add(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+            out = torch.empty_like(x)
+            n = out.numel()
+            add_kernel[(triton.cdiv(n, 1024),)](x, y, out, n, BLOCK=1024)
+            return out
+judge:
+  kind: function
+  entry: solution.py:add
+  params: [x, y]
+  compare: {kind: allclose, rtol: 1.0e-6, atol: 1.0e-6}
+tests:
+  - name: One block (n = 1024)
+    input: {gen: _setup.py:pair, seed: 0, kwargs: {n: 1024}}
+  - name: Partial block (n = 1000)
+    input: {gen: _setup.py:pair, seed: 1, kwargs: {n: 1000}}
+  - name: Single element
+    visible: false
+    input: {gen: _setup.py:pair, seed: 2, kwargs: {n: 1}}
+  - name: Many blocks, ragged end
+    visible: false
+    input: {gen: _setup.py:pair, seed: 3, kwargs: {n: 1000003}}
+limits: {timeout_s: 120}

@@ -1,0 +1,38 @@
+schema_version: 1
+id: cpp-sum
+title: Sum an Array (C++)
+environment: cpp
+requires: [cpu]
+description: Return the sum of the array.
+files:
+  - path: solution.cpp
+    role: editable
+    content: |
+      #include <vector>
+      long long sum(const std::vector<int>& xs) { return 0; }
+  - path: main.cpp
+    role: hidden
+    content: |
+      #include <string>
+      #include <vector>
+      #include <leetclaude/judge.h>
+      long long sum(const std::vector<int>& xs);
+      int main() {
+        struct Case { std::string name; std::vector<int> xs; long long want; };
+        std::vector<Case> cases = {{"empty", {}, 0}, {"small", {1, 2, 3}, 6}, {"negative", {-5, 2}, -3}};
+        for (auto& c : cases) {
+          long long got = sum(c.xs);
+          lc::test(c.name, got == c.want, std::to_string(c.want), std::to_string(got), "", c.name != "negative");
+        }
+        lc::metric("cases", 3);
+      }
+reference:
+  files:
+    - path: solution.cpp
+      content: |
+        #include <vector>
+        long long sum(const std::vector<int>& xs) { long long s = 0; for (int x : xs) s += x; return s; }
+judge:
+  kind: script
+  build: [[c++, -std=c++17, -O2, "-I{bundle}/_lc/include", -o, main, main.cpp, solution.cpp]]
+  command: [./main]

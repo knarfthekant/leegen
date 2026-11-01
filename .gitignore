@@ -1,0 +1,12 @@
+# user state
+workspace/
+# build / deps
+web/node_modules/
+web/dist/
+server/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# local executor config, if kept in the repo
+config/executors.yaml
+.DS_Store

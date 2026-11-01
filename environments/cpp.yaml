@@ -1,0 +1,4 @@
+id: cpp
+description: C++17 with the system compiler (c++). Use the script judge; include <leetclaude/judge.h>.
+language: cpp
+requires: [cpu]

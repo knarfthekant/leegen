@@ -1,0 +1,15 @@
+id: cuda
+description: >-
+  CUDA C++ with nvcc 13 from NVIDIA's PyPI wheels (no system CUDA toolkit needed, only the
+  driver and a host C++ compiler). NVIDIA GPUs only: a local Linux box, an SSH host or SLURM.
+language: cuda
+python: "3.12"
+dependencies: [nvidia-cuda-nvcc]
+requires: [cuda]
+env:
+  CUDA_HOME: "{site_packages}/nvidia/cu13"
+  PATH: "{site_packages}/nvidia/cu13/bin:$PATH"
+  LD_LIBRARY_PATH: "{site_packages}/nvidia/cu13/lib:${LD_LIBRARY_PATH:-}"
+  # compile native code for the GPU on the build node: no PTX JIT, so a toolkit slightly newer
+  # than the driver still works (CUDA minor-version compatibility)
+  NVCC_APPEND_FLAGS: "-arch=native"

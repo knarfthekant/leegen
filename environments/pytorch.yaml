@@ -1,0 +1,8 @@
+id: pytorch
+description: PyTorch on the best local accelerator (CUDA or Apple MPS). Use leetclaude_harness.device().
+language: python
+python: "3.12"
+dependencies: ["torch>=2.5", numpy, pytest]
+requires: [gpu]
+env:
+  PYTORCH_ENABLE_MPS_FALLBACK: "1"

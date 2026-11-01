@@ -1,0 +1,264 @@
+schema_version: 1
+id: py-async-generators
+title: Async Generators from Scratch
+difficulty: intro
+tags: [python, asyncio, generators]
+track: python-fundamentals
+order: 1
+environment: python
+requires: [cpu]
+description: |
+  An **async generator** is an `async def` function that contains `yield`. Calling it does not
+  run any code yet. It returns an object you consume with `async for`, and between items it may
+  `await` other things (network reads, sleeps, queues).
+
+  ```python
+  async def numbers():
+      yield 1
+      await asyncio.sleep(0.1)   # can await between items
+      yield 2
+
+  async for n in numbers():      # only valid inside another async function
+      print(n)
+  ```
+
+  ```mermaid
+  sequenceDiagram
+      participant C as consumer (async for)
+      participant G as async generator
+      C->>G: __anext__()
+      G-->>C: yield 1
+      C->>G: __anext__()
+      Note over G: await asyncio.sleep(...)
+      G-->>C: yield 2
+      C->>G: __anext__()
+      G-->>C: StopAsyncIteration
+  ```
+
+  Implement three functions in `solution.py`.
+
+  ### 1. `countdown(n)`
+  Yield `n, n-1, ..., 1`, calling `await asyncio.sleep(0)` before each item so other tasks get a
+  turn. `countdown(0)` yields nothing.
+
+  ### 2. `batched(stream, size)`
+  `stream` is any *async iterable*. Yield lists of up to `size` consecutive items. The last batch
+  may be shorter. Raise `ValueError` if `size < 1`, but only once iteration starts (that is the
+  natural behaviour of a generator, so you don't need anything special).
+
+  ### 3. `read_lines(conn)`
+  `conn` has `async def readline() -> str | None` (returns `None` at end of input) and a plain
+  `close()` method. Yield each line with surrounding whitespace stripped, skipping empty lines.
+  **`conn.close()` must be called exactly once**, whether the consumer reads everything, stops
+  early with `break`, or an exception is raised.
+
+  :::details{summary="What happens when the consumer breaks early?"}
+  When an `async for` loop exits early, the generator is not resumed again. Python later calls
+  its `aclose()` method, which raises `GeneratorExit` at the paused `yield`. Code in a
+  `try/finally` around the `yield` still runs. Tests here call `aclose()` explicitly, the same
+  way `contextlib.aclosing` does.
+  :::
+
+  `test_visible.py` shows some of the tests. More are hidden.
+hints:
+  - "`countdown`: a plain `for i in range(n, 0, -1)` loop with `await asyncio.sleep(0)` and `yield i` inside works."
+  - "`batched`: keep a list, append each item from `async for`, and yield and reset it when it reaches `size`. Don't forget what's left at the end."
+  - "`read_lines`: wrap the whole loop in `try: ... finally: conn.close()`."
+files:
+  - path: solution.py
+    role: editable
+    content: |
+      import asyncio
+      from typing import AsyncIterable, AsyncIterator, Protocol, TypeVar
+
+      T = TypeVar("T")
+
+
+      class Connection(Protocol):
+          async def readline(self) -> str | None: ...
+          def close(self) -> None: ...
+
+
+      async def countdown(n: int) -> AsyncIterator[int]:
+          # yield n, n-1, ..., 1
+          raise NotImplementedError
+          yield  # makes this an async generator
+
+
+      async def batched(stream: AsyncIterable[T], size: int) -> AsyncIterator[list[T]]:
+          raise NotImplementedError
+          yield
+
+
+      async def read_lines(conn: Connection) -> AsyncIterator[str]:
+          raise NotImplementedError
+          yield
+  - path: test_visible.py
+    role: readonly
+    content: |
+      import asyncio
+
+      from solution import batched, countdown, read_lines
+
+
+      async def collect(agen):
+          return [x async for x in agen]
+
+
+      async def aiter_list(items):
+          for x in items:
+              await asyncio.sleep(0)
+              yield x
+
+
+      class FakeConn:
+          def __init__(self, lines):
+              self.lines = list(lines)
+              self.closed = 0
+
+          async def readline(self):
+              await asyncio.sleep(0)
+              return self.lines.pop(0) if self.lines else None
+
+          def close(self):
+              self.closed += 1
+
+
+      async def test_countdown_three():
+          """countdown(3) yields 3, 2, 1"""
+          assert await collect(countdown(3)) == [3, 2, 1]
+
+
+      async def test_batched_uneven():
+          """batched splits 5 items into [2, 2, 1]"""
+          assert await collect(batched(aiter_list([1, 2, 3, 4, 5]), 2)) == [[1, 2], [3, 4], [5]]
+
+
+      async def test_read_lines_closes():
+          """read_lines strips, skips blanks, and closes the connection"""
+          conn = FakeConn([" a \n", "\n", "b\n"])
+          assert await collect(read_lines(conn)) == ["a", "b"]
+          assert conn.closed == 1
+  - path: test_hidden.py
+    role: hidden
+    content: |
+      import asyncio
+      import inspect
+
+      import pytest
+
+      from solution import batched, countdown, read_lines
+      from test_visible import FakeConn, aiter_list, collect
+
+
+      def test_functions_are_async_generators():
+          """all three functions are async generator functions"""
+          for fn in (countdown, batched, read_lines):
+              assert inspect.isasyncgenfunction(fn), f"{fn.__name__} must be an async generator"
+
+
+      async def test_countdown_zero():
+          """countdown(0) yields nothing"""
+          assert await collect(countdown(0)) == []
+
+
+      async def test_countdown_yields_control():
+          """countdown lets other tasks run between items"""
+          seen = []
+
+          async def other():
+              for _ in range(3):
+                  seen.append("other")
+                  await asyncio.sleep(0)
+
+          async def consume():
+              async for n in countdown(3):
+                  seen.append(n)
+
+          await asyncio.gather(consume(), other())
+          assert seen.index("other") < seen.index(1)
+
+
+      async def test_batched_exact_multiple():
+          """no empty trailing batch when items divide evenly"""
+          assert await collect(batched(aiter_list(range(6)), 3)) == [[0, 1, 2], [3, 4, 5]]
+
+
+      async def test_batched_empty_stream():
+          """an empty stream gives no batches"""
+          assert await collect(batched(aiter_list([]), 4)) == []
+
+
+      async def test_batched_invalid_size():
+          """size < 1 raises ValueError when iteration starts"""
+          gen = batched(aiter_list([1]), 0)
+          with pytest.raises(ValueError):
+              await gen.__anext__()
+
+
+      async def test_read_lines_early_break_closes():
+          """breaking early still closes the connection exactly once"""
+          conn = FakeConn(["one", "two", "three"])
+          gen = read_lines(conn)
+          async for line in gen:
+              break
+          await gen.aclose()
+          assert conn.closed == 1
+
+
+      async def test_read_lines_error_closes():
+          """an error from readline() still closes the connection"""
+
+          class Broken(FakeConn):
+              async def readline(self):
+                  raise ConnectionError("reset")
+
+          conn = Broken([])
+          with pytest.raises(ConnectionError):
+              await collect(read_lines(conn))
+          assert conn.closed == 1
+reference:
+  files:
+    - path: solution.py
+      content: |
+        import asyncio
+        from typing import AsyncIterable, AsyncIterator, Protocol, TypeVar
+
+        T = TypeVar("T")
+
+
+        class Connection(Protocol):
+            async def readline(self) -> str | None: ...
+            def close(self) -> None: ...
+
+
+        async def countdown(n: int) -> AsyncIterator[int]:
+            for i in range(n, 0, -1):
+                await asyncio.sleep(0)
+                yield i
+
+
+        async def batched(stream: AsyncIterable[T], size: int) -> AsyncIterator[list[T]]:
+            if size < 1:
+                raise ValueError("size must be >= 1")
+            batch: list[T] = []
+            async for item in stream:
+                batch.append(item)
+                if len(batch) == size:
+                    yield batch
+                    batch = []
+            if batch:
+                yield batch
+
+
+        async def read_lines(conn: Connection) -> AsyncIterator[str]:
+            try:
+                while (line := await conn.readline()) is not None:
+                    line = line.strip()
+                    if line:
+                        yield line
+            finally:
+                conn.close()
+judge:
+  kind: pytest
+limits: {timeout_s: 10}

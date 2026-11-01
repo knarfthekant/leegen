@@ -1,0 +1,106 @@
+schema_version: 1
+id: merge-ranges
+title: Merge Booking Ranges
+difficulty: easy
+tags: [arrays, sorting, intervals]
+environment: python
+requires: [cpu]
+description: |
+  A meeting room keeps a list of bookings. Each booking is a pair `[start, end]` with
+  `start <= end`, both integers. Bookings that overlap or **touch** (one ends exactly when the
+  next starts) should be shown as a single block.
+
+  Write `merge_ranges(bookings)` that returns the merged blocks, sorted by start time.
+
+  :::figure{caption="Bookings [1,3], [2,6] and [8,10] become [1,6] and [8,10]"}
+  <svg viewBox="0 0 330 70" width="330" xmlns="http://www.w3.org/2000/svg" font-family="monospace" font-size="11">
+    <line x1="10" y1="60" x2="320" y2="60" stroke="currentColor" stroke-width="1"/>
+    <rect x="40" y="8" width="60" height="12" fill="none" stroke="currentColor"/>
+    <rect x="70" y="24" width="120" height="12" fill="none" stroke="currentColor"/>
+    <rect x="250" y="8" width="60" height="12" fill="none" stroke="currentColor"/>
+    <rect x="40" y="42" width="150" height="8" fill="currentColor" opacity="0.35"/>
+    <rect x="250" y="42" width="60" height="8" fill="currentColor" opacity="0.35"/>
+  </svg>
+  :::
+
+  ### Example
+
+  ```text
+  Input:  bookings = [[1, 3], [2, 6], [8, 10], [10, 12]]
+  Output: [[1, 6], [8, 12]]
+  ```
+
+  ### Constraints
+
+  - $0 \le n \le 10^5$
+  - $-10^9 \le start \le end \le 10^9$
+  - The input is **not** necessarily sorted. Don't modify the input list.
+
+  :::note
+  Aim for $O(n \log n)$ time.
+  :::
+hints:
+  - What becomes easy if the bookings are sorted by start time?
+  - After sorting, compare each booking with the last merged block only.
+  - Touching counts as overlapping, so use `<=` when comparing the next start with the current end.
+files:
+  - path: solution.py
+    role: editable
+    content: |
+      def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:
+          pass
+  - path: _gen.py
+    role: hidden
+    content: |
+      import random
+
+      def random_bookings(seed: int, n: int):
+          rng = random.Random(seed)
+          out = []
+          for _ in range(n):
+              s = rng.randint(-10**6, 10**6)
+              out.append([s, s + rng.randint(0, 500)])
+          return [out]
+reference:
+  files:
+    - path: solution.py
+      content: |
+        def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:
+            merged: list[list[int]] = []
+            for start, end in sorted(bookings):
+                if merged and start <= merged[-1][1]:
+                    merged[-1][1] = max(merged[-1][1], end)
+                else:
+                    merged.append([start, end])
+            return merged
+judge:
+  kind: function
+  entry: solution.py:merge_ranges
+  params: [bookings]
+  compare: {kind: exact}
+tests:
+  - name: Example
+    input: {args: [[[1, 3], [2, 6], [8, 10], [10, 12]]]}
+    expected: [[1, 6], [8, 12]]
+  - name: Unsorted input
+    input: {args: [[[5, 7], [1, 2], [3, 4]]]}
+    expected: [[1, 2], [3, 4], [5, 7]]
+  - name: Empty
+    input: {args: [[]]}
+    expected: []
+  - name: Nested ranges
+    visible: false
+    input: {args: [[[1, 10], [2, 3], [4, 5], [9, 12]]]}
+    expected: [[1, 12]]
+  - name: Single point bookings
+    visible: false
+    input: {args: [[[3, 3], [3, 3], [1, 1]]]}
+    expected: [[1, 1], [3, 3]]
+  - name: Negative times
+    visible: false
+    input: {args: [[[-5, -1], [-2, 0], [2, 4]]]}
+    expected: [[-5, 0], [2, 4]]
+  - name: Large random
+    visible: false
+    input: {gen: _gen.py:random_bookings, seed: 7, kwargs: {n: 20000}}
+limits: {timeout_s: 5}

@@ -1,0 +1,213 @@
+schema_version: 1
+id: kv-cache-basics
+title: Decode with a KV Cache
+difficulty: medium
+tags: [pytorch, attention, transformers, inference]
+track: ml-fundamentals
+order: 1
+environment: pytorch
+requires: [gpu]
+description: |
+  An autoregressive transformer generates one token at a time. At step $t$ the new token's
+  query attends to the keys and values of **every** position $0..t$. Recomputing $K$ and $V$
+  for the whole prefix at every step repeats work: step $t$ re-projects $t$ old tokens.
+
+  A **KV cache** stores each position's key and value the first time they're computed. Each
+  decode step then projects only the new token, appends its $k, v$ to the cache, and attends
+  over the cached tensors.
+
+  ```mermaid
+  flowchart LR
+      x["x_t (new token)"] --> P["project: q_t, k_t, v_t"]
+      P -->|append k_t, v_t| C[("KV cache<br/>[B, H, t+1, Dh]")]
+      P -->|q_t| A["attend(q_t, K, V)"]
+      C -->|K, V| A
+      A --> o[o_t]
+  ```
+
+  For one head with head size $d_h$:
+
+  $$o_t = \operatorname{softmax}\!\left(\frac{q_t K_{0..t}^\top}{\sqrt{d_h}}\right) V_{0..t}$$
+
+  ### Your task
+
+  In `solution.py`:
+
+  1. **`KVCache`** preallocates key and value buffers of shape
+     `[batch, n_heads, max_len, head_dim]` on the given device.
+     - `append(k, v)` writes `t_new` new positions (`k`, `v` are `[batch, n_heads, t_new, head_dim]`)
+       and raises `ValueError` if the cache would go past `max_len`.
+     - `get()` returns `(k, v)` for the positions written so far. Return slices of the buffers
+       (views), not copies.
+     - `len(cache)` is the number of positions written so far.
+  2. **`decode_with_cache(x, w_q, w_k, w_v, n_heads)`** processes `x` (`[B, T, D]`) **one
+     position at a time**, using a `KVCache` and the read-only helpers in `attention.py`. It
+     returns the attention output `[B, T, D]`, where row $t$ attends to positions $0..t$
+     (causal). Projections are `x @ w_q`, `x @ w_k`, `x @ w_v`, each with weight shape `[D, D]`.
+
+  :::note
+  `attend()` only accepts a single query position, so a full-sequence shortcut won't work.
+  Tests run on the selected device (`mps` on Apple silicon, `cuda` on NVIDIA). Keep every tensor
+  on `x.device`.
+  :::
+
+  :::details{summary="Why preallocate?"}
+  Growing the cache with `torch.cat` at every step allocates a new tensor and copies the whole
+  prefix each time, which is $O(T^2)$ memory traffic. Writing into a preallocated buffer keeps
+  each step $O(1)$ apart from the attention itself. Real inference engines go further and page
+  the cache into fixed-size blocks.
+  :::
+hints:
+  - "In `__init__`: `self.k = torch.zeros(batch, n_heads, max_len, head_dim, device=device, dtype=dtype)`, the same for `v`, and `self.length = 0`."
+  - "`append`: `self.k[:, :, self.length:self.length + t_new] = k`, then advance `self.length`."
+  - "Decode loop: `x_t = x[:, t:t+1]` keeps the time dimension. Project it, `split_heads`, append, `attend`, `merge_heads`, then collect the outputs and `torch.cat` them along dim 1."
+files:
+  - path: solution.py
+    role: editable
+    content: |
+      import torch
+
+      from attention import attend, merge_heads, split_heads
+
+
+      class KVCache:
+          def __init__(self, batch: int, n_heads: int, max_len: int, head_dim: int, *,
+                       device: torch.device, dtype: torch.dtype = torch.float32) -> None:
+              # TODO: preallocate key/value buffers [batch, n_heads, max_len, head_dim]
+              ...
+
+          def append(self, k: torch.Tensor, v: torch.Tensor) -> None:
+              """k, v: [batch, n_heads, t_new, head_dim]. Raise ValueError on overflow."""
+              raise NotImplementedError
+
+          def get(self) -> tuple[torch.Tensor, torch.Tensor]:
+              """(k, v) for all positions so far: [batch, n_heads, length, head_dim]."""
+              raise NotImplementedError
+
+          def __len__(self) -> int:
+              raise NotImplementedError
+
+
+      def decode_with_cache(x: torch.Tensor, w_q: torch.Tensor, w_k: torch.Tensor,
+                            w_v: torch.Tensor, n_heads: int) -> torch.Tensor:
+          """x: [B, T, D] -> [B, T, D], one position at a time with a KVCache."""
+          raise NotImplementedError
+  - path: attention.py
+    role: readonly
+    content: |
+      import math
+
+      import torch
+
+
+      def split_heads(x: torch.Tensor, n_heads: int) -> torch.Tensor:
+          """[B, T, D] -> [B, H, T, D // H]"""
+          b, t, d = x.shape
+          return x.view(b, t, n_heads, d // n_heads).transpose(1, 2)
+
+
+      def merge_heads(x: torch.Tensor) -> torch.Tensor:
+          """[B, H, T, Dh] -> [B, T, H * Dh]"""
+          b, h, t, dh = x.shape
+          return x.transpose(1, 2).reshape(b, t, h * dh)
+
+
+      def attend(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
+          """One decode step. q: [B, H, 1, Dh]; k, v: [B, H, T, Dh] -> [B, H, 1, Dh]"""
+          if q.shape[-2] != 1:
+              raise ValueError("attend() handles a single decode step: q must have length 1")
+          scores = q @ k.transpose(-1, -2) / math.sqrt(q.shape[-1])
+          return torch.softmax(scores, dim=-1) @ v
+  - path: _setup.py
+    role: hidden
+    content: |
+      import torch
+
+      from leetclaude_harness import device
+
+
+      def make_inputs(seed: int, B: int, T: int, D: int, H: int):
+          g = torch.Generator().manual_seed(seed)
+          dev = device()
+          scale = D ** -0.5
+
+          def rand(*shape, s=1.0):
+              return (torch.randn(*shape, generator=g) * s).to(dev)
+
+          return {"x": rand(B, T, D), "w_q": rand(D, D, s=scale), "w_k": rand(D, D, s=scale),
+                  "w_v": rand(D, D, s=scale), "n_heads": H}
+
+
+      def full_causal_attention(x, w_q, w_k, w_v, n_heads):
+          """Independent check used while authoring: non-cached causal attention."""
+          b, t, d = x.shape
+          q, k, v = (m.view(b, t, n_heads, d // n_heads).transpose(1, 2)
+                     for m in (x @ w_q, x @ w_k, x @ w_v))
+          mask = torch.ones(t, t, dtype=torch.bool, device=x.device).tril()
+          scores = (q @ k.transpose(-1, -2)) / (d // n_heads) ** 0.5
+          scores = scores.masked_fill(~mask, float("-inf"))
+          out = torch.softmax(scores, -1) @ v
+          return out.transpose(1, 2).reshape(b, t, d)
+reference:
+  files:
+    - path: solution.py
+      content: |
+        import torch
+
+        from attention import attend, merge_heads, split_heads
+
+
+        class KVCache:
+            def __init__(self, batch: int, n_heads: int, max_len: int, head_dim: int, *,
+                         device: torch.device, dtype: torch.dtype = torch.float32) -> None:
+                shape = (batch, n_heads, max_len, head_dim)
+                self.k = torch.zeros(shape, device=device, dtype=dtype)
+                self.v = torch.zeros(shape, device=device, dtype=dtype)
+                self.max_len = max_len
+                self.length = 0
+
+            def append(self, k: torch.Tensor, v: torch.Tensor) -> None:
+                t_new = k.shape[-2]
+                if self.length + t_new > self.max_len:
+                    raise ValueError("KV cache overflow")
+                self.k[:, :, self.length:self.length + t_new] = k
+                self.v[:, :, self.length:self.length + t_new] = v
+                self.length += t_new
+
+            def get(self) -> tuple[torch.Tensor, torch.Tensor]:
+                return self.k[:, :, :self.length], self.v[:, :, :self.length]
+
+            def __len__(self) -> int:
+                return self.length
+
+
+        def decode_with_cache(x: torch.Tensor, w_q: torch.Tensor, w_k: torch.Tensor,
+                              w_v: torch.Tensor, n_heads: int) -> torch.Tensor:
+            b, t, d = x.shape
+            cache = KVCache(b, n_heads, t, d // n_heads, device=x.device, dtype=x.dtype)
+            outs = []
+            for i in range(t):
+                x_t = x[:, i:i + 1]
+                q = split_heads(x_t @ w_q, n_heads)
+                cache.append(split_heads(x_t @ w_k, n_heads), split_heads(x_t @ w_v, n_heads))
+                outs.append(merge_heads(attend(q, *cache.get())))
+            return torch.cat(outs, dim=1)
+judge:
+  kind: function
+  entry: solution.py:decode_with_cache
+  compare: {kind: allclose, rtol: 1.0e-4, atol: 1.0e-5}
+tests:
+  - name: Tiny (B=1, T=3, D=8, H=2)
+    input: {gen: _setup.py:make_inputs, seed: 0, kwargs: {B: 1, T: 3, D: 8, H: 2}}
+  - name: Batch of 2, four heads
+    input: {gen: _setup.py:make_inputs, seed: 1, kwargs: {B: 2, T: 6, D: 16, H: 4}}
+  - name: Single position
+    visible: false
+    input: {gen: _setup.py:make_inputs, seed: 2, kwargs: {B: 1, T: 1, D: 8, H: 1}}
+  - name: Long sequence
+    visible: false
+    input: {gen: _setup.py:make_inputs, seed: 3, kwargs: {B: 2, T: 96, D: 64, H: 8}}
+  - name: Wide heads
+    visible: false
+    input: {gen: _setup.py:make_inputs, seed: 4, kwargs: {B: 3, T: 24, D: 128, H: 2}}
+limits: {timeout_s: 60}

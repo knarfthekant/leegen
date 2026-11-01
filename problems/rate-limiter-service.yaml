@@ -1,0 +1,280 @@
+schema_version: 1
+id: rate-limiter-service
+title: Finish the API Rate Limiter
+difficulty: medium
+tags: [python, system-design, application]
+environment: python
+requires: [cpu]
+description: |
+  You joined a team whose small HTTP-style API service is almost done. The request handler,
+  clock and response types are written and **read-only**. What's missing is the rate limiter in
+  `app/limiter.py`.
+
+  ```mermaid
+  flowchart LR
+      R[Request] --> S[ApiService.handle]
+      S -->|key = api_key or client_ip| L[TokenBucketLimiter.check]
+      L -->|allowed| H[route handler] --> OK[200]
+      L -->|denied| TM[429 + Retry-After]
+  ```
+
+  ### The token bucket
+
+  Each key (an API key or a client IP) has a bucket holding at most `capacity` tokens. A new key
+  starts with a **full** bucket. Tokens refill continuously at `refill_per_sec`. That means
+  fractional tokens accumulate, but the bucket never goes above `capacity`. Each request costs
+  `cost` tokens (default 1).
+
+  - If the bucket has at least `cost` tokens, take them. The request is **allowed** and
+    `retry_after` is `0.0`.
+  - Otherwise nothing is taken. The request is **denied** and `retry_after` is the number of
+    seconds until enough tokens will exist:
+
+  $$\text{retry\_after} = \frac{\text{cost} - \text{tokens}}{\text{refill\_per\_sec}}$$
+
+  - If `cost > capacity`, the request can never succeed. Raise `ValueError`.
+
+  Time comes from the injected `clock` (`clock.now()` returns seconds as a float). Never call
+  `time.time()` directly, because the tests use a fake clock.
+
+  :::warning
+  Buckets for different keys are independent. Read `app/service.py` to see how keys and
+  per-route costs are chosen. The `/export` route costs 5 tokens.
+  :::
+
+  `test_service.py` holds the team's existing tests. Hidden tests check refill math, isolation
+  between keys, and edge cases.
+hints:
+  - Store `(tokens, last_seen_time)` per key in a dict.
+  - "On each check: `tokens = min(capacity, tokens + (now - last) * refill_per_sec)`, then update `last = now` before deciding."
+  - Only subtract when allowed. A denied request must not use up tokens.
+files:
+  - path: app/__init__.py
+    role: readonly
+    content: ""
+  - path: app/clock.py
+    role: readonly
+    content: |
+      import time
+      from typing import Protocol
+
+
+      class Clock(Protocol):
+          def now(self) -> float: ...
+
+
+      class SystemClock:
+          def now(self) -> float:
+              return time.monotonic()
+
+
+      class FakeClock:
+          """Manually advanced clock used in tests."""
+
+          def __init__(self, start: float = 1000.0) -> None:
+              self._now = start
+
+          def now(self) -> float:
+              return self._now
+
+          def advance(self, seconds: float) -> None:
+              self._now += seconds
+  - path: app/limiter.py
+    role: editable
+    content: |
+      from dataclasses import dataclass
+
+      from app.clock import Clock
+
+
+      @dataclass(frozen=True)
+      class Decision:
+          allowed: bool
+          retry_after: float = 0.0
+
+
+      class TokenBucketLimiter:
+          def __init__(self, capacity: float, refill_per_sec: float, clock: Clock) -> None:
+              self.capacity = capacity
+              self.refill_per_sec = refill_per_sec
+              self.clock = clock
+              # TODO: per-key state
+
+          def check(self, key: str, cost: float = 1.0) -> Decision:
+              # TODO: implement the token bucket described in the problem
+              return Decision(allowed=True)
+  - path: app/service.py
+    role: readonly
+    content: |
+      from dataclasses import dataclass, field
+
+      from app.limiter import TokenBucketLimiter
+
+      ROUTE_COST = {"/export": 5.0}
+
+
+      @dataclass
+      class Request:
+          path: str
+          client_ip: str
+          api_key: str | None = None
+
+
+      @dataclass
+      class Response:
+          status: int
+          body: str = ""
+          headers: dict[str, str] = field(default_factory=dict)
+
+
+      class ApiService:
+          def __init__(self, limiter: TokenBucketLimiter) -> None:
+              self.limiter = limiter
+
+          def handle(self, req: Request) -> Response:
+              key = f"key:{req.api_key}" if req.api_key else f"ip:{req.client_ip}"
+              decision = self.limiter.check(key, ROUTE_COST.get(req.path, 1.0))
+              if not decision.allowed:
+                  return Response(429, "rate limited",
+                                  {"Retry-After": f"{decision.retry_after:.3f}"})
+              return Response(200, f"ok {req.path}")
+  - path: test_service.py
+    role: readonly
+    content: |
+      from app.clock import FakeClock
+      from app.limiter import TokenBucketLimiter
+      from app.service import ApiService, Request
+
+
+      def make(capacity=3, rate=1.0):
+          clock = FakeClock()
+          return clock, ApiService(TokenBucketLimiter(capacity, rate, clock))
+
+
+      def test_allows_up_to_capacity():
+          """a new client can make `capacity` requests at once"""
+          _, svc = make()
+          assert [svc.handle(Request("/", "1.1.1.1")).status for _ in range(3)] == [200] * 3
+
+
+      def test_denies_when_empty():
+          """the next request gets 429 and a Retry-After header"""
+          _, svc = make()
+          for _ in range(3):
+              svc.handle(Request("/", "1.1.1.1"))
+          res = svc.handle(Request("/", "1.1.1.1"))
+          assert res.status == 429
+          assert float(res.headers["Retry-After"]) == 1.0
+
+
+      def test_refills_over_time():
+          """waiting one second refills one token"""
+          clock, svc = make()
+          for _ in range(3):
+              svc.handle(Request("/", "1.1.1.1"))
+          clock.advance(1.0)
+          assert svc.handle(Request("/", "1.1.1.1")).status == 200
+  - path: test_hidden.py
+    role: hidden
+    content: |
+      import pytest
+
+      from app.clock import FakeClock
+      from app.limiter import TokenBucketLimiter
+      from app.service import ApiService, Request
+
+
+      def make(capacity=3, rate=1.0):
+          clock = FakeClock()
+          return clock, TokenBucketLimiter(capacity, rate, clock)
+
+
+      def test_keys_are_independent():
+          """one client's usage doesn't affect another"""
+          _, lim = make(capacity=1)
+          assert lim.check("a").allowed
+          assert not lim.check("a").allowed
+          assert lim.check("b").allowed
+
+
+      def test_fractional_refill():
+          """half a second at 1 token/s is not enough for one more request"""
+          clock, lim = make(capacity=1)
+          lim.check("a")
+          clock.advance(0.5)
+          d = lim.check("a")
+          assert not d.allowed
+          assert d.retry_after == pytest.approx(0.5)
+
+
+      def test_denied_requests_do_not_consume():
+          """a denied request leaves the bucket unchanged"""
+          clock, lim = make(capacity=2, rate=1.0)
+          lim.check("a", 2)
+          clock.advance(1.0)
+          assert not lim.check("a", 2).allowed
+          clock.advance(1.0)
+          assert lim.check("a", 2).allowed
+
+
+      def test_never_exceeds_capacity():
+          """a long idle period doesn't overfill the bucket"""
+          clock, lim = make(capacity=3)
+          clock.advance(1000)
+          results = [lim.check("a").allowed for _ in range(4)]
+          assert results == [True, True, True, False]
+
+
+      def test_cost_above_capacity_raises():
+          """a cost larger than capacity is a ValueError"""
+          _, lim = make(capacity=3)
+          with pytest.raises(ValueError):
+              lim.check("a", 4)
+
+
+      def test_export_route_costs_five():
+          """/export uses 5 tokens; api keys are bucketed separately from IPs"""
+          clock = FakeClock()
+          svc = ApiService(TokenBucketLimiter(10, 2.0, clock))
+          assert svc.handle(Request("/export", "9.9.9.9", api_key="k")).status == 200
+          assert svc.handle(Request("/export", "9.9.9.9", api_key="k")).status == 200
+          res = svc.handle(Request("/export", "9.9.9.9", api_key="k"))
+          assert res.status == 429
+          assert float(res.headers["Retry-After"]) == pytest.approx(2.5)
+          assert svc.handle(Request("/", "9.9.9.9")).status == 200
+reference:
+  files:
+    - path: app/limiter.py
+      content: |
+        from dataclasses import dataclass
+
+        from app.clock import Clock
+
+
+        @dataclass(frozen=True)
+        class Decision:
+            allowed: bool
+            retry_after: float = 0.0
+
+
+        class TokenBucketLimiter:
+            def __init__(self, capacity: float, refill_per_sec: float, clock: Clock) -> None:
+                self.capacity = capacity
+                self.refill_per_sec = refill_per_sec
+                self.clock = clock
+                self._buckets: dict[str, tuple[float, float]] = {}
+
+            def check(self, key: str, cost: float = 1.0) -> Decision:
+                if cost > self.capacity:
+                    raise ValueError("cost exceeds bucket capacity")
+                now = self.clock.now()
+                tokens, last = self._buckets.get(key, (self.capacity, now))
+                tokens = min(self.capacity, tokens + (now - last) * self.refill_per_sec)
+                if tokens >= cost:
+                    self._buckets[key] = (tokens - cost, now)
+                    return Decision(True, 0.0)
+                self._buckets[key] = (tokens, now)
+                return Decision(False, (cost - tokens) / self.refill_per_sec)
+judge:
+  kind: pytest
+limits: {timeout_s: 10}

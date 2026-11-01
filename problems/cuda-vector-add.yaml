@@ -1,0 +1,153 @@
+schema_version: 1
+id: cuda-vector-add
+title: Your First CUDA Kernel
+difficulty: intro
+tags: [cuda, gpu, kernels]
+track: cuda-101
+order: 1
+environment: cuda
+requires: [cuda]
+description: |
+  A CUDA **kernel** is a function that runs on the GPU, many copies at once. Each copy is a
+  **thread** with its own index. Threads are grouped into **blocks**, and blocks form a **grid**.
+  You choose the shape when you launch the kernel:
+
+  ```cpp
+  my_kernel<<<num_blocks, threads_per_block>>>(args...);
+  ```
+
+  Inside the kernel, a thread computes its global index from built-in variables:
+
+  $$i = \texttt{blockIdx.x} \cdot \texttt{blockDim.x} + \texttt{threadIdx.x}$$
+
+  :::figure{caption="A grid of 3 blocks with 4 threads each covers indices 0-11"}
+  <svg viewBox="0 0 372 64" width="372" xmlns="http://www.w3.org/2000/svg" font-family="monospace" font-size="10">
+    <g fill="none" stroke="currentColor">
+      <rect x="2" y="16" width="120" height="30"/><rect x="126" y="16" width="120" height="30"/><rect x="250" y="16" width="120" height="30"/>
+    </g>
+    <g fill="currentColor" opacity="0.25">
+      <rect x="6" y="20" width="26" height="22"/><rect x="35" y="20" width="26" height="22"/><rect x="64" y="20" width="26" height="22"/><rect x="93" y="20" width="26" height="22"/>
+      <rect x="130" y="20" width="26" height="22"/><rect x="159" y="20" width="26" height="22"/><rect x="188" y="20" width="26" height="22"/><rect x="217" y="20" width="26" height="22"/>
+      <rect x="254" y="20" width="26" height="22"/><rect x="283" y="20" width="26" height="22"/><rect x="312" y="20" width="26" height="22"/><rect x="341" y="20" width="26" height="22"/>
+    </g>
+    <g fill="currentColor"><text x="40" y="11">block 0</text><text x="164" y="11">block 1</text><text x="288" y="11">block 2</text>
+    <text x="14" y="58">0</text><text x="43" y="58">1</text><text x="72" y="58">2</text><text x="101" y="58">3</text><text x="138" y="58">4</text><text x="355" y="58">11</text></g>
+  </svg>
+  :::
+
+  ### Your task
+
+  In `kernel.cu`:
+
+  1. Write the kernel `vector_add(a, b, c, n)` that sets `c[i] = a[i] + b[i]` for every
+     `i < n`. The grid is usually bigger than `n`, so threads with `i >= n` must do nothing.
+  2. Write `launch_vector_add(d_a, d_b, d_c, n)`. It receives **device** pointers and launches
+     the kernel with 256 threads per block and enough blocks to cover all `n` elements:
+     $\lceil n / 256 \rceil$, or `(n + 255) / 256` in integer arithmetic.
+
+  The hidden harness allocates the device memory, copies the inputs, calls your launcher, and
+  checks every element against a CPU computation. Sizes include `n = 1` and sizes that aren't a
+  multiple of 256.
+
+  :::warning
+  This problem needs an NVIDIA GPU. Run it on a CUDA executor: a local Linux machine, or a remote
+  SSH or SLURM machine configured in `~/.config/leetclaude/executors.yaml`.
+  :::
+hints:
+  - "Inside the kernel: `int i = blockIdx.x * blockDim.x + threadIdx.x; if (i < n) c[i] = a[i] + b[i];`"
+  - "Launcher: `int blocks = (n + 255) / 256; vector_add<<<blocks, 256>>>(d_a, d_b, d_c, n);`"
+files:
+  - path: kernel.cu
+    role: editable
+    content: |
+      #include "kernel.h"
+
+      __global__ void vector_add(const float* a, const float* b, float* c, int n) {
+          // TODO: compute this thread's global index and add one element
+      }
+
+      void launch_vector_add(const float* d_a, const float* d_b, float* d_c, int n) {
+          // TODO: launch vector_add with 256 threads per block
+      }
+  - path: kernel.h
+    role: readonly
+    content: |
+      #pragma once
+
+      __global__ void vector_add(const float* a, const float* b, float* c, int n);
+
+      // d_a, d_b, d_c are device pointers holding n floats
+      void launch_vector_add(const float* d_a, const float* d_b, float* d_c, int n);
+  - path: main.cu
+    role: hidden
+    content: |
+      #include <cmath>
+      #include <cstdio>
+      #include <random>
+      #include <string>
+      #include <vector>
+
+      #include <leetclaude/judge.h>
+      #include "kernel.h"
+
+      static bool run_case(const std::string& name, int n, bool visible) {
+          std::mt19937 rng(n);
+          std::uniform_real_distribution<float> dist(-100.f, 100.f);
+          std::vector<float> a(n), b(n), c(n, -1.f);
+          for (int i = 0; i < n; ++i) { a[i] = dist(rng); b[i] = dist(rng); }
+          float *da, *db, *dc;
+          size_t bytes = sizeof(float) * n;
+          cudaMalloc(&da, bytes); cudaMalloc(&db, bytes); cudaMalloc(&dc, bytes);
+          cudaMemcpy(da, a.data(), bytes, cudaMemcpyHostToDevice);
+          cudaMemcpy(db, b.data(), bytes, cudaMemcpyHostToDevice);
+          cudaMemset(dc, 0xff, bytes);  // NaN pattern: untouched elements fail
+          launch_vector_add(da, db, dc, n);
+          cudaError_t err = cudaDeviceSynchronize();
+          if (err == cudaSuccess) err = cudaGetLastError();
+          cudaMemcpy(c.data(), dc, bytes, cudaMemcpyDeviceToHost);
+          cudaFree(da); cudaFree(db); cudaFree(dc);
+          if (err != cudaSuccess) {
+              lc::error(name, std::string("CUDA error: ") + cudaGetErrorString(err), visible);
+              return false;
+          }
+          for (int i = 0; i < n; ++i) {
+              float want = a[i] + b[i];
+              if (!(std::fabs(c[i] - want) <= 1e-5f * std::fabs(want) + 1e-6f)) {
+                  char msg[160];
+                  std::snprintf(msg, sizeof msg, "c[%d] = %g, expected %g", i, c[i], want);
+                  lc::test(name, false, "every element equals a[i] + b[i]", msg, "", visible);
+                  return false;
+              }
+          }
+          lc::test(name, true, "every element equals a[i] + b[i]", "all match", "", visible);
+          return true;
+      }
+
+      int main() {
+          run_case("n = 1", 1, true);
+          run_case("n = 1000", 1000, true);
+          run_case("n = 256 (exactly one block)", 256, false);
+          run_case("n = 12345 (partial last block)", 12345, false);
+          run_case("n = 2^22", 1 << 22, false);
+          return 0;
+      }
+reference:
+  files:
+    - path: kernel.cu
+      content: |
+        #include "kernel.h"
+
+        __global__ void vector_add(const float* a, const float* b, float* c, int n) {
+            int i = blockIdx.x * blockDim.x + threadIdx.x;
+            if (i < n) c[i] = a[i] + b[i];
+        }
+
+        void launch_vector_add(const float* d_a, const float* d_b, float* d_c, int n) {
+            int blocks = (n + 255) / 256;
+            vector_add<<<blocks, 256>>>(d_a, d_b, d_c, n);
+        }
+judge:
+  kind: script
+  build: [[nvcc, -O2, -std=c++17, "-I{bundle}/_lc/include", -o, main, main.cu, kernel.cu]]
+  command: [./main]
+limits: {timeout_s: 30}

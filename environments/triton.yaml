@@ -1,0 +1,11 @@
+id: triton
+description: >-
+  Triton kernels with PyTorch (Linux + NVIDIA). On a Linux machine without CUDA, change
+  `requires` to [cpu] and the TRITON_INTERPRET fallback below runs kernels in interpreter mode;
+  macOS has no Triton wheels.
+language: python
+python: "3.12"
+dependencies: ["torch>=2.5", "triton>=3.1", numpy, pytest]
+requires: [cuda]
+env_without_cuda:
+  TRITON_INTERPRET: "1"
