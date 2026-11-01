@@ -45,22 +45,31 @@ async def _save_annotations(problem_id: str, items: list[dict[str, Any]]) -> Non
 
 
 def _resolve_columns(start_col: int | None, end_col: int | None, start: int, end: int,
-                     lines: list[str], file: str) -> tuple[int | None, int | None]:
-    """Columns are 1-based and `end_col` is exclusive (the position just after the last
-    character), like an editor selection. No columns means a whole-line highlight. A start
-    column alone runs to the end of the last line."""
+                     lines: list[str], file: str) -> tuple[int, int]:
+    """Every annotation on a file ends up with an exact character range. Columns are 1-based and
+    `end_col` is exclusive (the position just after the last character), like an editor
+    selection.
+
+    - no columns: the text of the line(s), without the leading indentation and trailing spaces
+    - `start_col` only: from there to the end of the text on the last line
+    - both: exactly that range, validated against the code
+    """
+    first, last = lines[start - 1], lines[end - 1]
     if start_col is None:
         if end_col is not None:
             raise ValueError("end_col needs start_col")
-        return None, None
-    last_len = len(lines[end - 1])
+        start_col = len(first) - len(first.lstrip()) + 1
+        end_col = len(last.rstrip()) + 1
+        if start == end and end_col < start_col:  # blank line: an empty range
+            end_col = start_col
+        return start_col, end_col
     if end_col is None:
-        end_col = last_len + 1
-    if not (1 <= start_col <= len(lines[start - 1]) + 1):
+        end_col = max(len(last.rstrip()) + 1, start_col if start == end else 1)
+    if not (1 <= start_col <= len(first) + 1):
         raise ValueError(f"start_col {start_col} is outside line {start} of {file} "
-                         f"(1-{len(lines[start - 1]) + 1})")
-    if not (1 <= end_col <= last_len + 1):
-        raise ValueError(f"end_col {end_col} is outside line {end} of {file} (1-{last_len + 1})")
+                         f"(1-{len(first) + 1})")
+    if not (1 <= end_col <= len(last) + 1):
+        raise ValueError(f"end_col {end_col} is outside line {end} of {file} (1-{len(last) + 1})")
     if start == end and end_col <= start_col:
         raise ValueError("end_col must be greater than start_col on a single line "
                          "(end_col is exclusive)")

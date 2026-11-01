@@ -87,6 +87,7 @@ kbd {
 .spacer { flex: 1; }
 .row { display: flex; gap: 8px; align-items: center; }
 .row.between { justify-content: space-between; }
+.row.end { justify-content: flex-end; }
 .cap { text-transform: capitalize; }
 .tabular { font-variant-numeric: tabular-nums; }
 .accent-icon { color: var(--accent); }
@@ -333,7 +334,6 @@ details[open] .hint-chevron { transform: rotate(180deg); }
 .pill.active { background: var(--surface-3); color: var(--text); font-weight: 600; }
 .pill-add { width: 30px; height: 30px; }
 .case { display: flex; flex-direction: column; gap: 12px; animation: fade-in 160ms var(--ease); }
-.case-name { font-weight: 600; }
 .field-label { font-size: 12px; color: var(--text-2); margin-bottom: 5px; font-weight: 500; }
 .field-value, .field-input {
   margin: 0; padding: 10px 12px; background: var(--surface-2); border: none; border-radius: var(--r-md);
@@ -400,18 +400,28 @@ button.loc:hover { background: var(--accent-soft); color: var(--accent); }
 .dismiss { width: 26px; height: 26px; opacity: 0; }
 .review-item:hover .dismiss, .dismiss:focus-visible { opacity: 1; }
 
-/* editor annotations */
-.lc-ann-info { background: rgba(128, 128, 124, 0.12); }
-.lc-ann-hint { background: rgba(74, 111, 208, 0.1); }
-.lc-ann-warning { background: rgba(214, 152, 30, 0.14); }
-.lc-ann-error { background: rgba(209, 72, 72, 0.12); }
-.lc-ann-praise { background: rgba(46, 154, 92, 0.11); }
-.lc-glyph { border-radius: 50%; margin-left: 6px; width: 8px !important; height: 8px !important; margin-top: 6px; }
-.lc-glyph-info { background: #8a8a86; }
-.lc-glyph-hint { background: #5b7fd6; }
-.lc-glyph-warning { background: #d19a2a; }
-.lc-glyph-error { background: #d9534f; }
-.lc-glyph-praise { background: #3f9a63; }
+/* editor annotations
+   Each comment is one translucent highlight layer over its exact characters (layers blend, so
+   overlapping comments both stay visible) plus one gutter mark: a dot for a single line, a
+   connected bar for several. Focus only darkens the comment's own colour. */
+.lc-sev-info    { --c: #8a8a86; --c-strong: #5e5e5a; --tint: rgba(128, 128, 124, 0.16); --tint-strong: rgba(110, 110, 106, 0.36); }
+.lc-sev-hint    { --c: #5b7fd6; --c-strong: #3558b8; --tint: rgba(74, 111, 208, 0.16);  --tint-strong: rgba(53, 88, 184, 0.36); }
+.lc-sev-warning { --c: #d19a2a; --c-strong: #a87310; --tint: rgba(214, 152, 30, 0.2);   --tint-strong: rgba(168, 115, 16, 0.42); }
+.lc-sev-error   { --c: #d9534f; --c-strong: #b02a26; --tint: rgba(209, 72, 72, 0.16);   --tint-strong: rgba(176, 42, 38, 0.36); }
+.lc-sev-praise  { --c: #3f9a63; --c-strong: #257444; --tint: rgba(46, 154, 92, 0.16);   --tint-strong: rgba(37, 116, 68, 0.36); }
+.lc-ann { background: var(--tint); border-radius: 2px; cursor: pointer; transition: background var(--fast) var(--ease); }
+.lc-ann.lc-sel { background: var(--tint-strong); }
+.lc-glyph { cursor: pointer; position: relative; }
+.lc-glyph::before {
+  content: ""; position: absolute; left: 50%; width: 4px; margin-left: -2px; background: var(--c);
+  transition: background var(--fast) var(--ease);
+}
+.lc-glyph.lc-sel::before { background: var(--c-strong); }
+.lc-glyph-dot::before { width: 8px; height: 8px; margin-left: -4px; top: 50%; margin-top: -4px; border-radius: 50%; }
+.lc-glyph-start::before { top: 50%; bottom: 0; border-radius: 2px 2px 0 0; }
+.lc-glyph-mid::before { top: 0; bottom: 0; }
+.lc-glyph-end::before { top: 0; bottom: 50%; border-radius: 0 0 2px 2px; }
+@media (prefers-reduced-motion: reduce) { .lc-ann, .lc-glyph::before { transition: none; } }
 
 /* ------------------------------------------------------------------ problem list */
 .list-page { display: flex; flex-direction: column; height: 100%; }
@@ -565,22 +575,7 @@ button.loc:hover { background: var(--accent-soft); color: var(--accent); }
 .group-desc > * { margin: 0; }
 .pill-note { margin-left: 6px; font-size: 11px; font-weight: 500; color: var(--text-3); }
 
-/* exact-range annotations: a stronger tint plus an underline, so they read apart from line bands */
-.lc-ann-text { border-radius: 2px; }
-.lc-ann-text.lc-ann-info { background: rgba(128, 128, 124, 0.22); box-shadow: inset 0 -2px 0 #8a8a86; }
-.lc-ann-text.lc-ann-hint { background: rgba(74, 111, 208, 0.2); box-shadow: inset 0 -2px 0 #5b7fd6; }
-.lc-ann-text.lc-ann-warning { background: rgba(214, 152, 30, 0.26); box-shadow: inset 0 -2px 0 #d19a2a; }
-.lc-ann-text.lc-ann-error { background: rgba(209, 72, 72, 0.22); box-shadow: inset 0 -2px 0 #d9534f; }
-.lc-ann-text.lc-ann-praise { background: rgba(46, 154, 92, 0.22); box-shadow: inset 0 -2px 0 #3f9a63; }
-.lc-ann-text { cursor: pointer; }
-.lc-ann-selected { outline: 1.5px solid var(--accent); outline-offset: -1px; }
-.lc-glyph { cursor: pointer; transition: transform var(--fast) var(--ease); }
-.lc-glyph:hover, .lc-glyph-selected { transform: scale(1.35); }
-.lc-glyph-selected { box-shadow: 0 0 0 2px var(--accent-soft); }
-@media (prefers-reduced-motion: reduce) { .lc-glyph { transition: none; } }
-
-/* review list: click to jump, and highlight the one picked in the editor */
-.review-item { border: 1.5px solid transparent; transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease); }
+/* review list: click to focus (click again to unfocus); focus only darkens the row */
 .review-item.clickable { cursor: pointer; }
 .review-item.clickable:hover { background: var(--surface-3); }
-.review-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+.review-item.selected, .review-item.selected:hover { background: color-mix(in srgb, var(--surface-3), var(--text) 9%); }

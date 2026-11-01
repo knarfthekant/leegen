@@ -94,9 +94,14 @@ async def test_annotation_columns():
         ok = await annotate(start_line=2, start_col=12, end_col=13)
         assert not ok.is_error
         await annotate(start_line=2, start_col=5)  # end_col defaults to end of line 2
+        await annotate(start_line=2)  # no columns: the text of the line, minus indentation
+        await annotate(start_line=1, end_line=2)  # several lines: first text .. last text
         saved = st.workspace.read_state("merge-ranges", "annotations", [])
         assert (saved[0]["start_col"], saved[0]["end_col"]) == (12, 13)
         assert (saved[1]["start_col"], saved[1]["end_col"]) == (5, 13)
+        assert (saved[2]["start_col"], saved[2]["end_col"]) == (5, 13)
+        assert (saved[3]["start_line"], saved[3]["start_col"], saved[3]["end_line"],
+                saved[3]["end_col"]) == (1, 1, 2, 13)
         for bad, needle in [
             ({"start_line": 2, "start_col": 99}, "start_col 99"),
             ({"start_line": 2, "start_col": 5, "end_col": 99}, "end_col 99"),

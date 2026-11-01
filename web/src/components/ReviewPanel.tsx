@@ -9,8 +9,8 @@ interface Props {
   proposals: Proposal[];
   /** the highlighted annotation, if any (clicked in the editor or in this list) */
   selectedId: string | null;
-  /** select an annotation and move the editor to its exact range */
-  onSelect: (a: Annotation) => void;
+  /** focus an annotation and move the editor to it; null unfocuses */
+  onSelect: (a: Annotation | null) => void;
   onDismiss: (a: Annotation) => void;
   onOpenProposal: (p: Proposal) => void;
 }
@@ -53,7 +53,11 @@ export function ReviewPanel({ annotations, proposals, selectedId, onSelect, onDi
     .sort((a, b) => (a.file! < b.file! ? -1 : a.file! > b.file! ? 1 : a.start_line! - b.start_line!));
 
   return (
-    <div className="panel-body review">
+    <div
+      className="panel-body review"
+      // a click on the empty space around the comments lets go of the focused one
+      onClick={(e) => e.target === e.currentTarget && selectedId && onSelect(null)}
+    >
       {proposals.map((p) => (
         <div key={p.id} className="review-item">
           <span className="sev-icon sev-hint">
@@ -79,7 +83,7 @@ export function ReviewPanel({ annotations, proposals, selectedId, onSelect, onDi
             key={a.id}
             ref={a.id === selectedId ? selectedRef : undefined}
             className={cx("review-item", a.file && a.start_line != null && "clickable", a.id === selectedId && "selected")}
-            onClick={() => onSelect(a)}
+            onClick={() => onSelect(a.id === selectedId ? null : a)}
           >
             <span className={`sev-icon sev-${a.severity}`} title={a.severity}>
               <Icon size={14} strokeWidth={1.9} />
@@ -88,9 +92,7 @@ export function ReviewPanel({ annotations, proposals, selectedId, onSelect, onDi
               <div className="review-head">
                 <span className={`sev-label sev-${a.severity}`}>{a.severity}</span>
                 {a.file && a.start_line != null ? (
-                  <button className="loc" onClick={() => onSelect(a)}>
-                    {locLabel(a)}
-                  </button>
+                  <span className="loc">{locLabel(a)}</span>
                 ) : (
                   <span className="muted small">general</span>
                 )}

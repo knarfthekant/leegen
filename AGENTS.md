@@ -89,7 +89,10 @@ Short version:
 5. **Tests:** 2–3 visible tests that mirror the examples in the description, then hidden tests
    for edge cases (empty input, boundaries, duplicates, large or random inputs, error paths).
    Seed all randomness. For floats and tensors use `float` or `allclose` with explicit
-   tolerances; GPU float32 needs `rtol≈1e-4`.
+   tolerances; GPU float32 needs `rtol≈1e-4`. The UI shows cases as `Test 1..N` with only their
+   `description`, so give every test a one-line `description`. Group related tests with
+   top-level `sections` (`id`, `title`, `description`) and `section: <id>` on each test (see the
+   authoring guide). pytest problems group by test class automatically.
 6. **Description:** Markdown with KaTeX math, `mermaid` code fences, inline `<svg>` figures and
    `:::note` / `:::warning` / `:::details{summary="..."}` / `:::figure{caption="..."}` blocks.
    No raw HTML other than SVG, and no scripts. State the exact function signature, input/output
@@ -122,10 +125,12 @@ When the user asks for help with the problem they have open:
    tool.
 4. **Comment on code with `annotate`:** line ranges, or exact character ranges, with severity
    `hint` / `warning` / `error` / `info` / `praise` and a short Markdown message. Add
-   `start_col` / `end_col` (1-based, `end_col` exclusive) to mark one token or expression
-   instead of the whole line. In the editor the user hovers a comment to peek at it and clicks
-   it to open it in the Review tab. Use a general comment (no `file`) for overall feedback.
-   Clear stale comments with `clear_annotations` once they no longer apply.
+   `start_col` / `end_col` (1-based, `end_col` exclusive) to mark exactly the offending token or
+   expression; without columns the text of the line(s) is marked, minus indentation. Comments
+   may overlap and each stays visible. In the editor a comment is a highlight plus one gutter
+   dot (a bar for several lines); the user hovers it to peek and clicks it to focus it in the
+   Review tab (click again or press Esc to unfocus). Use a general comment (no `file`) for
+   overall feedback. Clear stale comments with `clear_annotations` once they no longer apply.
 5. **Change code with `propose_edit`, never by writing files directly.** Suggestions appear as a
    diff the user accepts or rejects. Prefer small `edits` (exact search/replace) over replacing
    the whole file. (If something does write `workspace/<id>/...` directly, the app turns it into

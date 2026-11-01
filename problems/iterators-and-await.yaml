@@ -1,0 +1,693 @@
+schema_version: 1
+id: iterators-and-await
+title: Iterators, Await, and the Two Kinds of Suspension
+difficulty: easy
+tags:
+  - python
+  - asyncio
+  - iterators
+  - generators
+track: python-fundamentals
+order: 2
+environment: python
+requires: [cpu]
+description: |
+  Python has **two** different things that can pause, and confusing them is the most common
+  async bug. This problem climbs the whole ladder — plain iterators, then `await`, then async
+  generators — so you can tell the two apart by building each one.
+
+  | | what pauses | control goes to | resumes when |
+  |---|---|---|---|
+  | **generator frame** | a `yield` | the consumer (`next()` / `async for`) | the consumer asks for the next item |
+  | **task** | an `await` of something *still pending* | the event loop | that awaitable completes |
+
+  Three consequences, each tested below:
+
+  1. One `next()` runs the body up to exactly **one** `yield`. The frame really is frozen.
+  2. Freezing a frame is **not** the same as giving the event loop a turn. `async for` over a
+     generator that never awaits is a tight loop with no scheduling points at all.
+  3. Anything written **after** a `yield` may never run, because the consumer can walk away.
+     Cleanup belongs in `finally`.
+
+  ```mermaid
+  sequenceDiagram
+      participant L as event loop
+      participant C as consumer
+      participant G as async generator
+      C->>G: __anext__()
+      G->>G: await asyncio.sleep(0)
+      Note over L,G: the await suspends the TASK
+      L-->>G: resumed
+      G-->>C: yield n
+      Note over C,G: the yield suspends the FRAME only
+  ```
+
+  ## 1. `Peekable` — the sync iterator protocol
+
+  ```python
+  class Peekable:
+      def __init__(self, items: Iterable[T]) -> None: ...
+      def __iter__(self) -> Peekable: ...
+      def __next__(self) -> T: ...
+      def peek(self) -> T: ...
+  ```
+
+  `peek()` returns the next item **without consuming it**, so the following `next()` returns that
+  same item.
+
+  - `iter(p) is p` — an iterator is its own iterable.
+  - `peek()` can be called repeatedly; it returns the same item every time.
+  - Once exhausted, both `peek()` and `next()` raise `StopIteration` — every time, not just the
+    first.
+  - `items` may be a **one-shot** iterator (a generator, a file handle, a stream), so you cannot
+    use `len()`, indexing or `list()` to look ahead. You have to buffer one item.
+
+  ## 2. `take` — a sync generator, and who runs between resumes
+
+  ```python
+  def take(items: Iterable[T], k: int) -> Iterator[T]
+  ```
+
+  Yield at most `k` items from `items`, stopping early if the source runs out.
+
+  - Constructing the generator runs no code; nothing is read before the first `next()`.
+  - Each `next()` advances the source by **exactly one** item.
+  - `k <= 0` yields nothing and never touches `items`.
+
+  There is no `await` anywhere on this rung. Watch the interleaving, with a source that logs
+  every time it hands out an item:
+
+  ```text
+  log = []
+  g = take(source, 3)
+  next(g)  ->  source logs "step",  caller logs "got 1"
+  next(g)  ->  source logs "step",  caller logs "got 2"
+  next(g)  ->  source logs "step",  caller logs "got 3"
+  ```
+
+  The generator's frame froze at the `yield` and **the caller kept running** before asking for
+  the next item. That is "one `next()` = one `yield`", and it needs no event loop at all.
+
+  ## 3. `fair_countdown` — an async generator that actually suspends
+
+  ```python
+  async def fair_countdown(n: int) -> AsyncIterator[int]
+  ```
+
+  Yield `n, n-1, ..., 1`, calling `await asyncio.sleep(0)` **before each** item.
+
+  The position of that line is the whole lesson, and only a scheduling test can see it. With one
+  other task taking two turns:
+
+  ```text
+  fair_countdown(2):  ['other', 2, 'other', 1]
+  ```
+
+  Every item is gated — no value is delivered until the loop has given somebody else a turn,
+  including the *first* one.
+
+  :::note
+  `await asyncio.sleep(0)` is not a timer. Internally it is a bare `yield` aimed at the **task
+  driver** instead of at a consumer. Same keyword, different recipient, completely different
+  consequence.
+  :::
+
+  ## 4. `burst` — the control group
+
+  ```python
+  async def burst(n: int) -> AsyncIterator[int]
+  ```
+
+  Yield `n, n-1, ..., 1` with **no `await` anywhere**.
+
+  This is the anti-pattern, kept deliberately so the difference is measurable:
+
+  ```text
+  burst(2):           [2, 1, 'other', 'other']
+  ```
+
+  It is a perfectly valid async generator and still yields one item per `__anext__()`. But each
+  of those calls completes **synchronously**, so the consumer drains every item inside one task
+  step, and the other task does not get a turn until the generator is exhausted.
+
+  :::warning
+  An async generator that never awaits is indistinguishable, to the scheduler, from
+  `iter([n, n-1, ..., 1])`. It only becomes cooperative where it awaits something pending.
+  :::
+
+  ## 5. `drain` — cleanup that always runs
+
+  ```python
+  async def drain(conn: Connection) -> AsyncIterator[str]
+  ```
+
+  `conn.readline()` is `async` and returns `None` at end of input; `conn.close()` is a plain
+  method. Yield each line with surrounding whitespace stripped, skipping empty lines.
+  `conn.close()` must be called **exactly once**, whether the consumer reads everything, breaks
+  out early, or `readline()` raises.
+
+  :::details{summary="Why does cleanup written after the loop fail?"}
+  When the consumer leaves early, the generator is paused **at the `yield`**. Python later calls
+  `aclose()`, which throws `GeneratorExit` there. Statements after your loop are never reached;
+  only a `finally` block runs.
+
+  ```python
+  async def good(conn):
+      try:
+          while (line := await conn.readline()) is not None:
+              yield line.strip()
+      finally:
+          conn.close()              # always runs
+
+  async def bad(conn):
+      while (line := await conn.readline()) is not None:
+          yield line.strip()
+      conn.close()                  # skipped on an early break
+  ```
+  :::
+
+  ## Worked example
+
+  `fair_countdown(2)` and `burst(2)`, each racing one other task that takes two turns:
+
+  ```text
+  fair_countdown      await sleep(0)   other: 'other'
+                      yield 2          consumer: 2
+                      await sleep(0)   other: 'other'
+                      yield 1          consumer: 1
+  result  ['other', 2, 'other', 1]
+
+  burst               yield 2          consumer: 2
+                      yield 1          consumer: 1
+                      (exhausted)      other: 'other', 'other'
+  result  [2, 1, 'other', 'other']
+  ```
+
+  ## Constraints
+
+  - `0 <= n <= 10_000` for both countdowns, and `0 <= k <= 10_000` for `take`.
+  - Use `asyncio.sleep(0)` — never a real delay. The tests assert exact interleavings.
+  - Standard library only. `test_visible.py` shows some of the tests.
+hints:
+  - |
+    `Peekable` needs one slot of state: the buffered item and whether that slot is filled.
+    `__next__` returns the buffer when it is filled and pulls from the source otherwise.
+    `__iter__` returns `self`.
+  - |
+    `take`: call `iter(items)` once, then loop over `range(max(k, 0))`, pull one item with
+    `next()` inside `try/except StopIteration: return`, and `yield` what you pulled.
+  - |
+    In `fair_countdown` the only difference from `burst` is where the `await` sits — it must be
+    *before* the `yield`, not after it and not missing. In `drain`, wrap the whole `while` loop
+    in `try: ... finally: conn.close()`.
+files:
+  - path: solution.py
+    role: editable
+    content: |
+      import asyncio
+      from typing import AsyncIterator, Iterable, Iterator, Protocol, TypeVar
+
+      T = TypeVar("T")
+
+
+      class Connection(Protocol):
+          async def readline(self) -> str | None: ...
+          def close(self) -> None: ...
+
+
+      class Peekable:
+          """A sync iterator that can look one step ahead without consuming."""
+
+          def __init__(self, items: Iterable[T]) -> None:
+              raise NotImplementedError
+
+          def __iter__(self) -> "Peekable":
+              raise NotImplementedError
+
+          def __next__(self) -> T:
+              raise NotImplementedError
+
+          def peek(self) -> T:
+              raise NotImplementedError
+
+
+      def take(items: Iterable[T], k: int) -> Iterator[T]:
+          """Yield at most k items from items, reading lazily."""
+          raise NotImplementedError
+          yield  # keep this a generator function
+
+
+      async def fair_countdown(n: int) -> AsyncIterator[int]:
+          """Yield n, n-1, ..., 1, awaiting asyncio.sleep(0) before EACH item."""
+          raise NotImplementedError
+          yield
+
+
+      async def burst(n: int) -> AsyncIterator[int]:
+          """Yield n, n-1, ..., 1 with no await at all. Used as the control group."""
+          raise NotImplementedError
+          yield
+
+
+      async def drain(conn: Connection) -> AsyncIterator[str]:
+          """Yield stripped non-empty lines, closing conn exactly once."""
+          raise NotImplementedError
+          yield
+  - path: test_visible.py
+    role: readonly
+    content: |
+      """Visible tests, one worked example per question type.
+
+      The five question types are declared as pytest classes, so the run results show
+      them as collapsible section headers instead of one flat list:
+
+          1. TestValuesAndOrder    does it produce the right items, in order?
+          2. TestIteratorProtocol  is it really an iterator - iter(), peek(), StopIteration?
+          3. TestLaziness          is anything read before it is asked for?
+          4. TestTaskSuspension    does an await hand the loop a turn?
+          5. TestCleanup           does close() run on every exit path?
+
+      `TestTaskSuspension` gets a deliberately weak example: it only checks that the
+      other task ran before the first item. The exact interleaving is graded in
+      test_hidden.py.
+      """
+
+      import asyncio
+
+      from solution import Peekable, burst, drain, fair_countdown, take
+
+
+      # ---------------------------------------------------------------------------
+      # Helpers - also imported by test_hidden.py
+      # ---------------------------------------------------------------------------
+
+
+      class FakeConn:
+          """An async line source that counts how many times it was closed."""
+
+          def __init__(self, lines):
+              self.lines = list(lines)
+              self.closed = 0
+
+          async def readline(self):
+              await asyncio.sleep(0)
+              return self.lines.pop(0) if self.lines else None
+
+          def close(self):
+              self.closed += 1
+
+
+      class LogSource:
+          """A one-shot iterator that records every time it is stepped."""
+
+          def __init__(self, items, log):
+              self._it = iter(items)
+              self.log = log
+
+          def __iter__(self):
+              return self
+
+          def __next__(self):
+              self.log.append("step")
+              return next(self._it)
+
+
+      async def collect(agen):
+          """Drain an async generator into a list."""
+          return [x async for x in agen]
+
+
+      # ---------------------------------------------------------------------------
+      # 1. Values and order
+      # ---------------------------------------------------------------------------
+
+
+      class TestValuesAndOrder:
+          """Does it produce the right items, in the right order?"""
+
+          async def test_fair_countdown_values(self):
+              """fair_countdown(n) yields n, n-1, ..., 1"""
+              assert await collect(fair_countdown(3)) == [3, 2, 1]
+
+          async def test_burst_values(self):
+              """burst(n) yields the same values; only *when* they arrive differs"""
+              assert await collect(burst(3)) == [3, 2, 1]
+
+
+      # ---------------------------------------------------------------------------
+      # 2. Iterator protocol
+      # ---------------------------------------------------------------------------
+
+
+      class TestIteratorProtocol:
+          """Is it really an iterator - iter(), peek(), StopIteration?"""
+
+          def test_peekable_peek_lookahead(self):
+              """peek() shows the next item without consuming it"""
+              p = Peekable([1, 2])
+              assert iter(p) is p
+              assert p.peek() == 1
+              assert p.peek() == 1
+              assert next(p) == 1
+              assert next(p) == 2
+
+
+      # ---------------------------------------------------------------------------
+      # 3. Laziness
+      # ---------------------------------------------------------------------------
+
+
+      class TestLaziness:
+          """Is anything read before it is asked for?"""
+
+          def test_take_is_lazy(self):
+              """take() reads nothing until the first next()"""
+              log = []
+
+              def source():
+                  for i in [1, 2, 3]:
+                      log.append("read")
+                      yield i
+
+              g = take(source(), 2)
+              assert log == []
+              assert next(g) == 1
+              assert log == ["read"]
+
+
+      # ---------------------------------------------------------------------------
+      # 4. Task suspension
+      # ---------------------------------------------------------------------------
+
+
+      class TestTaskSuspension:
+          """Does an await hand the event loop a turn?"""
+
+          async def test_await_lets_the_other_task_run_first(self):
+              """the first value arrives only after another task has had a turn
+
+              Deliberately weaker than the hidden tests: this only checks that the
+              other task ran *before* the first item. The exact interleaving for both
+              countdowns is what the hidden tests grade - see the description's
+              "Worked example" for the full expected order.
+              """
+              seen = []
+
+              async def other():
+                  seen.append("other")
+                  await asyncio.sleep(0)
+
+              async def consume():
+                  async for n in fair_countdown(3):
+                      seen.append(n)
+
+              await asyncio.gather(consume(), other())
+              assert seen.index("other") < seen.index(3)
+
+
+      # ---------------------------------------------------------------------------
+      # 5. Cleanup
+      # ---------------------------------------------------------------------------
+
+
+      class TestCleanup:
+          """Does close() run on every exit path, exactly once?"""
+
+          async def test_drain_strips_and_closes(self):
+              """drain() strips, skips blanks, and closes the connection"""
+              conn = FakeConn([" a \n", "\n", "b\n"])
+              assert await collect(drain(conn)) == ["a", "b"]
+              assert conn.closed == 1
+  - path: test_hidden.py
+    role: hidden
+    content: |
+      """Hidden tests, grouped under the same five declared classes.
+
+      Same five classes, same order, harder cases: the easy case first, then the
+      boundary, then the exhaustion or error path. A failing section therefore points
+      at one concept rather than one function.
+      """
+
+      import asyncio
+      import inspect
+
+      import pytest
+
+      from solution import Peekable, burst, drain, fair_countdown, take
+      from test_visible import FakeConn, LogSource, collect
+
+
+      # ---------------------------------------------------------------------------
+      # 1. Values and order
+      # ---------------------------------------------------------------------------
+
+
+      class TestValuesAndOrder:
+          """Does it produce the right items, in the right order?"""
+
+          async def test_countdowns_agree_on_values(self):
+              """both countdowns produce identical values"""
+              assert await collect(fair_countdown(4)) == [4, 3, 2, 1]
+              assert await collect(burst(4)) == [4, 3, 2, 1]
+
+          async def test_zero_yields_nothing(self):
+              """countdown(0) yields nothing in either version"""
+              assert await collect(fair_countdown(0)) == []
+              assert await collect(burst(0)) == []
+
+          def test_take_more_than_available(self):
+              """asking for more than exists stops early instead of raising"""
+              assert list(take(iter([1, 2]), 5)) == [1, 2]
+
+
+      # ---------------------------------------------------------------------------
+      # 2. Iterator protocol
+      # ---------------------------------------------------------------------------
+
+
+      class TestIteratorProtocol:
+          """Is it really an iterator - iter(), peek(), StopIteration?"""
+
+          def test_peekable_is_its_own_iterator(self):
+              """iter(p) is p, as the protocol requires"""
+              p = Peekable([1])
+              assert iter(p) is p
+
+          def test_peekable_one_shot_source(self):
+              """works over a one-shot generator, not just a list"""
+              p = Peekable(c for c in "abc")
+              assert p.peek() == "a"
+              assert next(p) == "a"
+              assert next(p) == "b"
+              assert p.peek() == "c"
+
+          def test_peekable_exhausted_stays_exhausted(self):
+              """peek() and next() raise StopIteration forever once empty"""
+              p = Peekable([])
+              with pytest.raises(StopIteration):
+                  p.peek()
+              with pytest.raises(StopIteration):
+                  p.peek()
+              with pytest.raises(StopIteration):
+                  next(p)
+
+          def test_all_functions_are_generators(self):
+              """each function uses the right kind of suspension"""
+              assert inspect.isgeneratorfunction(take)
+              assert inspect.isasyncgenfunction(fair_countdown)
+              assert inspect.isasyncgenfunction(burst)
+              assert inspect.isasyncgenfunction(drain)
+
+
+      # ---------------------------------------------------------------------------
+      # 3. Laziness
+      # ---------------------------------------------------------------------------
+
+
+      class TestLaziness:
+          """Is anything read before it is asked for?"""
+
+          def test_take_zero_touches_nothing(self):
+              """k <= 0 yields nothing and never steps the source"""
+              log = []
+              assert list(take(LogSource([1, 2], log), 0)) == []
+              assert log == []
+
+          def test_peekable_does_not_read_ahead_twice(self):
+              """peeking twice steps the source only once"""
+              log = []
+              p = Peekable(LogSource([1, 2], log))
+              p.peek()
+              p.peek()
+              assert log == ["step"]
+
+          def test_take_caller_runs_between_resumes(self):
+              """one next() steps the source exactly once, then returns to the caller"""
+              log = []
+              g = take(LogSource([1, 2, 3], log), 3)
+              log.append(f"got {next(g)}")
+              log.append(f"got {next(g)}")
+              log.append(f"got {next(g)}")
+              assert log == ["step", "got 1", "step", "got 2", "step", "got 3"]
+
+          def test_take_leaves_the_rest_of_the_source(self):
+              """taking exactly k leaves the rest of the source unread"""
+              log = []
+              src = LogSource([1, 2, 3, 4], log)
+              assert list(take(src, 2)) == [1, 2]
+              assert log == ["step", "step"]
+              assert list(src) == [3, 4]
+
+
+      # ---------------------------------------------------------------------------
+      # 4. Task suspension
+      # ---------------------------------------------------------------------------
+
+
+      async def trace(factory, turns=3):
+          """Run factory() alongside one other task that takes `turns` turns.
+
+          The returned log is the whole point: it shows *when* each value arrived
+          relative to the other task, which a values-only check cannot see.
+          """
+          seen = []
+
+          async def other():
+              for _ in range(turns):
+                  seen.append("other")
+                  await asyncio.sleep(0)
+
+          async def consume():
+              async for n in factory():
+                  seen.append(n)
+
+          await asyncio.gather(consume(), other())
+          return seen
+
+
+      class TestTaskSuspension:
+          """Does an await hand the event loop a turn?"""
+
+          async def test_fair_countdown_gates_every_item(self):
+              """every item waits for another task to get a turn"""
+              assert await trace(lambda: fair_countdown(3)) == ["other", 3, "other", 2, "other", 1]
+
+          async def test_burst_has_no_suspension_point(self):
+              """a generator with no await drains in one task step"""
+              assert await trace(lambda: burst(3)) == [3, 2, 1, "other", "other", "other"]
+
+
+      # ---------------------------------------------------------------------------
+      # 5. Cleanup
+      # ---------------------------------------------------------------------------
+
+
+      class TestCleanup:
+          """Does close() run on every exit path, exactly once?"""
+
+          async def test_drain_empty_closes_once(self):
+              """an empty connection yields nothing and still closes"""
+              conn = FakeConn([])
+              assert await collect(drain(conn)) == []
+              assert conn.closed == 1
+
+          async def test_drain_skips_blank_lines(self):
+              """whitespace-only lines are skipped"""
+              conn = FakeConn(["   \n", "\tx\n", " y \n"])
+              assert await collect(drain(conn)) == ["x", "y"]
+
+          async def test_drain_early_break_closes_once(self):
+              """breaking early still closes the connection exactly once"""
+              conn = FakeConn(["one", "two", "three"])
+              gen = drain(conn)
+              async for _ in gen:
+                  break
+              await gen.aclose()
+              assert conn.closed == 1
+
+          async def test_drain_error_closes_once(self):
+              """a readline() error closes the connection and propagates"""
+
+              class Broken(FakeConn):
+                  async def readline(self):
+                      raise ConnectionError("reset")
+
+              conn = Broken([])
+              with pytest.raises(ConnectionError):
+                  await collect(drain(conn))
+              assert conn.closed == 1
+
+reference:
+  files:
+    - path: solution.py
+      content: |
+        import asyncio
+        from typing import AsyncIterator, Iterable, Iterator, Protocol, TypeVar
+
+        T = TypeVar("T")
+
+
+        class Connection(Protocol):
+            async def readline(self) -> str | None: ...
+            def close(self) -> None: ...
+
+
+        class Peekable:
+            """A sync iterator that can look one step ahead without consuming."""
+
+            def __init__(self, items: Iterable[T]) -> None:
+                self._it = iter(items)
+                self._has = False
+                self._buf: T | None = None
+
+            def __iter__(self) -> "Peekable":
+                return self
+
+            def __next__(self) -> T:
+                if self._has:
+                    self._has = False
+                    return self._buf
+                return next(self._it)
+
+            def peek(self) -> T:
+                if not self._has:
+                    self._buf = next(self._it)
+                    self._has = True
+                return self._buf
+
+
+        def take(items: Iterable[T], k: int) -> Iterator[T]:
+            """Yield at most k items from items, reading lazily."""
+            it = iter(items)
+            for _ in range(max(k, 0)):
+                try:
+                    item = next(it)
+                except StopIteration:
+                    return
+                yield item
+
+
+        async def fair_countdown(n: int) -> AsyncIterator[int]:
+            """Yield n, n-1, ..., 1, awaiting asyncio.sleep(0) before EACH item."""
+            for i in range(n, 0, -1):
+                await asyncio.sleep(0)
+                yield i
+
+
+        async def burst(n: int) -> AsyncIterator[int]:
+            """Yield n, n-1, ..., 1 with no await at all. Used as the control group."""
+            for i in range(n, 0, -1):
+                yield i
+
+
+        async def drain(conn: Connection) -> AsyncIterator[str]:
+            """Yield stripped non-empty lines, closing conn exactly once."""
+            try:
+                while (line := await conn.readline()) is not None:
+                    line = line.strip()
+                    if line:
+                        yield line
+            finally:
+                conn.close()
+judge:
+  kind: pytest

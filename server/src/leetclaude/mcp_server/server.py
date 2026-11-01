@@ -74,11 +74,12 @@ class AnnotationIn(BaseModel):
     start_line: int | None = Field(None, description="1-based first line (required with file).")
     end_line: int | None = Field(None, description="1-based last line; defaults to start_line.")
     start_col: int | None = Field(
-        None, description="Optional 1-based column where the highlight starts on start_line. "
-        "Omit both columns to highlight whole lines.")
+        None, description="1-based column where the highlight starts on start_line. Give exact "
+        "columns whenever the problem is one token or expression. Omit both columns to mark the "
+        "text of the line(s), without indentation.")
     end_col: int | None = Field(
-        None, description="Optional 1-based column on end_line, exclusive (one past the last "
-        "highlighted character). Defaults to the end of end_line when start_col is given.")
+        None, description="1-based column on end_line, exclusive (one past the last highlighted "
+        "character). Defaults to the end of the text on end_line when start_col is given.")
     severity: Literal["info", "hint", "warning", "error", "praise"] = "info"
     message: str = Field(description="Markdown. Keep it short and specific.")
 
@@ -277,12 +278,13 @@ def build_mcp() -> MCPServer:
     @tool()
     async def annotate(annotations: list[AnnotationIn], problem_id: str | None = None,
                        author: str = "assistant") -> dict[str, Any]:
-        """Comment on the user's code. Each annotation highlights a line range, or an exact
-        character range when start_col/end_col are given, in a visible file (or is a general
-        comment when file is omitted). It shows up in the editor (hover to peek, click to open
-        it in Review) and in the Review tab. Lines and columns are 1-based and refer to the
-        current code from get_session; end_col is exclusive. Prefer a precise range over a
-        whole line when the problem is one expression or token."""
+        """Comment on the user's code. Each annotation marks an exact character range in a
+        visible file (or is a general comment when file is omitted). In the editor it shows as a
+        highlight plus one gutter dot (a bar for several lines); hovering peeks at it and
+        clicking focuses it in the Review tab. Lines and columns are 1-based and refer to the
+        current code from get_session; end_col is exclusive. Always prefer start_col/end_col
+        that cover just the offending token or expression; without columns the whole text of
+        the line(s) is marked. Comments may overlap, and each stays visible."""
         p = _problem(problem_id)
         created = await tutor.add_annotations(p, [a.model_dump() for a in annotations], author)
         return {"created": [c["id"] for c in created]}

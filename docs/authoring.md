@@ -235,10 +235,14 @@ benchmark: {against: reference, repeats: 20, max_slowdown: 3.0}
   - large inputs that need the intended complexity (set `limits.timeout_s` so a brute-force
     solution actually times out)
   - error paths
-- Name tests by **what they check** ("Touching ranges merge"). The UI labels the pills
-  `Test 1..N` by position and shows the name as the heading and in the tooltip, so the name is
-  for you and the Review/result detail, not for the pill.
-- Give a case a one-line `description` when the point of it isn't obvious from the input.
+- **The UI shows no test titles.** Cases appear as `Test 1..N` (numbered by position across the
+  whole problem), and the only text the user sees for a case is its `description`. `name` stays
+  required and unique, but only identifies the case in the YAML, validation reports and the
+  tutor tools, so name it by what it checks ("Touching ranges merge").
+- Give every case a one-line `description` saying what it checks, in plain words the user can
+  act on ("Bookings arrive out of order, so sort before merging."). Without one the user sees
+  just a number, which matters most for hidden tests: a failing hidden test shows its input and
+  output, and the description is what explains why that input was there.
 - **Sections** group related cases. Declare them once, then tag tests:
 
   ```yaml

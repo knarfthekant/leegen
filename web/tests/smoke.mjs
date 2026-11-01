@@ -97,7 +97,9 @@ try {
   if (await page.locator(".group-desc", { hasText: "examples from the statement" }).count()) throw new Error("section did not collapse");
   await page.locator(".group-head", { hasText: "Basics" }).click();
   await page.locator(".pill", { hasText: "Test 1" }).first().click();
-  await page.locator(".case-name", { hasText: "Example" }).waitFor();
+  // cases are numbered, so they show a description and no title
+  await page.locator(".case", { hasText: "example from the statement" }).waitFor();
+  if (await page.locator(".case-name").count()) throw new Error("test titles should be gone");
 
   step("undo and redo buttons follow the edit history");
   const undo = page.getByRole("button", { name: /^Undo/ });
@@ -135,38 +137,106 @@ try {
   console.log("  custom case ok:", caseText.split("\n").filter(Boolean).slice(0, 8).join(" | "));
   await page.screenshot({ path: `${SHOTS}/lc-smoke-custom.png` });
 
-  step("precise annotations: highlight, hover peek, click opens the Review item");
+  step("comments: character ranges, one mark each, overlaps stay visible");
   await page.getByRole("tab", { name: "Testcase" }).click();
-  // line 3 of the solution: `    for start, end in sorted(bookings):`; mark just `sorted(bookings)`
-  const col = SOLUTION.split("\n")[2].indexOf("sorted(bookings)") + 1;
+  const lines = SOLUTION.split("\n");
+  const col = lines[2].indexOf("sorted(bookings)") + 1; // `for start, end in sorted(bookings):`
   await call("annotate", { problem_id: PID, annotations: [
-    { file: "solution.py", start_line: 3, start_col: col, end_col: col + "sorted(bookings)".length, severity: "hint", message: "Sorting is the key step." },
+    { file: "solution.py", start_line: 3, start_col: col, end_col: col + 16, severity: "hint", message: "Sorting is the key step." },
+    // overlaps the first one on `(bookings)`
+    { file: "solution.py", start_line: 3, start_col: col + 6, end_col: col + 17, severity: "error", message: "The call and colon." },
+    // no columns: the text of the line, without indentation
     { file: "solution.py", start_line: 6, severity: "praise", message: "Good merge." },
+    // two lines: one connected bar
+    { file: "solution.py", start_line: 4, end_line: 5, severity: "warning", message: "Check this branch." },
   ] });
   await page.getByRole("tab", { name: /Review/ }).waitFor();
-  const hl = page.locator(".lc-ann-text.lc-ann-hint");
-  await hl.first().waitFor();
-  // Monaco splits an inline decoration into one span per token; together they cover the range
-  const marked = (await hl.allInnerTexts()).join("");
-  if (marked !== "sorted(bookings)") throw new Error(`character range highlighted ${JSON.stringify(marked)}`);
-  await hl.first().hover();
-  await page.locator(".monaco-hover", { hasText: "Sorting is the key step." }).waitFor();
-  await page.screenshot({ path: `${SHOTS}/lc-smoke-peek.png` });
-  await hl.first().click();
-  await page.locator(".review-item.selected", { hasText: "Sorting is the key step." }).waitFor();
-  const loc = await page.locator(".review-item.selected .loc").innerText();
-  if (!loc.includes(`3:${col}`)) throw new Error("location label lacks the columns: " + loc);
-  await page.waitForTimeout(300); // let the highlight transition finish
-  await page.screenshot({ path: `${SHOTS}/lc-smoke-review.png` });
-  // and back: clicking the list item selects the exact characters in the editor
-  await page.locator(".review-item", { hasText: "Good merge." }).click();
-  await page.locator(".review-item.selected", { hasText: "Good merge." }).waitFor();
-  await page.locator(".review-item", { hasText: "Sorting is the key step." }).click();
-  const picked = await page.evaluate(() => {
-    const ed = window.monaco.editor.getEditors().find((e) => !e.getOption(window.monaco.editor.EditorOption.readOnly));
-    return ed.getModel().getValueInRange(ed.getSelection());
+  const editorEval = (fn, arg) => page.evaluate(`(() => {
+    const m = window.monaco, ed = m.editor.getEditors().find((e) => !e.getOption(m.editor.EditorOption.readOnly));
+    return (${fn.toString()})(m, ed, ${JSON.stringify(arg ?? null)});
+  })()`);
+  const decos = () => editorEval((m, ed) => {
+    const model = ed.getModel();
+    return model.getAllDecorations().filter((d) => d.options.className?.includes("lc-ann") || d.options.glyphMarginClassName?.includes("lc-glyph"))
+      .map((d) => ({ cls: d.options.className ?? "", glyph: d.options.glyphMarginClassName ?? "", lane: d.options.glyphMargin?.position ?? 0,
+                     line: d.range.startLineNumber, text: model.getValueInRange(d.range) }));
   });
-  if (picked !== "sorted(bookings)") throw new Error(`Review click selected ${JSON.stringify(picked)}`);
+  await page.waitForFunction(() => window.monaco.editor.getEditors().some((e) => e.getModel().getAllDecorations().some((d) => d.options.className?.includes("lc-ann"))));
+  let d = await decos();
+  const layer = (sev) => d.find((x) => x.cls.includes("lc-ann") && x.cls.includes(`lc-sev-${sev}`));
+  const marks = (sev) => d.filter((x) => x.glyph.includes(`lc-sev-${sev}`));
+  if (layer("hint").text !== "sorted(bookings)") throw new Error("hint covers " + JSON.stringify(layer("hint").text));
+  if (layer("error").text !== "(bookings):") throw new Error("error covers " + JSON.stringify(layer("error").text));
+  if (layer("praise").text !== "else:") throw new Error("a comment without columns should cover the text only: " + JSON.stringify(layer("praise").text));
+  if (!layer("warning").text.startsWith("if merged") || !layer("warning").text.endsWith("end)")) throw new Error("multi-line text range: " + JSON.stringify(layer("warning").text));
+  for (const sev of ["hint", "error", "praise"]) if (marks(sev).length !== 1 || !marks(sev)[0].glyph.includes("lc-glyph-dot")) throw new Error(`${sev} should have exactly one dot`);
+  const bar = marks("warning").map((x) => x.glyph.match(/lc-glyph-(start|mid|end|dot)/)[1]).join(",");
+  if (bar !== "start,end") throw new Error("a two-line comment should be a start+end bar, got " + bar);
+  if (marks("hint")[0].lane === marks("error")[0].lane) throw new Error("overlapping comments must use different gutter lanes");
+  console.log("  ranges ok:", ["hint", "error", "praise", "warning"].map((s) => JSON.stringify(layer(s).text.slice(0, 18))).join(" "));
+  await page.screenshot({ path: `${SHOTS}/lc-smoke-overlap.png` });
+
+  const px = (line, column) => editorEval((m, ed, [l, c]) => {
+    const p = ed.getScrolledVisiblePosition({ lineNumber: l, column: c });
+    const r = ed.getDomNode().getBoundingClientRect();
+    return { x: r.left + p.left + 2, y: r.top + p.top + p.height / 2 };
+  }, [line, column]);
+  const clickAt = async (line, column) => { const p = await px(line, column); await page.mouse.click(p.x, p.y); };
+  const focused = async () => (await page.locator(".review-item.selected").allInnerTexts()).map((t) => t.replace(/\s+/g, " "));
+  const darkened = async () => (await decos()).filter((x) => x.cls.includes("lc-sel") || x.glyph.includes("lc-sel")).length;
+  const expectFocus = async (what, msg, marks = 1) => {
+    await page.waitForTimeout(200);
+    const f = await focused();
+    if (what ? !(f.length === 1 && f[0].includes(what)) : f.length) throw new Error(`${msg}: focused = ${JSON.stringify(f)}`);
+    if ((await darkened()) !== (what ? 1 + marks : 0)) throw new Error(`${msg}: expected ${what ? `text layer + ${marks} mark(s)` : "nothing"} darkened`);
+  };
+
+  step("hover peek shows every comment under the pointer");
+  const both = await px(3, col + 8);
+  await page.mouse.move(both.x, both.y);
+  await page.locator(".monaco-hover", { hasText: "Sorting is the key step." }).waitFor();
+  const peek = await page.locator(".monaco-hover").first().innerText();
+  if (!peek.includes("The call and colon.")) throw new Error("peek should list the overlapping comment too: " + peek);
+
+  step("click focuses a comment (darkens it, no outline); clicking again unfocuses");
+  await clickAt(3, col + 1); // only the hint covers this
+  await expectFocus("Sorting is the key step.", "click on a comment");
+  const outline = await page.evaluate(() => { const el = document.querySelector(".lc-ann.lc-sel"); return el ? getComputedStyle(el).outlineStyle : "none"; });
+  if (outline !== "none") throw new Error("a focused comment should not have an outline");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `${SHOTS}/lc-smoke-review.png` });
+  await clickAt(3, col + 1);
+  await expectFocus(null, "second click on the focused comment");
+
+  step("other ways to unfocus: click elsewhere in the editor, Escape, click the Review row again");
+  await clickAt(3, col + 1);
+  await expectFocus("Sorting is the key step.", "refocus");
+  await clickAt(1, 3); // plain code, no comment
+  await expectFocus(null, "click on plain code");
+  await clickAt(3, col + 1);
+  await page.keyboard.press("Escape");
+  await expectFocus(null, "Escape");
+  await page.locator(".review-item", { hasText: "Good merge." }).click();
+  await expectFocus("Good merge.", "Review row click");
+  await page.locator(".review-item", { hasText: "Good merge." }).click();
+  await expectFocus(null, "Review row clicked again");
+  await page.locator(".review-item", { hasText: "Good merge." }).click();
+  await page.locator(".review").click({ position: { x: 4, y: 4 } });
+  await expectFocus(null, "click on empty Review space");
+
+  step("overlapped comments: clicking the overlap steps through them, then unfocuses");
+  await clickAt(3, col + 8);
+  await expectFocus("The call and colon.", "overlap, first click (smaller range first)");
+  await clickAt(3, col + 8);
+  await expectFocus("Sorting is the key step.", "overlap, second click");
+  await clickAt(3, col + 8);
+  await expectFocus(null, "overlap, third click");
+
+  step("the gutter bar focuses its comment");
+  const barBox = await page.locator(".lc-glyph-end.lc-sev-warning").boundingBox();
+  await page.mouse.click(barBox.x + barBox.width / 2, barBox.y + barBox.height / 2);
+  await expectFocus("Check this branch.", "gutter bar", 2); // the whole bar darkens
+  await page.keyboard.press("Escape");
   await call("clear_annotations", { problem_id: PID });
 
   console.log("SMOKE OK");

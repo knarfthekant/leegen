@@ -485,7 +485,7 @@ export function WorkspacePage({ id }: { id: string }) {
                   selectedAnnotationId={selectedAnnotationId}
                   onSelectAnnotation={(aid) => {
                     setSelectedAnnotationId(aid);
-                    showBottom("review");
+                    if (aid) showBottom("review");
                   }}
                   dark={dark}
                   saveState={saveState}
@@ -555,8 +555,8 @@ export function WorkspacePage({ id }: { id: string }) {
                       proposals={proposals}
                       selectedId={selectedAnnotationId}
                       onSelect={(a) => {
-                        setSelectedAnnotationId(a.id);
-                        if (!a.file || a.start_line == null) return;
+                        setSelectedAnnotationId(a?.id ?? null);
+                        if (!a || !a.file || a.start_line == null) return;
                         setActive(a.file);
                         setRevealLine({
                           path: a.file,

@@ -45,8 +45,8 @@ interface Props {
   revealLine: RevealTarget | null;
   /** annotation highlighted in the editor and in the Review panel */
   selectedAnnotationId: string | null;
-  /** the user clicked an annotation in the editor (gutter dot or highlighted text) */
-  onSelectAnnotation: (id: string) => void;
+  /** focus an annotation (clicked in the editor), or null to unfocus */
+  onSelectAnnotation: (id: string | null) => void;
   dark: boolean;
   saveState: SaveState;
   cursor: CursorInfo | null;
@@ -58,33 +58,62 @@ const EDITOR_FONT = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, m
 
 type Ed = monaco.editor.IStandaloneCodeEditor;
 
-// --- annotation hover peek -------------------------------------------------------------------
-// One provider for every model. Each editor publishes its annotations here, keyed by model URI,
-// so overlapping ranges all show up in a single peek.
+// --- annotations -------------------------------------------------------------------------------
+// Each editor publishes its annotations here, keyed by model URI, so the hover provider (one for
+// all models) and the click handler can find them. `range` reads the *tracked* decoration range,
+// so it follows the user's edits instead of the position the annotation was created at.
 
-const annotationsByModel = new Map<string, Annotation[]>();
-
-function annotationRange(a: Annotation): monaco.Range {
-  const startLine = a.start_line ?? 1;
-  const endLine = a.end_line ?? startLine;
-  return a.start_col == null || a.end_col == null
-    ? new monaco.Range(startLine, 1, endLine, Number.MAX_SAFE_INTEGER)
-    : new monaco.Range(startLine, a.start_col, endLine, a.end_col);
+interface Entry {
+  a: Annotation;
+  range: () => monaco.Range;
+  lane: monaco.editor.GlyphMarginLane;
 }
 
-const isPrecise = (a: Annotation) => a.start_col != null && a.end_col != null;
+const entriesByModel = new Map<string, Entry[]>();
 
-/** Annotations covering a position, smallest range first (the most specific one wins a click). */
-function annotationsAt(uri: string, pos: monaco.IPosition): Annotation[] {
-  return (annotationsByModel.get(uri) ?? [])
-    .filter((a) => annotationRange(a).containsPosition(pos))
-    .sort((a, b) => size(a) - size(b));
+/**
+ * The exact characters an annotation covers. The server always sends columns; annotations saved
+ * before that (or created without them) fall back to the text of the line(s) minus indentation.
+ */
+function resolveRange(a: Annotation, model: monaco.editor.ITextModel): monaco.Range {
+  const last = model.getLineCount();
+  const startLine = Math.min(Math.max(a.start_line ?? 1, 1), last);
+  const endLine = Math.min(Math.max(a.end_line ?? startLine, startLine), last);
+  const startCol = a.start_col ?? (model.getLineFirstNonWhitespaceColumn(startLine) || model.getLineMaxColumn(startLine));
+  let endCol = a.end_col ?? (model.getLineLastNonWhitespaceColumn(endLine) || startCol);
+  if (startLine === endLine) endCol = Math.max(endCol, startCol);
+  return new monaco.Range(startLine, startCol, endLine, endCol);
 }
 
-function size(a: Annotation) {
-  const startLine = a.start_line ?? 1;
-  const endLine = a.end_line ?? startLine;
-  return isPrecise(a) && startLine === endLine ? a.end_col! - a.start_col! : (endLine - startLine + 1) * 1000;
+/** Smaller ranges first, so the most specific comment comes first at a click or hover. */
+function weight(r: monaco.Range) {
+  return (r.endLineNumber - r.startLineNumber) * 10000 + (r.endColumn - r.startColumn);
+}
+
+function entriesAt(uri: string, pos: monaco.IPosition): Entry[] {
+  return (entriesByModel.get(uri) ?? [])
+    .filter((e) => e.range().containsPosition(pos))
+    .sort((x, y) => weight(x.range()) - weight(y.range()));
+}
+
+/** Each comment owns one gutter lane at its lines; comments that overlap in lines take other lanes. */
+function assignLanes(items: { startLine: number; endLine: number }[]): monaco.editor.GlyphMarginLane[] {
+  const lanes = [
+    monaco.editor.GlyphMarginLane.Left,
+    monaco.editor.GlyphMarginLane.Center,
+    monaco.editor.GlyphMarginLane.Right,
+  ];
+  const taken: [number, number][][] = lanes.map(() => []);
+  const order = items.map((_, i) => i).sort((x, y) => items[x].startLine - items[y].startLine || x - y);
+  const out = new Array<monaco.editor.GlyphMarginLane>(items.length);
+  for (const i of order) {
+    const { startLine, endLine } = items[i];
+    let lane = taken.findIndex((spans) => spans.every(([s, e]) => endLine < s || startLine > e));
+    if (lane < 0) lane = lanes.length - 1; // more than three at once: the last lane is shared
+    taken[lane].push([startLine, endLine]);
+    out[i] = lanes[lane];
+  }
+  return out;
 }
 
 let hoverRegistered = false;
@@ -93,13 +122,13 @@ function registerAnnotationHover() {
   hoverRegistered = true;
   monaco.languages.registerHoverProvider("*", {
     provideHover(model, position) {
-      const hits = annotationsAt(model.uri.toString(), position);
+      const hits = entriesAt(model.uri.toString(), position);
       if (!hits.length) return null;
       return {
-        range: annotationRange(hits[0]).intersectRanges(model.getFullModelRange()) ?? undefined,
-        contents: hits.flatMap((a) => [
+        range: hits[0].range(),
+        contents: hits.flatMap(({ a }) => [
           { value: `**${a.severity}** · ${a.author}\n\n${a.message}` },
-          { value: `_${isPrecise(a) ? "Click" : "Click the dot in the gutter"} to open in Review_` },
+          { value: "_Click to focus in Review_" },
         ]),
       };
     },
@@ -145,14 +174,40 @@ export function Editor(props: Props) {
     syncUndo();
     editor.onMouseDown((e) => {
       const model = editor.getModel();
-      if (!model || !e.target.position || !e.event.leftButton) return;
-      const inGutter = e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN;
-      const onText = e.target.type === monaco.editor.MouseTargetType.CONTENT_TEXT;
-      if (!inGutter && !onText) return;
-      // Text clicks only count on exact-range highlights, so editing a whole-line one never
-      // yanks the user into the Review tab. The gutter dot selects any annotation.
-      const hit = annotationsAt(model.uri.toString(), e.target.position).find((a) => inGutter || isPrecise(a));
-      if (hit) handlers.current.onSelectAnnotation(hit.id);
+      if (!model || !e.event.leftButton) return;
+      const { selectedAnnotationId: picked, onSelectAnnotation } = handlers.current;
+      const type = e.target.type;
+      const inGutter = type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN;
+      const inText = type === monaco.editor.MouseTargetType.CONTENT_TEXT;
+      const inEmpty = type === monaco.editor.MouseTargetType.CONTENT_EMPTY;
+      if (!inGutter && !inText && !inEmpty) return;
+      const uri = model.uri.toString();
+      let hits: Entry[] = [];
+      if (e.target.position) {
+        if (inGutter) {
+          // a dot or bar covers its comment's lines in its own lane
+          const line = e.target.position.lineNumber;
+          const lane = (e.target.detail as monaco.editor.IMouseTargetMarginData | undefined)?.glyphMarginLane;
+          hits = (entriesByModel.get(uri) ?? []).filter((x) => {
+            const r = x.range();
+            return line >= r.startLineNumber && line <= r.endLineNumber && (lane == null || x.lane === lane);
+          });
+        } else if (inText) {
+          hits = entriesAt(uri, e.target.position);
+        }
+      }
+      if (!hits.length) {
+        // a click on code that carries no comment lets go of the focused one
+        if (picked) onSelectAnnotation(null);
+        return;
+      }
+      // Clicking again steps through the comments stacked there; past the last one it unfocuses.
+      const at = hits.findIndex((x) => x.a.id === picked);
+      onSelectAnnotation(at < 0 ? hits[0].a.id : at + 1 < hits.length ? hits[at + 1].a.id : null);
+    });
+    editor.onKeyDown((e) => {
+      if (e.keyCode === monaco.KeyCode.Escape && handlers.current.selectedAnnotationId)
+        handlers.current.onSelectAnnotation(null);
     });
     editor.onDidChangeCursorSelection((e) => {
       const sel = e.selection;
@@ -177,37 +232,61 @@ export function Editor(props: Props) {
   function applyDecorations() {
     const coll = decorations.current;
     const model = editorRef.current?.getModel();
-    if (!coll || !file) return;
+    if (!coll || !model || !file) return;
+    const uri = model.uri.toString();
     const mine = annotations.filter((a) => a.file === file.path && a.start_line != null);
-    if (model) annotationsByModel.set(model.uri.toString(), mine);
-    const items = mine.map((a) => {
-      const precise = isPrecise(a);
-      const picked = a.id === props.selectedAnnotationId;
-      return {
-        range: annotationRange(a),
+    const ranges = mine.map((a) => resolveRange(a, model));
+    const lanes = assignLanes(ranges.map((r) => ({ startLine: r.startLineNumber, endLine: r.endLineNumber })));
+
+    // Per comment: one translucent highlight layer (layers blend, so overlaps stay visible), then
+    // one gutter mark per line: a dot for a single line, a connected bar for several.
+    const items: monaco.editor.IModelDeltaDecoration[] = [];
+    const slots: { entry: number; kind: "text" | "glyph" }[] = [];
+    mine.forEach((a, i) => {
+      const r = ranges[i];
+      const sel = a.id === props.selectedAnnotationId ? " lc-sel" : "";
+      const sev = `lc-sev-${a.severity}`;
+      items.push({
+        range: r,
         options: {
-          isWholeLine: !precise,
-          // exact ranges: a tinted, underlined span; whole lines: a tinted band
-          // `className` paints a layer behind the text (fine for line bands); exact ranges use
-          // `inlineClassName` so the styled span wraps the characters themselves.
-          ...(precise
-            ? { inlineClassName: cx("lc-ann-text", `lc-ann-${a.severity}`, picked && "lc-ann-selected") }
-            : { className: cx("lc-ann", `lc-ann-${a.severity}`, picked && "lc-ann-selected") }),
-          glyphMarginClassName: `lc-glyph lc-glyph-${a.severity}${picked ? " lc-glyph-selected" : ""}`,
-          glyphMarginHoverMessage: { value: a.message },
+          className: `lc-ann ${sev}${sel}`,
           overviewRuler: { color: severityColor(a.severity), position: monaco.editor.OverviewRulerLane.Right },
           stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
         },
-      };
+      });
+      slots.push({ entry: i, kind: "text" });
+      for (let line = r.startLineNumber; line <= r.endLineNumber; line++) {
+        const part = r.startLineNumber === r.endLineNumber ? "dot" : line === r.startLineNumber ? "start" : line === r.endLineNumber ? "end" : "mid";
+        items.push({
+          range: new monaco.Range(line, 1, line, 1),
+          options: {
+            glyphMargin: { position: lanes[i] },
+            glyphMarginClassName: `lc-glyph lc-glyph-${part} ${sev}${sel}`,
+            glyphMarginHoverMessage: { value: a.message },
+          },
+        });
+        slots.push({ entry: i, kind: "glyph" });
+      }
     });
     coll.set(items);
+    const textIndex = new Map<number, number>();
+    slots.forEach((s, k) => s.kind === "text" && textIndex.set(s.entry, k));
+    entriesByModel.set(
+      uri,
+      mine.map((a, i) => ({
+        a,
+        lane: lanes[i],
+        // the text layer's tracked range, which moves with the user's edits
+        range: () => (coll.getRange(textIndex.get(i)!) ?? ranges[i]),
+      })),
+    );
   }
 
   useEffect(applyDecorations, [annotations, file?.path, props.selectedAnnotationId]);
   useEffect(
     () => () => {
       const uri = editorRef.current?.getModel()?.uri.toString();
-      if (uri) annotationsByModel.delete(uri);
+      if (uri) entriesByModel.delete(uri);
     },
     [file?.path],
   );
@@ -216,14 +295,11 @@ export function Editor(props: Props) {
     const r = props.revealLine;
     const ed = editorRef.current;
     if (!r || !ed || r.path !== file?.path) return;
-    if (r.col != null && r.endCol != null) {
-      const range = new monaco.Range(r.line, r.col, r.endLine ?? r.line, r.endCol);
-      ed.revealRangeInCenter(range);
-      ed.setSelection(range);
-    } else {
-      ed.revealLineInCenter(r.line);
-      ed.setPosition({ lineNumber: r.line, column: 1 });
-    }
+    // Move to the start of the comment without selecting it: a selection would paint over the
+    // comment's own colour, and the focus is shown by that colour darkening.
+    const col = r.col ?? 1;
+    ed.revealRangeInCenter(new monaco.Range(r.line, col, r.endLine ?? r.line, r.endCol ?? col));
+    ed.setPosition({ lineNumber: r.line, column: col });
     ed.focus();
   }, [props.revealLine?.nonce, file?.path]);
 

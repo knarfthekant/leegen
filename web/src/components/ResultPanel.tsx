@@ -144,7 +144,6 @@ export function ResultPanel({
               key={x.name + x.index}
               className={cx("pill", x.status === "pass" ? "pass" : "fail", sel === x.index && "active")}
               onClick={() => setSel(x.index)}
-              title={x.visible || x.custom ? x.name : `${x.name} (hidden)`}
             >
               <span className="status-dot" />
               Test {x.index + 1}
@@ -156,17 +155,11 @@ export function ResultPanel({
 
       {t && (
         <div className="case">
-          <div className="row between">
-            <span className="case-name">{t.name}</span>
+          <div className="row">
             <Chip tone={t.status === "pass" ? "pass" : "fail"}>
               <span className="cap">{t.status}</span>
             </Chip>
           </div>
-          {t.section && (
-            <div className="muted small">
-              {sections.find((x) => x.id === t.section)?.title ?? t.section}
-            </div>
-          )}
           {t.description && <div className="muted"><Markdown source={t.description} /></div>}
           {!t.visible && t.status === "pass" && <p className="muted small">Hidden test: details are shown only when it fails.</p>}
           {t.input != null && <InputView input={t.input} params={params} />}
