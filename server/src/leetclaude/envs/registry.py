@@ -10,19 +10,8 @@ from pathlib import Path
 import yaml
 
 from leetclaude.config import settings
-from leetclaude.schema.models import Environment
-
-
-def satisfies(capabilities: Iterable[str], requires: Iterable[str]) -> bool:
-    caps = set(capabilities)
-    for req in requires:
-        if req == "cpu" and "cpu" not in caps:
-            return False
-        if req == "gpu" and not caps & {"cuda", "mps", "gpu"}:
-            return False
-        if req == "cuda" and "cuda" not in caps:
-            return False
-    return True
+from leetclaude.core.compat import satisfies  # noqa: F401  (re-exported)
+from leetclaude.core.models import Environment
 
 
 def env_hash(env: Environment, extra_deps: Iterable[str] = ()) -> str:

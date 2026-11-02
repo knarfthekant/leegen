@@ -10,3 +10,5 @@ __pycache__/
 # local executor config, if kept in the repo
 config/executors.yaml
 .DS_Store
+# wrangler local state
+.wrangler/

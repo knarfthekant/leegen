@@ -1,0 +1,846 @@
+{
+  "$defs": {
+    "Annotation": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "start_line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Line"
+        },
+        "end_line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Line"
+        },
+        "start_col": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Col"
+        },
+        "end_col": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Col"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "hint",
+            "warning",
+            "error",
+            "praise"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "author": {
+          "title": "Author",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "severity",
+        "message",
+        "author",
+        "created_at"
+      ],
+      "title": "Annotation",
+      "type": "object"
+    },
+    "AnnotationsChangedEvent": {
+      "properties": {
+        "type": {
+          "const": "annotations_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "annotations": {
+          "items": {
+            "$ref": "#/$defs/Annotation"
+          },
+          "title": "Annotations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "annotations"
+      ],
+      "title": "AnnotationsChangedEvent",
+      "type": "object"
+    },
+    "CustomTest": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "section": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section"
+        },
+        "input": {
+          "additionalProperties": true,
+          "title": "Input",
+          "type": "object"
+        },
+        "expected": {
+          "default": null,
+          "title": "Expected"
+        }
+      },
+      "title": "CustomTest",
+      "type": "object"
+    },
+    "CustomTestsChangedEvent": {
+      "properties": {
+        "type": {
+          "const": "custom_tests_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "tests": {
+          "items": {
+            "$ref": "#/$defs/CustomTest"
+          },
+          "title": "Tests",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "tests"
+      ],
+      "title": "CustomTestsChangedEvent",
+      "type": "object"
+    },
+    "FilesChangedEvent": {
+      "properties": {
+        "type": {
+          "const": "files_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "files": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Files",
+          "type": "object"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "files",
+        "reason"
+      ],
+      "title": "FilesChangedEvent",
+      "type": "object"
+    },
+    "Metric": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "unit": {
+          "default": "",
+          "title": "Unit",
+          "type": "string"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "Metric",
+      "type": "object"
+    },
+    "NavigateEvent": {
+      "properties": {
+        "type": {
+          "const": "navigate",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id"
+      ],
+      "title": "NavigateEvent",
+      "type": "object"
+    },
+    "ProblemChangedEvent": {
+      "properties": {
+        "type": {
+          "const": "problem_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id"
+      ],
+      "title": "ProblemChangedEvent",
+      "type": "object"
+    },
+    "ProblemsChangedEvent": {
+      "properties": {
+        "type": {
+          "const": "problems_changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ProblemsChangedEvent",
+      "type": "object"
+    },
+    "Proposal": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "rationale": {
+          "default": "",
+          "title": "Rationale",
+          "type": "string"
+        },
+        "author": {
+          "title": "Author",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "mcp",
+            "disk",
+            "webmcp"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "file",
+        "content",
+        "author",
+        "source",
+        "created_at"
+      ],
+      "title": "Proposal",
+      "type": "object"
+    },
+    "ProposalsChangedEvent": {
+      "properties": {
+        "type": {
+          "const": "proposals_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "proposals": {
+          "items": {
+            "$ref": "#/$defs/Proposal"
+          },
+          "title": "Proposals",
+          "type": "array"
+        },
+        "added": {
+          "default": false,
+          "title": "Added",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "proposals"
+      ],
+      "title": "ProposalsChangedEvent",
+      "type": "object"
+    },
+    "RunFinishedEvent": {
+      "properties": {
+        "type": {
+          "const": "run_finished",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/RunResult"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "run_id",
+        "source",
+        "result"
+      ],
+      "title": "RunFinishedEvent",
+      "type": "object"
+    },
+    "RunResult": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "mode": {
+          "default": "user",
+          "enum": [
+            "user",
+            "reference"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "error",
+            "timeout",
+            "compile_error",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "executor": {
+          "title": "Executor",
+          "type": "string"
+        },
+        "device": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "number"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "number"
+        },
+        "passed": {
+          "default": 0,
+          "title": "Passed",
+          "type": "integer"
+        },
+        "total": {
+          "default": 0,
+          "title": "Total",
+          "type": "integer"
+        },
+        "tests": {
+          "items": {
+            "$ref": "#/$defs/TestResult"
+          },
+          "title": "Tests",
+          "type": "array"
+        },
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/Metric"
+          },
+          "title": "Metrics",
+          "type": "array"
+        },
+        "compile_output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compile Output"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "stdout": {
+          "default": "",
+          "title": "Stdout",
+          "type": "string"
+        },
+        "stderr": {
+          "default": "",
+          "title": "Stderr",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "problem_id",
+        "status",
+        "executor",
+        "started_at",
+        "duration_ms"
+      ],
+      "title": "RunResult",
+      "type": "object"
+    },
+    "RunStartedEvent": {
+      "properties": {
+        "type": {
+          "const": "run_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "run_id",
+        "source"
+      ],
+      "title": "RunStartedEvent",
+      "type": "object"
+    },
+    "RunStatusEvent": {
+      "properties": {
+        "type": {
+          "const": "run_status",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "preparing",
+            "queued",
+            "running",
+            "loading"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "run_id",
+        "phase",
+        "detail"
+      ],
+      "title": "RunStatusEvent",
+      "type": "object"
+    },
+    "RunnerEvent": {
+      "description": "One harness result line, streamed while the run is in progress.",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "line": {
+          "title": "Line",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "line"
+      ],
+      "title": "RunnerEvent",
+      "type": "object"
+    },
+    "TestResult": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "error",
+            "timeout",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "custom": {
+          "default": false,
+          "title": "Custom",
+          "type": "boolean"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "section": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section"
+        },
+        "input": {
+          "default": null,
+          "title": "Input"
+        },
+        "expected": {
+          "default": null,
+          "title": "Expected"
+        },
+        "actual": {
+          "default": null,
+          "title": "Actual"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message"
+        },
+        "stdout": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stdout"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        }
+      },
+      "required": [
+        "name",
+        "status"
+      ],
+      "title": "TestResult",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "run_result": {
+      "$ref": "#/$defs/RunResult"
+    },
+    "test_result": {
+      "$ref": "#/$defs/TestResult"
+    },
+    "metric": {
+      "$ref": "#/$defs/Metric"
+    },
+    "annotation": {
+      "$ref": "#/$defs/Annotation"
+    },
+    "proposal": {
+      "$ref": "#/$defs/Proposal"
+    },
+    "custom_test": {
+      "$ref": "#/$defs/CustomTest"
+    },
+    "backend_event": {
+      "discriminator": {
+        "mapping": {
+          "annotations_changed": "#/$defs/AnnotationsChangedEvent",
+          "custom_tests_changed": "#/$defs/CustomTestsChangedEvent",
+          "files_changed": "#/$defs/FilesChangedEvent",
+          "navigate": "#/$defs/NavigateEvent",
+          "problem_changed": "#/$defs/ProblemChangedEvent",
+          "problems_changed": "#/$defs/ProblemsChangedEvent",
+          "proposals_changed": "#/$defs/ProposalsChangedEvent",
+          "run_finished": "#/$defs/RunFinishedEvent",
+          "run_started": "#/$defs/RunStartedEvent",
+          "run_status": "#/$defs/RunStatusEvent"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/RunStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/RunStatusEvent"
+        },
+        {
+          "$ref": "#/$defs/RunFinishedEvent"
+        },
+        {
+          "$ref": "#/$defs/AnnotationsChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/ProposalsChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/FilesChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/CustomTestsChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/NavigateEvent"
+        },
+        {
+          "$ref": "#/$defs/ProblemsChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/ProblemChangedEvent"
+        }
+      ],
+      "title": "Backend Event"
+    },
+    "runner_event": {
+      "$ref": "#/$defs/RunnerEvent"
+    }
+  },
+  "required": [
+    "run_result",
+    "test_result",
+    "metric",
+    "annotation",
+    "proposal",
+    "custom_test",
+    "backend_event",
+    "runner_event"
+  ],
+  "title": "_Records",
+  "type": "object"
+}

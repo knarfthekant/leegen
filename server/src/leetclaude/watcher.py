@@ -28,8 +28,6 @@ async def _on_problem_change(paths: set[Path]) -> None:
 
 
 async def _on_workspace_change(path: Path) -> None:
-    from leetclaude import tutor
-
     st = app_state()
     try:
         rel = path.resolve().relative_to(st.workspace.root.resolve())
@@ -48,11 +46,12 @@ async def _on_workspace_change(path: Path) -> None:
     content = path.read_text()
     if content == st.workspace.last_written(problem.id, file):
         return  # our own write
-    if content == tutor.current_files(problem).get(file):
+    if content == st.service.current_files(problem).get(file):
         return
     try:
-        await tutor.propose_edit(problem, file, content=content, author="external edit",
-                                 source="disk", rationale="the file was changed on disk")
+        await st.service.propose_edit(file, content=content, problem_id=problem.id,
+                                      author="external edit", source="disk",
+                                      rationale="the file was changed on disk")
     except ValueError:
         pass
 

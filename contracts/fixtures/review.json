@@ -1,0 +1,804 @@
+{
+  "cases": [
+    {
+      "fn": "resolve_columns",
+      "args": {
+        "start_col": null,
+        "end_col": null,
+        "start": 2,
+        "end": 2,
+        "lines": [
+          "def f(x):",
+          "    return  x + 1   ",
+          "",
+          "\tpass"
+        ],
+        "file": "x.py"
+      },
+      "result": [
+        5,
+        18
+      ]
+    },
+    {
+      "fn": "resolve_columns",
+      "args": {
+        "start_col": null,
+        "end_col": null,
+        "start": 3,
+        "end": 3,
+        "lines": [
+          "def f(x):",
+          "    return  x + 1   ",
+          "",
+          "\tpass"
+        ],
+        "file": "x.py"
+      },
+      "result": [
+        1,
+        1
+      ]
+    },
+    {
+      "fn": "resolve_columns",
+      "args": {
+        "start_col": null,
+        "end_col": null,
+        "start": 1,
+        "end": 4,
+        "lines": [
+          "def f(x):",
+          "    return  x + 1   ",
+          "",
+          "\tpass"
+        ],
+        "file": "x.py"
+      },
+      "result": [
+        1,
+        6
+      ]
+    },
+    {
+      "fn": "resolve_columns",
+      "args": {
+        "start_col": 5,
+        "end_col": null,
+        "start": 2,
+        "end": 2,
+        "lines": [
+          "def f(x):",
+          "    return  x + 1   ",
+          "",
+          "\tpass"
+        ],
+        "file": "x.py"
+      },
+      "result": [
+        5,
+        18
+      ]
+    },
+    {
+      "fn": "resolve_columns",
+      "args": {
+        "start_col": 12,
+        "end_col": 17,
+        "start": 2,
+        "end": 2,
+        "lines": [
+          "def f(x):",
+          "    return  x + 1   ",
+          "",
+          "\tpass"
+        ],
+        "file": "x.py"
+      },
+      "result": [
+        12,
+        17
+      ]
+    },
+    {
+      "fn": "resolve_columns",
+      "args": {
+        "start_col": 3,
+        "end_col": 3,
+        "start": 2,
+        "end": 2,
+        "lines": [
+          "def f(x):",
+          "    return  x + 1   ",
+          "",
+          "\tpass"
+        ],
+        "file": "x.py"
+      },
+      "error": "end_col must be greater than start_col on a single line (end_col is exclusive)"
+    },
+    {
+      "fn": "resolve_columns",
+      "args": {
+        "start_col": null,
+        "end_col": 4,
+        "start": 1,
+        "end": 1,
+        "lines": [
+          "def f(x):",
+          "    return  x + 1   ",
+          "",
+          "\tpass"
+        ],
+        "file": "x.py"
+      },
+      "error": "end_col needs start_col"
+    },
+    {
+      "fn": "resolve_columns",
+      "args": {
+        "start_col": 99,
+        "end_col": null,
+        "start": 1,
+        "end": 1,
+        "lines": [
+          "def f(x):",
+          "    return  x + 1   ",
+          "",
+          "\tpass"
+        ],
+        "file": "x.py"
+      },
+      "error": "start_col 99 is outside line 1 of x.py (1-10)"
+    },
+    {
+      "fn": "resolve_columns",
+      "args": {
+        "start_col": 1,
+        "end_col": 99,
+        "start": 1,
+        "end": 1,
+        "lines": [
+          "def f(x):",
+          "    return  x + 1   ",
+          "",
+          "\tpass"
+        ],
+        "file": "x.py"
+      },
+      "error": "end_col 99 is outside line 1 of x.py (1-10)"
+    },
+    {
+      "fn": "resolve_columns",
+      "args": {
+        "start_col": 2,
+        "end_col": 3,
+        "start": 1,
+        "end": 4,
+        "lines": [
+          "def f(x):",
+          "    return  x + 1   ",
+          "",
+          "\tpass"
+        ],
+        "file": "x.py"
+      },
+      "result": [
+        2,
+        3
+      ]
+    },
+    {
+      "fn": "make_annotations",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "items": [
+          {
+            "file": "solution.py",
+            "start_line": 1,
+            "severity": "hint",
+            "message": "look here"
+          },
+          {
+            "message": "overall good",
+            "severity": "praise"
+          }
+        ],
+        "author": "assistant"
+      },
+      "result": [
+        {
+          "id": "id1",
+          "file": "solution.py",
+          "start_line": 1,
+          "end_line": 1,
+          "start_col": 1,
+          "end_col": 64,
+          "severity": "hint",
+          "message": "look here",
+          "author": "assistant",
+          "created_at": 1700000001.0
+        },
+        {
+          "id": "id2",
+          "file": null,
+          "start_line": null,
+          "end_line": null,
+          "start_col": null,
+          "end_col": null,
+          "severity": "praise",
+          "message": "overall good",
+          "author": "assistant",
+          "created_at": 1700000002.0
+        }
+      ]
+    },
+    {
+      "fn": "make_annotations",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "items": [
+          {
+            "file": "solution.py",
+            "start_line": 1,
+            "end_line": 2,
+            "start_col": 1,
+            "end_col": 4,
+            "message": "range",
+            "author": "codex"
+          }
+        ],
+        "author": "assistant"
+      },
+      "result": [
+        {
+          "id": "id1",
+          "file": "solution.py",
+          "start_line": 1,
+          "end_line": 2,
+          "start_col": 1,
+          "end_col": 4,
+          "severity": "info",
+          "message": "range",
+          "author": "codex",
+          "created_at": 1700000001.0
+        }
+      ]
+    },
+    {
+      "fn": "make_annotations",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "items": [
+          {
+            "file": "solution.py",
+            "start_line": 99,
+            "message": "x"
+          }
+        ],
+        "author": "assistant"
+      },
+      "error": "line range 99-99 is outside solution.py (1-3)"
+    },
+    {
+      "fn": "make_annotations",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "items": [
+          {
+            "file": "solution.py",
+            "message": "no line"
+          }
+        ],
+        "author": "assistant"
+      },
+      "error": "annotations on a file need start_line (1-based)"
+    },
+    {
+      "fn": "make_annotations",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "items": [
+          {
+            "file": "_hidden_missing.py",
+            "start_line": 1,
+            "message": "x"
+          }
+        ],
+        "author": "assistant"
+      },
+      "error": "'_hidden_missing.py' is not a visible file of merge-ranges"
+    },
+    {
+      "fn": "make_annotations",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "items": [
+          {
+            "message": "bad severity",
+            "severity": "nitpick"
+          }
+        ],
+        "author": "assistant"
+      },
+      "error": "severity must be one of ('info', 'hint', 'warning', 'error', 'praise')"
+    },
+    {
+      "fn": "make_annotations",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "items": [
+          {
+            "file": "solution.py",
+            "start_line": 1
+          }
+        ],
+        "author": "assistant"
+      },
+      "error": "each annotation needs a message"
+    },
+    {
+      "fn": "without_annotations",
+      "args": {
+        "items": [
+          {
+            "id": "a1",
+            "file": "solution.py"
+          },
+          {
+            "id": "a2",
+            "file": null
+          },
+          {
+            "id": "a3",
+            "file": "solution.py"
+          }
+        ],
+        "annotation_id": "a2"
+      },
+      "result": [
+        {
+          "id": "a1",
+          "file": "solution.py"
+        },
+        {
+          "id": "a3",
+          "file": "solution.py"
+        }
+      ]
+    },
+    {
+      "fn": "without_annotations",
+      "args": {
+        "items": [
+          {
+            "id": "a1",
+            "file": "solution.py"
+          },
+          {
+            "id": "a2",
+            "file": null
+          },
+          {
+            "id": "a3",
+            "file": "solution.py"
+          }
+        ],
+        "annotation_id": "zz"
+      },
+      "result": [
+        {
+          "id": "a1",
+          "file": "solution.py"
+        },
+        {
+          "id": "a2",
+          "file": null
+        },
+        {
+          "id": "a3",
+          "file": "solution.py"
+        }
+      ]
+    },
+    {
+      "fn": "without_annotations",
+      "args": {
+        "items": [
+          {
+            "id": "a1",
+            "file": "solution.py"
+          },
+          {
+            "id": "a2",
+            "file": null
+          },
+          {
+            "id": "a3",
+            "file": "solution.py"
+          }
+        ],
+        "clear": true
+      },
+      "result": []
+    },
+    {
+      "fn": "without_annotations",
+      "args": {
+        "items": [
+          {
+            "id": "a1",
+            "file": "solution.py"
+          },
+          {
+            "id": "a2",
+            "file": null
+          },
+          {
+            "id": "a3",
+            "file": "solution.py"
+          }
+        ],
+        "clear": true,
+        "file": "solution.py"
+      },
+      "result": [
+        {
+          "id": "a2",
+          "file": null
+        }
+      ]
+    },
+    {
+      "fn": "apply_edits",
+      "args": {
+        "content": "a b a",
+        "edits": [
+          {
+            "old": "b",
+            "new": "c"
+          }
+        ]
+      },
+      "result": "a c a"
+    },
+    {
+      "fn": "apply_edits",
+      "args": {
+        "content": "a b a",
+        "edits": [
+          {
+            "old": "a",
+            "new": "c"
+          }
+        ]
+      },
+      "error": "edit 1: `old` text must match exactly once (found 2)"
+    },
+    {
+      "fn": "apply_edits",
+      "args": {
+        "content": "a b a",
+        "edits": [
+          {
+            "old": "",
+            "new": "c"
+          }
+        ]
+      },
+      "error": "edit 1: `old` text must match exactly once (found 0)"
+    },
+    {
+      "fn": "apply_edits",
+      "args": {
+        "content": "x = 1\ny = 2\n",
+        "edits": [
+          {
+            "old": "x = 1",
+            "new": "x = 3"
+          },
+          {
+            "old": "y = 2",
+            "new": "y = x"
+          }
+        ]
+      },
+      "result": "x = 3\ny = x\n"
+    },
+    {
+      "fn": "make_proposal",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "file": "solution.py",
+        "edits": [
+          {
+            "old": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:",
+            "new": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:  # edited"
+          }
+        ],
+        "rationale": "why"
+      },
+      "result": {
+        "id": "id1",
+        "file": "solution.py",
+        "content": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:  # edited\n    pass\n",
+        "rationale": "why",
+        "author": "assistant",
+        "source": "mcp",
+        "created_at": 1700000001.0
+      }
+    },
+    {
+      "fn": "make_proposal",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "file": "solution.py",
+        "content": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+      },
+      "error": "the proposed content is identical to the current code"
+    },
+    {
+      "fn": "make_proposal",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "file": "solution.py"
+      },
+      "error": "give either `content` (the full new file) or `edits`"
+    },
+    {
+      "fn": "make_proposal",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "file": "missing.py",
+        "content": "x"
+      },
+      "error": "'missing.py' is not an editable file of merge-ranges"
+    },
+    {
+      "fn": "make_proposal",
+      "args": {
+        "problem": "merge-ranges",
+        "files": {
+          "solution.py": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n"
+        },
+        "file": "solution.py",
+        "content": "brand new\n",
+        "author": "codex",
+        "source": "webmcp"
+      },
+      "result": {
+        "id": "id1",
+        "file": "solution.py",
+        "content": "brand new\n",
+        "rationale": "",
+        "author": "codex",
+        "source": "webmcp",
+        "created_at": 1700000001.0
+      }
+    },
+    {
+      "fn": "with_proposal",
+      "args": {
+        "items": [
+          {
+            "id": "p1",
+            "file": "a.py"
+          },
+          {
+            "id": "p2",
+            "file": "b.py"
+          }
+        ],
+        "proposal": {
+          "id": "p3",
+          "file": "a.py"
+        }
+      },
+      "result": [
+        {
+          "id": "p2",
+          "file": "b.py"
+        },
+        {
+          "id": "p3",
+          "file": "a.py"
+        }
+      ]
+    },
+    {
+      "fn": "make_custom_test",
+      "args": {
+        "problem": "merge-ranges",
+        "existing": [],
+        "args": [
+          [
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              4
+            ]
+          ]
+        ]
+      },
+      "result": {
+        "input": {
+          "args": [
+            [
+              [
+                1,
+                3
+              ],
+              [
+                2,
+                4
+              ]
+            ]
+          ],
+          "kwargs": {}
+        },
+        "name": "Test 1"
+      }
+    },
+    {
+      "fn": "make_custom_test",
+      "args": {
+        "problem": "merge-ranges",
+        "existing": [
+          {
+            "name": "Test 1"
+          }
+        ],
+        "args": [
+          []
+        ],
+        "description": "empty",
+        "section": "basics"
+      },
+      "result": {
+        "input": {
+          "args": [
+            []
+          ],
+          "kwargs": {}
+        },
+        "name": "Test 2",
+        "description": "empty",
+        "section": "basics"
+      }
+    },
+    {
+      "fn": "make_custom_test",
+      "args": {
+        "problem": "merge-ranges",
+        "existing": [],
+        "args": [
+          []
+        ],
+        "name": "Example"
+      },
+      "result": {
+        "input": {
+          "args": [
+            []
+          ],
+          "kwargs": {}
+        },
+        "name": "Example (2)"
+      }
+    },
+    {
+      "fn": "make_custom_test",
+      "args": {
+        "problem": "merge-ranges",
+        "existing": [],
+        "args": [
+          []
+        ],
+        "section": "nope"
+      },
+      "error": "unknown section 'nope'; sections: ['basics', 'edge-cases', 'scale']"
+    },
+    {
+      "fn": "make_custom_test",
+      "args": {
+        "problem": "merge-ranges",
+        "existing": [],
+        "args": "not-a-list"
+      },
+      "error": "args must be a list of positional arguments"
+    },
+    {
+      "fn": "make_custom_test",
+      "args": {
+        "problem": "py-async-generators",
+        "existing": [],
+        "args": []
+      },
+      "error": "custom test cases are only supported for function-judge problems"
+    },
+    {
+      "fn": "unique_test_name",
+      "args": {
+        "wanted": null,
+        "taken": []
+      },
+      "result": "Test 1"
+    },
+    {
+      "fn": "unique_test_name",
+      "args": {
+        "wanted": null,
+        "taken": [
+          "Test 1",
+          "Test 2"
+        ]
+      },
+      "result": "Test 3"
+    },
+    {
+      "fn": "unique_test_name",
+      "args": {
+        "wanted": "Edge",
+        "taken": []
+      },
+      "result": "Edge"
+    },
+    {
+      "fn": "unique_test_name",
+      "args": {
+        "wanted": " Edge ",
+        "taken": [
+          "Edge"
+        ]
+      },
+      "result": "Edge (2)"
+    },
+    {
+      "fn": "unique_test_name",
+      "args": {
+        "wanted": "Edge",
+        "taken": [
+          "Edge",
+          "Edge (2)"
+        ]
+      },
+      "result": "Edge (3)"
+    }
+  ]
+}

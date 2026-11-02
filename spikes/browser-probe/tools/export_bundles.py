@@ -1,4 +1,4 @@
-"""Export real job bundles for the browser probe, using the server's own planning code.
+"""Export real job bundles for the browser probe, using the core planning code (core.plan).
 
 Run from the repo root:
     uv run --project server python -I spikes/browser-probe/tools/export_bundles.py \
@@ -16,41 +16,17 @@ import json
 import sys
 from pathlib import Path
 
-from leetclaude.envs.registry import EnvironmentRegistry
-from leetclaude.judges import get_judge
-from leetclaude.languages import get_language
-from leetclaude.runner.orchestrator import (
-    HARNESS_DIR,
-    RunRequest,
-    _materialize,
-    _reference_files,
-    _test_payload,
-)
+from leetclaude.core.plan import plan_run
+from leetclaude.runner.orchestrator import HARNESS_DIR
 from leetclaude.store.problems import parse_problem_yaml
 
 
 def bundle_files(problem, mode: str) -> dict[str, str]:
-    env = EnvironmentRegistry().get(problem.environment)
-    if env is None:
-        raise SystemExit(f"{problem.id}: unknown environment {problem.environment!r}")
-    req = RunRequest(problem=problem, mode=mode)
-    tests = _test_payload(problem, req)
-    plan = get_judge(problem.judge.kind).plan(problem, tests, get_language(env.language), mode)
-
-    files: dict[str, str] = {}
-    user = _materialize(problem, {})
-    if mode == "reference":
-        user.update(_reference_files(problem))
-    files.update({f"user/{k}": v for k, v in user.items()})
-    if plan.needs_ref_dir:
-        ref = {**_materialize(problem, {}), **_reference_files(problem)}
-        files.update({f"ref/{k}": v for k, v in ref.items()})
+    plan = plan_run(problem, mode=mode, device="cpu")
+    files = dict(plan.files)
     for path in sorted(HARNESS_DIR.rglob("*.py")):
         files[f"_lc/leetclaude_harness/{path.relative_to(HARNESS_DIR)}"] = path.read_text()
-    run_cfg = {**plan.config, "mode": mode, "user_dir": "user",
-               "ref_dir": "ref" if plan.needs_ref_dir else None,
-               "timeout_s": problem.limits.timeout_s, "device": "cpu"}
-    files["run.json"] = json.dumps(run_cfg, indent=2)
+    files["run.json"] = json.dumps(plan.run_config, indent=2)
     return files
 
 

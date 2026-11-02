@@ -36,12 +36,22 @@ def _cmd_dev(args: argparse.Namespace) -> int:
 
 
 def _cmd_schema(args: argparse.Namespace) -> int:
-    from leetclaude.schema.export import problem_json_schema, write_schema
+    from leetclaude.schema.contracts import check_all, write_all
+    from leetclaude.schema.export import problem_json_schema
 
     if args.stdout:
         print(json.dumps(problem_json_schema(), indent=2))
-    else:
-        print(write_schema())
+        return 0
+    root = settings().root
+    if args.check:
+        stale = check_all()
+        for p in stale:
+            print(f"out of date: {p.relative_to(root)}")
+        if stale:
+            print("run `uv run leetclaude schema` and commit the result")
+        return 1 if stale else 0
+    for p in write_all():
+        print(p.relative_to(root))
     return 0
 
 
@@ -152,8 +162,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--reload", action="store_true")
     s.set_defaults(fn=_cmd_serve)
 
-    s = sub.add_parser("schema", help="write schema/problem.schema.json")
-    s.add_argument("--stdout", action="store_true")
+    s = sub.add_parser("schema", help="regenerate schema/, contracts/ and the web app's types")
+    s.add_argument("--stdout", action="store_true", help="print the problem JSON Schema only")
+    s.add_argument("--check", action="store_true", help="fail if generated files are stale")
     s.set_defaults(fn=_cmd_schema)
 
     s = sub.add_parser("list", help="list problems")

@@ -9,7 +9,7 @@ import yaml
 from leetclaude.config import settings
 from leetclaude.executors.base import Executor
 from leetclaude.registry import lookup
-from leetclaude.schema.models import ExecutorConfig
+from leetclaude.core.models import Environment, ExecutorConfig
 
 DEFAULT = [ExecutorConfig(id="local", kind="local", description="This machine")]
 
@@ -41,11 +41,12 @@ class ExecutorManager:
     def get(self, executor_id: str) -> Executor | None:
         return self.all().get(executor_id)
 
-    def compatible(self, requires: list[str]) -> list[Executor]:
-        return [e for e in self.all().values() if e.supports(requires)]
+    def compatible(self, requires: list[str], env: Environment | None = None) -> list[Executor]:
+        return [e for e in self.all().values() if e.supports(requires, env)]
 
-    def choose(self, requires: list[str], preferred: str | None = None) -> Executor:
-        candidates = self.compatible(requires)
+    def choose(self, requires: list[str], preferred: str | None = None,
+               env: Environment | None = None) -> Executor:
+        candidates = self.compatible(requires, env)
         if preferred:
             match = next((e for e in candidates if e.id == preferred), None)
             if match is None:
@@ -53,6 +54,9 @@ class ExecutorManager:
                                   f"{requires} (or does not exist)")
             return match
         if not candidates:
+            if env is not None and not env.native:
+                raise LookupError(f"environment {env.id!r} runs only in the browser edition "
+                                  f"(runtimes: {sorted(env.runtimes())})")
             raise LookupError(f"no configured executor provides {requires}; add one to "
                               f"{self.config_file}")
         return candidates[0]

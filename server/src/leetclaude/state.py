@@ -82,7 +82,11 @@ class Session:
 
 
 class AppState:
+    """The server edition's wiring: file-backed stores, WebSocket hub, native executors."""
+
     def __init__(self) -> None:
+        from leetclaude.service import ToolService
+
         self.problems = ProblemStore()
         self.workspace = Workspace()
         self.environments = EnvironmentRegistry()
@@ -90,7 +94,11 @@ class AppState:
         self.orchestrator = Orchestrator(self.executors, self.environments)
         self.hub = Hub()
         self.session = Session.load()
-        self.run_lock: dict[str, asyncio.Lock] = {}
+        self.service = ToolService(
+            problems=self.problems, workspace=self.workspace, session=self.session,
+            events=self.hub, orchestrator=self.orchestrator, environments=self.environments,
+            docs_dir=settings().docs_dir)
+        self.run_lock: dict[str, asyncio.Lock] = self.service.run_lock
 
 
 @lru_cache
