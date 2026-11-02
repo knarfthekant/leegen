@@ -4,7 +4,7 @@ import { Button, IconButton } from "./ui";
 
 const PROMPT = "Open https://leegen.frankshan.workers.dev in your browser and create a coding problem based on my recent Codex activity.";
 
-export function CodexGuide() {
+export function CodexGuide({ hidden = false }: { hidden?: boolean }) {
   const [open, setOpen] = useState(true);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const prompt = useRef<HTMLTextAreaElement>(null);
@@ -27,6 +27,8 @@ export function CodexGuide() {
       prompt.current?.select();
     }
   };
+
+  if (hidden) return null;
 
   if (!open) return (
     <div className="codex-guide-launcher">

@@ -122,6 +122,7 @@ export async function createBrowserBackend(): Promise<BrowserBackend> {
 
   const backend: BrowserBackend = {
     edition: "browser",
+    getAgentStatus: () => service.getAgentStatus(),
     service,
     bundle,
 

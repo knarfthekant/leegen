@@ -17,6 +17,11 @@ This file is for any agent working in this repo. There are three jobs:
 2. **Tutoring**: help the user with the problem they have open. See [Tutoring protocol](#tutoring-protocol).
 3. **Developing**: change the app itself. See [Architecture](#architecture) and [Extending](#extending).
 
+For authoring and tutoring through MCP or WebMCP, call `set_agent_status` with
+`creating_problem` or `reviewing` while working, then `idle` when finished (including on
+failure). The UI highlights that the user should wait. Active status expires after five
+minutes; call again to renew it for longer work. This is app-wide and does not lock the editor.
+
 ## Running
 
 ```bash
@@ -24,6 +29,11 @@ make start    # installs deps if missing, rebuilds the UI if stale, serves UI + 
 make dev      # backend with --reload + Vite hot reload, together; Ctrl-C stops both
 make stop     # stop the server started by start/dev, from any terminal (make restart = stop + start)
 ```
+
+The Make targets export the checkout's `server/src` on `PYTHONPATH`, including to development
+reload subprocesses. On macOS, hidden `.pth` files can make an editable install invisible to
+Python even after `uv sync`. For direct CLI commands in that case, use
+`cd server && PYTHONPATH=src uv run leegen <command>`.
 
 | Port | What | Override |
 |---|---|---|

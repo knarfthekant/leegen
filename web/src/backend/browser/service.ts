@@ -7,7 +7,7 @@
 // the real Python core in Pyodide.
 
 import type { BackendEvent } from "../types";
-import type { RunResult } from "../../contracts/generated";
+import type { AgentStatus, RunResult } from "../../contracts/generated";
 import {
   type AnnotationRecord,
   type AnnotationRequest,
@@ -170,6 +170,25 @@ export class BrowserToolService {
   }
 
   // ---------------------------------------------------------------- authoring
+
+  async getAgentStatus(): Promise<AgentStatus> {
+    const status = await this.db.get<AgentStatus>("meta", "agent_status");
+    if (!status || (status.expires_at !== null && status.expires_at <= this.clock.now())) {
+      return { status: "idle", updated_at: status?.updated_at ?? 0, expires_at: null };
+    }
+    return status;
+  }
+
+  async setAgentStatus(status: AgentStatus["status"]): Promise<AgentStatus> {
+    if (!["idle", "reviewing", "creating_problem"].includes(status)) {
+      throw new InvalidError("status must be one of idle, reviewing, creating_problem");
+    }
+    const now = this.clock.now();
+    const result: AgentStatus = { status, updated_at: now, expires_at: status === "idle" ? null : now + 300 };
+    await this.db.put("meta", result, "agent_status");
+    this.broadcast({ type: "agent_status_changed", agent_status: result });
+    return result;
+  }
 
   authoringGuide(): string {
     const browser = this.guides.browser ? `\n\n---\n\n${this.guides.browser}` : "";

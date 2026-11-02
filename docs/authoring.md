@@ -7,6 +7,11 @@ A problem is one YAML file, `problems/<id>.yaml`, validated against
 - hidden setup and tests
 - a reference solution
 
+When authoring through MCP or WebMCP, call `set_agent_status(status="creating_problem")`
+before starting so the UI asks the user to wait. Call `set_agent_status(status="idle")` when
+finished, including on failure. Active status expires after five minutes; renew it if still
+working. This works even when no problem is open.
+
 The loop:
 
 1. Draft the YAML.

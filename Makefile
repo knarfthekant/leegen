@@ -1,6 +1,10 @@
 # Run from the repo root. Ports: LEEGEN_PORT (default 13370), LEEGEN_WEB_PORT (13371).
 .PHONY: start dev stop restart build check test smoke browser browser-serve browser-smoke
 
+# Run this checkout even when Python skips a macOS-hidden editable-install .pth file.
+# Export it so the dev server's reload subprocess can import the same source tree.
+export PYTHONPATH := $(CURDIR)/server/src$(if $(PYTHONPATH),:$(PYTHONPATH))
+
 ## UI + API + MCP on one port; installs deps and rebuilds the UI when needed
 start:
 	cd server && uv sync -q && uv run leegen start
@@ -19,7 +23,7 @@ build:
 	cd web && npm install --no-fund --no-audit && npm run build
 
 test:
-	cd server && uv run pytest
+	cd server && uv run python -m pytest
 
 check: test
 	cd server && uv run leegen validate --all

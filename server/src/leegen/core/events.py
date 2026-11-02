@@ -11,6 +11,20 @@ from leegen.core.models import RunResult
 from leegen.core.review import Severity
 
 
+AgentActivity = Literal["idle", "reviewing", "creating_problem"]
+
+
+class AgentStatus(BaseModel):
+    status: AgentActivity = "idle"
+    updated_at: float = 0.0
+    expires_at: float | None = None
+
+
+class AgentStatusChangedEvent(BaseModel):
+    type: Literal["agent_status_changed"]
+    agent_status: AgentStatus
+
+
 class Annotation(BaseModel):
     id: str
     file: str | None = None
@@ -108,7 +122,7 @@ class ProblemChangedEvent(BaseModel):
 BackendEvent = Annotated[
     RunStartedEvent | RunStatusEvent | RunFinishedEvent | AnnotationsChangedEvent
     | ProposalsChangedEvent | FilesChangedEvent | CustomTestsChangedEvent | NavigateEvent
-    | ProblemsChangedEvent | ProblemChangedEvent,
+    | ProblemsChangedEvent | ProblemChangedEvent | AgentStatusChangedEvent,
     Field(discriminator="type"),
 ]
 

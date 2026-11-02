@@ -34,6 +34,7 @@ type Handler = (svc: BrowserToolService, a: Args) => Promise<unknown> | unknown;
 
 /** One handler per MCP tool, mirroring mcp_server/server.py. */
 export const HANDLERS: Record<string, Handler> = {
+  set_agent_status: (s, a) => s.setAgentStatus(a.status),
   get_authoring_guide: (s) => s.authoringGuide(),
   get_tutoring_guide: (s) => s.tutoringGuide(),
   get_problem_schema: (s) => s.problemSchema(),

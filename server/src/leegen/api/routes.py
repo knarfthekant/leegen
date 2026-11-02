@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from leegen.core.events import AgentActivity
 from leegen.core.views import public_problem
 from leegen.service import ToolService
 from leegen.state import app_state
@@ -162,12 +163,28 @@ def get_session() -> dict[str, Any]:
     return _svc().get_session()
 
 
+class AgentStatusBody(BaseModel):
+    status: AgentActivity
+
+
+@router.get("/agent-status")
+def get_agent_status() -> dict[str, Any]:
+    return _svc().get_agent_status()
+
+
+@router.post("/agent-status")
+async def set_agent_status(body: AgentStatusBody) -> dict[str, Any]:
+    return await _svc().set_agent_status(body.status)
+
+
 @router.websocket("/ws")
 async def ws_endpoint(ws: WebSocket) -> None:
     hub = app_state().hub
     await ws.accept()
     hub.clients.add(ws)
     try:
+        await ws.send_json({"type": "agent_status_changed",
+                            "agent_status": _svc().get_agent_status()})
         while True:
             await ws.receive_text()  # clients only listen; keep the socket open
     except WebSocketDisconnect:

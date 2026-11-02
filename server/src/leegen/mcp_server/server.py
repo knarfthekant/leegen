@@ -17,6 +17,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
+from leegen.core.events import AgentActivity
 from leegen.core.toolspec import TOOLS
 from leegen.schema.export import problem_json_schema
 from leegen.service import ToolService
@@ -34,6 +35,9 @@ Tutoring (helping the user with the problem they have open): call get_session fi
 in small steps, and don't hand over a full solution unless the user asks for it. Use annotate to
 comment on specific lines, and propose_edit (never direct file writes) to suggest code changes,
 which the user accepts or rejects in the editor.
+
+Signal work with set_agent_status: reviewing or creating_problem, then idle when finished
+(including on failure). Renew before five minutes if still working.
 """
 
 
@@ -95,6 +99,14 @@ def build_mcp() -> MCPServer:
         return deco
 
     # ============================================================ authoring
+
+    @tool()
+    async def set_agent_status(status: AgentActivity) -> dict[str, Any]:
+        """Show the user that the agent is working and they should wait. Set reviewing before
+        reviewing code, or creating_problem before authoring a problem. Set idle when finished,
+        including on failure. Active status expires after five minutes; call again to renew.
+        Applies across the app, even when no problem is open. Does not lock the editor."""
+        return await _svc().set_agent_status(status)
 
     @tool()
     def get_authoring_guide() -> str:

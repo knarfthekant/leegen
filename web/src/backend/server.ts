@@ -1,6 +1,7 @@
 // The server edition: REST under /api and a listen-only WebSocket at /api/ws.
 
 import type { CustomTest, Problem, RunResult, WorkspaceState } from "../lib/api";
+import type { AgentStatus } from "../contracts/generated";
 import type { Backend, BackendEvent, BackendStatus, ExecutorListing, ProblemListing, SessionReport } from "./types";
 
 async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -115,6 +116,7 @@ export function createServerBackend(base = ""): Backend {
 
   return {
     edition: "server",
+    getAgentStatus: () => call<AgentStatus>("GET", `${api}/agent-status`),
     listProblems: () => call<ProblemListing>("GET", `${api}/problems`),
     getProblem: (id) => call<Problem>("GET", `${api}/problems/${enc(id)}`),
     getWorkspace: (id) => call<WorkspaceState>("GET", `${api}/workspace/${enc(id)}`),

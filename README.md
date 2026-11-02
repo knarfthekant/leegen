@@ -171,6 +171,11 @@ Open [http://127.0.0.1:13370](http://127.0.0.1:13370). One process serves the UI
 WebSocket updates, and MCP endpoint at `http://127.0.0.1:13370/mcp`. Keep it running while
 using the app or its MCP tools. Use `make stop` from another terminal to stop it.
 
+The Make targets load Python code from this checkout directly. This also handles macOS
+environments where hidden `.pth` files cause `uv run leegen` to report `No module named
+'leegen'`. For direct CLI use in that case, run `PYTHONPATH=src uv run leegen <command>`
+from `server/`.
+
 ### Connect your agent
 
 For **Codex**, register the local MCP server:

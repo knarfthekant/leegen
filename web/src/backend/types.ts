@@ -5,7 +5,7 @@
 //
 // Components only talk to `getBackend()` (./index.ts); nothing else knows which edition runs.
 
-import type { BackendEvent } from "../contracts/generated";
+import type { AgentStatus, BackendEvent } from "../contracts/generated";
 import type {
   CustomTest,
   ExecutorInfo,
@@ -60,6 +60,8 @@ export interface ImportSummary {
 
 export interface Backend {
   readonly edition: "server" | "browser";
+
+  getAgentStatus(): Promise<AgentStatus>;
 
   listProblems(): Promise<ProblemListing>;
   getProblem(id: string): Promise<Problem>;

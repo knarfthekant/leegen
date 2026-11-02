@@ -18,6 +18,7 @@ from typing import Any, Literal, Protocol
 
 from leegen.core import review
 from leegen.core.compat import requirements
+from leegen.core.events import AgentActivity, AgentStatus
 from leegen.core.models import Environment, Problem, RunResult
 from leegen.core.parse import dump_problem_yaml, format_error, parse_problem_yaml
 from leegen.core.toolspec import TUTORING_GUIDE
@@ -85,6 +86,7 @@ class ToolService:
         self.environments = environments
         self.docs_dir = docs_dir
         self.run_lock: dict[str, asyncio.Lock] = {}
+        self._agent_status = AgentStatus()
 
     @property
     def executors(self):  # type: ignore[no-untyped-def]
@@ -114,6 +116,20 @@ class ToolService:
         return self.workspace.read_state(problem_id, name, default)
 
     # ---------------------------------------------------------------- authoring
+
+    def get_agent_status(self) -> dict[str, Any]:
+        status = self._agent_status
+        if status.expires_at is not None and status.expires_at <= time.time():
+            status = AgentStatus(updated_at=status.updated_at)
+        return status.model_dump()
+
+    async def set_agent_status(self, status: AgentActivity) -> dict[str, Any]:
+        now = time.time()
+        self._agent_status = AgentStatus(
+            status=status, updated_at=now, expires_at=None if status == "idle" else now + 300)
+        result = self.get_agent_status()
+        await self.events.broadcast({"type": "agent_status_changed", "agent_status": result})
+        return result
 
     def authoring_guide(self) -> str:
         guide = self.docs_dir / "authoring.md"

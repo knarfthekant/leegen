@@ -631,6 +631,35 @@
       "browser": true
     },
     {
+      "name": "set_agent_status",
+      "title": "Set agent status",
+      "description": "Show the user that the agent is working and they should wait. Set reviewing before\nreviewing code, or creating_problem before authoring a problem. Set idle when finished,\nincluding on failure. Active status expires after five minutes; call again to renew.\nApplies across the app, even when no problem is open. Does not lock the editor.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "idle",
+              "reviewing",
+              "creating_problem"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "set_agent_statusArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
       "name": "update_problem",
       "title": "Update problem",
       "description": "Replace an existing problem with new YAML (validated the same way as create_problem).\nThe user's saved code for the problem is kept.",

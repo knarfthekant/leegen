@@ -23,6 +23,7 @@ class ToolSpec:
 
 
 TOOLS: dict[str, ToolSpec] = {
+    "set_agent_status": ToolSpec("Set agent status"),
     # authoring
     "get_authoring_guide": ToolSpec("Authoring guide", read_only=True),
     "get_tutoring_guide": ToolSpec("Tutoring guide", read_only=True),
@@ -54,6 +55,8 @@ the left, code and tests on the right). You are their tutor.
 1. **Call `get_session` first.** It returns the open problem, the user's *current* code (with
    unsaved edits), cursor and selection, the last run's failing tests, existing comments and
    pending suggestions.
+   Signal `set_agent_status(status="reviewing")` while working, then `idle` when finished
+   (including on failure). Renew before five minutes if needed.
 2. **Diagnose from evidence.** Read the failing tests' input, expected, actual and message. Use
    `run_tests` to check a hypothesis on their current code. `get_problem` with
    `include_hidden=true` shows the reference and hidden tests: use them to understand the

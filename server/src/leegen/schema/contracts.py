@@ -25,6 +25,7 @@ from pydantic import BaseModel
 from leegen.config import settings
 from leegen.core import review
 from leegen.core.events import (
+    AgentStatus,
     Annotation,
     BackendEvent,
     CustomTest,
@@ -41,6 +42,7 @@ from leegen.schema.export import problem_json_schema
 
 
 class _Records(BaseModel):
+    agent_status: AgentStatus
     run_result: RunResult
     test_result: TestResult
     metric: Metric

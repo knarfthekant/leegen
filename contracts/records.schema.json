@@ -1,5 +1,61 @@
 {
   "$defs": {
+    "AgentStatus": {
+      "properties": {
+        "status": {
+          "default": "idle",
+          "enum": [
+            "idle",
+            "reviewing",
+            "creating_problem"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "updated_at": {
+          "default": 0.0,
+          "title": "Updated At",
+          "type": "number"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        }
+      },
+      "title": "AgentStatus",
+      "type": "object",
+      "required": [
+        "status",
+        "updated_at",
+        "expires_at"
+      ]
+    },
+    "AgentStatusChangedEvent": {
+      "properties": {
+        "type": {
+          "const": "agent_status_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "agent_status": {
+          "$ref": "#/$defs/AgentStatus"
+        }
+      },
+      "required": [
+        "type",
+        "agent_status"
+      ],
+      "title": "AgentStatusChangedEvent",
+      "type": "object"
+    },
     "Annotation": {
       "properties": {
         "id": {
@@ -795,6 +851,9 @@
     }
   },
   "properties": {
+    "agent_status": {
+      "$ref": "#/$defs/AgentStatus"
+    },
     "run_result": {
       "$ref": "#/$defs/RunResult"
     },
@@ -816,6 +875,7 @@
     "backend_event": {
       "discriminator": {
         "mapping": {
+          "agent_status_changed": "#/$defs/AgentStatusChangedEvent",
           "annotations_changed": "#/$defs/AnnotationsChangedEvent",
           "custom_tests_changed": "#/$defs/CustomTestsChangedEvent",
           "files_changed": "#/$defs/FilesChangedEvent",
@@ -859,6 +919,9 @@
         },
         {
           "$ref": "#/$defs/ProblemChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/AgentStatusChangedEvent"
         }
       ],
       "title": "Backend Event"
@@ -868,6 +931,7 @@
     }
   },
   "required": [
+    "agent_status",
     "run_result",
     "test_result",
     "metric",
