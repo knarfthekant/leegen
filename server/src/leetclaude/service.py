@@ -146,8 +146,12 @@ class ToolService:
 
     def problem_list_view(self) -> dict[str, Any]:
         """UI view: summaries with a passed/attempted status, sorted by track and order."""
-        items = [{**problem_summary(p), "status": run_status(self._state(p.id, "last_run", None))}
-                 for p in self.problems.list()]
+        items = []
+        for p in self.problems.list():
+            env = self.environments.get(p.environment)
+            items.append({**problem_summary(p),
+                          "status": run_status(self._state(p.id, "last_run", None)),
+                          "runtimes": sorted(env.runtimes()) if env else ["native"]})
         items.sort(key=sort_key)
         errors = [{"path": e.path, "error": e.error} for e in self.problems.errors()]
         return {"problems": items, "errors": errors}
@@ -168,9 +172,14 @@ class ToolService:
             return await orch.run(RunRequest(problem=problem, mode=mode,  # type: ignore[arg-type]
                                              executor=executor))
 
-        return await validate(problem, env=env, known_envs=list(self.environments.all()),
-                              runnable=bool(env and orch.executors.compatible(requires, env)),
-                              requires=requires, run=run)
+        report = await validate(problem, env=env, known_envs=list(self.environments.all()),
+                                runnable=bool(env and orch.executors.compatible(requires, env)),
+                                requires=requires, run=run)
+        if report.skipped and env is not None and "native" not in env.runtimes():
+            report.summary = (f"{env.id!r} runs only in the browser edition (needs {requires}); "
+                              "not run")
+            report.issues = ["validate it in the browser edition (docs/browser.md)"]
+        return report
 
     async def validate_yaml(self, yaml_text: str) -> tuple[Problem | None, dict[str, Any]]:
         try:

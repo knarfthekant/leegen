@@ -64,3 +64,17 @@ def test_parse_reports_schema_errors():
     assert "reference" not in good["public"] and good["problem"]["reference"]
     bad = json.loads(parse("id: x\n"))
     assert bad["ok"] is False and bad["stage"] == "schema"
+
+
+def test_webgpu_helper_data_and_native_refusal(monkeypatch):
+    monkeypatch.syspath_prepend(str(HARNESS_ROOT))
+    import pytest
+
+    from leetclaude_harness import webgpu as wg
+
+    assert wg.to_f32(wg.f32([1.5, -2.0])) == [1.5, -2.0]
+    assert wg.to_u32(wg.u32([7, 0])) == [7, 0] and wg.to_i32(wg.i32([-3])) == [-3]
+    assert wg.groups(0, 64) == 1 and wg.groups(65, 64) == 2
+    assert wg.storage(b"1234").read_only and not wg.storage(size=8).read_only
+    with pytest.raises(wg.WebGPUUnavailable, match="browser edition"):
+        wg.device()   # natively there is no WebGPU: a clear error, not an ImportError

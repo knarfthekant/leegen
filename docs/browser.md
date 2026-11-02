@@ -73,6 +73,18 @@ into the CSP (`frame-src`, `frame-ancestors`), so rebuild when they change. The 
 `pyodide.asm.wasm` (about 10 MB), which is under Cloudflare's 25 MiB per-file limit. Users download
 about 20 MB the first time; after that it comes from the HTTP cache.
 
+## WebGPU problems
+
+The `webgpu` environment (`native: false`, `requires: [webgpu]`) runs only here. The user writes
+a WGSL kernel (`kernel.wgsl`, highlighted in the editor). A hidden Python host dispatches it with
+`leetclaude_harness.webgpu`, through Pyodide's JavaScript bridge, on the GPU of the runner's worker.
+The normal `function` judge compares the results. Compile and validation errors come back as
+`kernel.wgsl:line:col` messages. GPU time from timestamp queries can be reported as a metric. A
+kernel that never finishes is stopped by the same wall-clock deadline as runaway Python. The
+seed track is `webgpu-101`: vector add, workgroup reduction, tiled matrix multiply. The server
+edition lists these problems with a "browser edition" badge, and the browser edition marks
+CUDA/PyTorch problems "server edition".
+
 ## Using it with Codex
 
 Open the app URL in the ChatGPT desktop app's built-in browser. The status pill shows how many
@@ -98,8 +110,10 @@ page navigates (the app routes with `pushState` only). The tools also work in Ch
 
 ## Limits
 
-- Python only: environments with a `browser:` block (today `python`). `pytorch`, `triton`, `cuda`
-  and `cpp` problems are listed but run only on the server edition. The run panel says so.
+- Python plus WGSL only: environments with a `browser:` block (today `python` and `webgpu`).
+  `pytorch`, `triton`, `cuda` and `cpp` problems are listed but run only on the server edition.
+  The run panel says so. WebGPU needs a browser with an adapter (current Chrome, Edge or Safari;
+  Firefox on Windows and Apple Silicon).
 - Pyodide has no subprocesses, threads or signals: `function` and `pytest` judges only.
 - Hidden tests and reference solutions are in the browser (the UI hides them, but anyone can
   read IndexedDB). This is a training tool, so that is accepted. Don't treat redaction as a
@@ -111,8 +125,9 @@ page navigates (the app routes with `pushState` only). The tools also work in Ch
 You are in the **browser edition**. Problems and the user's code live in the user's browser, and
 code runs there in Pyodide (Python 3.14) on the CPU.
 
-- Use the `python` environment (it has a `browser:` block). Other environments are saved
-  unvalidated and cannot run here.
+- Use the `python` environment for CPU problems and `webgpu` for GPU kernels (WGSL with a hidden
+  Python host using `leetclaude_harness.webgpu`; see the authoring guide's archetypes). Other
+  environments are saved unvalidated and cannot run here.
 - Use the `function` or `pytest` judge. The `script` judge, subprocesses, threads and native
   extensions outside Pyodide's package set are unavailable.
 - `create_problem` validates in the browser runner, with the same rules as the server. The tools

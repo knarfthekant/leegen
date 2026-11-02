@@ -25,7 +25,7 @@ import { Brand, ConnectionDot, ThemeToggle } from "../components/Chrome";
 import { Editor, type CursorInfo, type EditorFile, type RevealTarget, type SaveState } from "../components/Editor";
 import { Markdown } from "../components/Markdown";
 import { ProblemDrawer } from "../components/ProblemDrawer";
-import { hardware } from "../components/ProblemRow";
+import { ElsewhereChip, elsewhere, hardware } from "../components/ProblemRow";
 import { ResultPanel } from "../components/ResultPanel";
 import { ReviewPanel } from "../components/ReviewPanel";
 import { TestcasePanel } from "../components/TestcasePanel";
@@ -77,6 +77,7 @@ export function WorkspacePage({ id }: { id: string }) {
   const [bottomTab, setBottomTab] = useState<BottomTab>("testcase");
   const [leftTab, setLeftTab] = useState<LeftTab>("description");
   const [executors, setExecutors] = useState<ExecutorInfo[]>([]);
+  const [runtimes, setRuntimes] = useState<string[] | undefined>(undefined);
   const [executor, setExecutor] = useState<string | null>(null);
   const [cursor, setCursor] = useState<CursorInfo | null>(null);
   const [revealLine, setRevealLine] = useState<RevealTarget | null>(null);
@@ -131,6 +132,7 @@ export function WorkspacePage({ id }: { id: string }) {
         setHintsRevealed(w.hints_revealed);
         setResult(w.last_run);
         setExecutors(ex.executors);
+        setRuntimes(ex.runtimes);
         const firstCompatible = ex.executors.find((e) => e.compatible);
         setExecutor(firstCompatible?.id ?? null);
         setProblems(list.problems);
@@ -381,7 +383,11 @@ export function WorkspacePage({ id }: { id: string }) {
             title="Where the code runs"
             disabled={compatible.length === 0}
           >
-            {compatible.length === 0 && <option value="">No executor provides {problem.requires.join(", ")}</option>}
+            {compatible.length === 0 && (
+              <option value="">
+                {elsewhere(runtimes) ? `Runs in the ${elsewhere(runtimes)!.label}` : `No executor provides ${problem.requires.join(", ")}`}
+              </option>
+            )}
             {compatible.map((e) => (
               <option key={e.id} value={e.id}>
                 {e.id} · {e.device}
@@ -443,7 +449,7 @@ export function WorkspacePage({ id }: { id: string }) {
                   <h1 className="title">
                     {index >= 0 && <span className="title-index">{index + 1}.</span>} {problem.title}
                   </h1>
-                  <MetaChips problem={problem} hw={hw} />
+                  <MetaChips problem={problem} hw={hw} runtimes={runtimes} />
                   <Markdown source={problem.description} problemId={problem.id} />
                 </>
               ) : (
@@ -588,7 +594,7 @@ export function WorkspacePage({ id }: { id: string }) {
   );
 }
 
-function MetaChips({ problem, hw }: { problem: Problem; hw: string[] }) {
+function MetaChips({ problem, hw, runtimes }: { problem: Problem; hw: string[]; runtimes?: string[] }) {
   const tags = problem.tags.filter((t) => t !== problem.environment);
   const [showTopics, setShowTopics] = useState(tags.length <= 3);
   return (
@@ -602,6 +608,7 @@ function MetaChips({ problem, hw }: { problem: Problem; hw: string[] }) {
           {r}
         </Chip>
       ))}
+      <ElsewhereChip runtimes={runtimes} />
       {tags.length > 0 &&
         (showTopics ? (
           tags.map((t) => (

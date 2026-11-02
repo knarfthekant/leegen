@@ -213,6 +213,47 @@ try {
   console.log("  " + (await page.locator(".soft-alert").first().innerText()).split("\n")[0]);
   await page.screenshot({ path: `${SHOTS}/lc-browser-import.png` });
 
+  step("WebGPU: WGSL editor, compile errors with locations, a passing kernel, GPU timing");
+  const hasGpu = (await tool("list_executors")).executors[0].capabilities.includes("webgpu");
+  if (!hasGpu) {
+    console.log("  skipped: no WebGPU adapter in this browser");
+  } else {
+    for (const id of ["webgpu-vector-add", "webgpu-reduction", "webgpu-tiled-matmul"]) {
+      const report = await tool("validate_problem_yaml", { yaml: (await tool("get_problem", { problem_id: id })).yaml });
+      console.log(`  ${id}: ok=${report.ok} ${report.summary}`);
+      if (!report.ok) throw new Error(`${id}: ${JSON.stringify(report.issues)}`);
+    }
+    await tool("open_problem", { problem_id: "webgpu-vector-add" });
+    await page.locator(".title", { hasText: "Vector Add" }).waitFor();
+    await page.waitForFunction(() => window.monaco.editor.getEditors().some((e) => e.getModel()?.getLanguageId() === "wgsl"));
+    await editor((m, ed) => ed.getModel().setValue("@compute @workgroup_size(64)\nfn main() {\n    let x: f32 = 1u;\n}\n"));
+    await page.waitForTimeout(700);
+    const broken = await tool("run_tests", {});
+    const msg = broken.failing_tests[0]?.message ?? "";
+    if (!/kernel\.wgsl:3:\d+/.test(msg)) throw new Error("compile errors should point at kernel.wgsl:3: " + msg);
+    console.log("  compile error: " + msg.split("\n").find((l) => l.includes("kernel.wgsl:")).trim().slice(0, 100));
+    const ref = (yaml) => yaml.split("reference:")[1].split("content: |\n")[1].split("\n").filter((l, i, all) => all.slice(0, i + 1).every((x) => x.startsWith("        ") || !x.trim())).map((l) => l.slice(8)).join("\n");
+    await editor((m, ed, code) => ed.getModel().setValue(code), ref((await tool("get_problem", { problem_id: "webgpu-vector-add" })).yaml));
+    await page.waitForTimeout(700);
+    await page.keyboard.press("ControlOrMeta+Enter");
+    const gpuStatus = await resultStatus();
+    console.log("  result:", (await page.locator(".result-head").innerText()).replace(/\s+/g, " "));
+    if (gpuStatus !== "Accepted") throw new Error(`webgpu-vector-add: expected Accepted, got ${gpuStatus}`);
+    await page.screenshot({ path: `${SHOTS}/lc-browser-webgpu.png` });
+    await tool("open_problem", { problem_id: "webgpu-tiled-matmul" });
+    await page.locator(".title", { hasText: "Tiled Matrix" }).waitFor();
+    await page.waitForFunction(() => window.monaco.editor.getEditors().some((e) => e.getModel()?.getLanguageId() === "wgsl"));
+    await editor((m, ed, code) => ed.getModel().setValue(code), ref((await tool("get_problem", { problem_id: "webgpu-tiled-matmul" })).yaml));
+    await page.waitForTimeout(700);
+    const mm = await tool("run_tests", {});
+    if (mm.status !== "passed") throw new Error("matmul reference: " + JSON.stringify(mm).slice(0, 500));
+    console.log("  matmul metrics:", JSON.stringify(mm.metrics));
+  }
+
+  step("problems that need native executors are marked");
+  await page.goto(APP + "/");
+  await page.locator(".problem-row", { hasText: "Decode with a KV Cache" }).getByText("server edition").waitFor();
+
   const unexpected = problems.filter((p) => !/Failed to load resource/.test(p));
   if (unexpected.length) throw new Error("console errors:\n" + unexpected.join("\n"));
   console.log("\nbrowser smoke: OK");

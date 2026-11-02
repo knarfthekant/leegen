@@ -226,7 +226,11 @@ export class BrowserToolService {
       this.db.all<WorkspaceRecord>("workspace"),
     ]);
     const lastRun = new Map(wss.map((w) => [w.id, w.state.last_run as { status?: string } | undefined]));
-    const items = recs.map((r) => ({ ...problemSummary(r.problem), status: runStatus(lastRun.get(r.id)) }));
+    const items = recs.map((r) => ({
+      ...problemSummary(r.problem),
+      status: runStatus(lastRun.get(r.id)),
+      runtimes: [...runtimes(this.environment(r.problem))].sort(),
+    }));
     items.sort(compareSummaries);
     return { problems: items, errors: [] as { path: string; error: string }[] };
   }

@@ -13,6 +13,8 @@ export interface ProblemSummary {
   requires: string[];
   judge: string;
   status?: "passed" | "attempted" | null;
+  /** Runtimes of the problem's environment: "native" (server edition), "pyodide" (browser). */
+  runtimes?: string[];
 }
 
 export interface ProblemFile {

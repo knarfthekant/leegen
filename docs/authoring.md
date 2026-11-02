@@ -50,6 +50,7 @@ Environments right now:
 | `triton` | Triton kernels + PyTorch, Linux/NVIDIA | `[cuda]` | no |
 | `cuda` | CUDA C++ with nvcc 13 (from PyPI wheels); `script` judge | `[cuda]` | no |
 | `cpp` | C++17 with the system compiler; `script` judge | `[cpu]` | no |
+| `webgpu` | WGSL compute kernels on the browser's GPU; hidden Python host | `[webgpu]` | only there |
 
 `list_environments` returns the live list and the executors that can run each environment. If
 no executor can run a problem, validation is skipped and the problem is saved unvalidated, so
@@ -325,6 +326,17 @@ A good description has:
   `-I{bundle}/_lc/include`). These only run on NVIDIA executors (local Linux box, SSH host,
   SLURM cluster). Examples: `cuda-vector-add` (script), `triton-vector-add` (function judge with
   Triton).
+- **GPU in the browser (WebGPU):** `webgpu` environment, `requires: [webgpu]`, browser edition
+  only. The editable file is a `kernel.wgsl`. A hidden `_host.py` is the `function` judge's entry:
+  it packs the inputs, calls `leetclaude_harness.webgpu.dispatch(wg.source("kernel.wgsl",
+  __file__), [wg.storage(...), wg.uniform(...)], workgroups=(...))` and returns plain lists, which
+  are compared with `float` tolerances. Bindings are `@group(0) @binding(i)` in list order.
+  Writable storage buffers are read back, and compile errors reach the user as
+  `kernel.wgsl:line:col`. `timed=True` puts the pass's GPU time in `wg.last_gpu_ms` (timestamp
+  queries, rounded to ~0.1 ms) for a `metric` event. Teach the concepts that carry over to CUDA
+  (workgroups ≈ blocks, `var<workgroup>` ≈ shared memory, `workgroupBarrier()` ≈
+  `__syncthreads()`). Examples: the `webgpu-101` track (`webgpu-vector-add`,
+  `webgpu-reduction`, `webgpu-tiled-matmul`).
 
 ## 7. Checklist before `create_problem`
 

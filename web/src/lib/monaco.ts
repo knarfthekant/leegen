@@ -10,11 +10,13 @@ import "monaco-editor/languages/definitions/yaml/register";
 import "monaco-editor/languages/definitions/markdown/register";
 import "monaco-editor/languages/definitions/shell/register";
 import { loader } from "@monaco-editor/react";
+import { registerWgsl } from "./wgsl";
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 // exposed for debugging and the browser smoke test
 (window as unknown as { monaco: typeof monaco }).monaco = monaco;
 loader.config({ monaco });
+registerWgsl(monaco);
 
 monaco.editor.defineTheme("lc-light", {
   base: "vs",
@@ -78,7 +80,7 @@ monaco.editor.defineTheme("lc-dark", {
 const EXT: Record<string, string> = {
   py: "python", cu: "cpp", cuh: "cpp", cpp: "cpp", cc: "cpp", h: "cpp", hpp: "cpp",
   ts: "typescript", tsx: "typescript", js: "javascript", yaml: "yaml", yml: "yaml",
-  md: "markdown", sh: "shell",
+  md: "markdown", sh: "shell", wgsl: "wgsl",
 };
 
 export function languageFor(path: string, override?: string | null): string {
