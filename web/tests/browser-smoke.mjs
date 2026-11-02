@@ -258,7 +258,7 @@ try {
   await page.goto(APP + "/p/" + PID);
   await page.locator(".monaco-editor").first().waitFor();
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
-  const runnerFrame = () => page.frames().find((f) => f !== page.mainFrame() && f.url().includes(":13381"));
+  const runnerFrame = () => page.frames().find((f) => f !== page.mainFrame() && new URL(f.url()).origin !== new URL(APP).origin);
   await page.waitForFunction(() => document.querySelector("iframe[title='leetclaude runner']"));
   for (let i = 0; i < 100 && !runnerFrame(); i++) await page.waitForTimeout(100);
   const precached = await runnerFrame().evaluate(async () => {

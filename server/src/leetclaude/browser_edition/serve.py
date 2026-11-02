@@ -27,6 +27,8 @@ def parse_headers(path: Path) -> list[tuple[str, list[tuple[str, str]]]]:
             continue
         if not line[0].isspace():
             rules.append((line.strip(), []))
+        elif line.strip().startswith("!"):   # detach a header set by an earlier rule
+            rules[-1][1].append((line.strip()[1:].strip(), ""))
         else:
             name, _, value = line.strip().partition(":")
             rules[-1][1].append((name.strip(), value.strip()))
@@ -51,7 +53,11 @@ class _Handler(http.server.SimpleHTTPRequestHandler):
         applied: dict[str, str] = {}
         for pattern, headers in self.rules:
             if fnmatch.fnmatch(path, pattern):
-                applied.update({n: v for n, v in headers})
+                for n, v in headers:
+                    if v == "":
+                        applied.pop(n, None)
+                    else:
+                        applied[n] = v
         for name, value in applied.items():
             self.send_header(name, value)
         if "Cache-Control" not in applied:

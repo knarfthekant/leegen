@@ -39,6 +39,7 @@ APP_HEADERS = """\
   Referrer-Policy: no-referrer
   Cache-Control: no-cache
 /assets/*
+  ! Cache-Control
   Cache-Control: public, max-age=31536000, immutable
 """
 
@@ -51,6 +52,7 @@ RUNNER_HEADERS = """\
   Referrer-Policy: no-referrer
   Cache-Control: no-cache
 /pyodide-*
+  ! Cache-Control
   Cache-Control: public, max-age=31536000, immutable
 """
 
