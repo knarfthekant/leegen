@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>leetclaude browser probe</title>
+  <link rel="stylesheet" href="./probe.css">
+</head>
+<body>
+  <header>
+    <h1>leetclaude browser probe <small>Phase 0</small></h1>
+    <div class="actions">
+      <button id="rerun">Run again</button>
+      <button id="copy">Copy report JSON</button>
+    </div>
+  </header>
+  <p class="lede">
+    Checks what the browser edition needs: cross-origin isolation, WebGPU, JSPI, storage, WebMCP
+    site tools, and Python in a separate-origin runner. Open this page in the Codex built-in
+    browser, then ask Codex to call <code>probe_get_report</code>.
+  </p>
+  <main id="report"></main>
+  <section class="card">
+    <h2>Agent notes <small>(written by the <code>probe_annotate</code> tool)</small></h2>
+    <ul id="notes"><li class="muted">none yet</li></ul>
+  </section>
+  <details class="card"><summary>Raw report</summary><pre id="raw"></pre></details>
+  <iframe id="runner" title="runner" allow="cross-origin-isolated"></iframe>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
