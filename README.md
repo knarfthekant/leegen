@@ -1,5 +1,19 @@
 # leegen
 
+**Your coding agent creates the problems. You do the learning.**
+
+[![Browser edition](https://img.shields.io/badge/try-browser%20edition-2563eb)](https://leegen.frankshan.workers.dev)
+[![Python 3.13+](https://img.shields.io/badge/Python-3.13%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
+[![React](https://img.shields.io/badge/React-19-149eca?logo=react&logoColor=white)](https://react.dev/)
+[![Pyodide](https://img.shields.io/badge/runtime-Pyodide-4b8bbe)](https://pyodide.org/)
+[![WebGPU](https://img.shields.io/badge/GPU-WebGPU-005a9c)](https://www.w3.org/TR/webgpu/)
+[![MCP](https://img.shields.io/badge/agents-MCP%20%7C%20WebMCP-5b5bd6)](#how-it-works-with-your-coding-agent)
+
+[Try the browser edition](https://leegen.frankshan.workers.dev) ·
+[Server quick start](#quick-start-server-edition) ·
+[Choose an edition](#choose-an-edition) ·
+[Documentation](#development-and-documentation)
+
 A LeetCode-style programming trainer where **your coding agent writes the problems, and you
 solve them**. Ask for an exercise on a topic you want to learn, work through it in the browser,
 and ask the same agent for hints or feedback. Use the hosted browser edition to run Python and
@@ -9,6 +23,17 @@ CPU and GPU execution.
 There is no fixed problem bank: the repo includes examples, and your agent can create new
 problems or adapt existing ones to your level. Exercises can cover algorithms, async Python,
 multi-file services, WebGPU, PyTorch, Triton, or CUDA kernels.
+
+## Highlights
+
+- **Problems made for you:** ask an agent for a new exercise or adjust an existing one. Each
+  YAML problem includes starter code, tests, a reference solution, and its runtime requirements.
+- **A tutor beside your editor:** share your current attempt with an agent, run tests, receive
+  line-level comments, and review proposed edits.
+- **CPU and GPU practice:** solve Python and WebGPU exercises in the browser, or use the server
+  edition for native Python, PyTorch, C++, CUDA, Triton, and remote GPU jobs.
+- **Your choice of setup:** open the hosted app or run a local server. Export, import, or manually
+  sync files to move problems and work between editions.
 
 ## Choose an edition
 
