@@ -26,9 +26,11 @@ def create_app(*, watch: bool = True) -> FastAPI:
         stop = asyncio.Event()
         task = asyncio.create_task(watch_forever(stop)) if watch else None
         async with mcp.session_manager.run():
+            app.state.mcp_online = True
             try:
                 yield
             finally:
+                app.state.mcp_online = False
                 stop.set()
                 if task:
                     task.cancel()
@@ -36,8 +38,13 @@ def create_app(*, watch: bool = True) -> FastAPI:
                         await task
 
     app = FastAPI(title="leegen", lifespan=lifespan)
+    app.state.mcp_online = False
     app.include_router(router)
     app.router.routes.extend(mcp_app.routes)  # POST/GET/DELETE /mcp
+
+    @app.get("/api/status")
+    def status() -> dict[str, bool]:
+        return {"server": True, "mcp": app.state.mcp_online}
 
     dist = settings().web_dist
     if dist.exists():

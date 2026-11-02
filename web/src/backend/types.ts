@@ -39,11 +39,16 @@ export interface SessionReport {
   executor: string | null;
 }
 
-export interface BackendStatus {
-  /** Shown as the topbar pill. */
-  ok: boolean;
+export interface ServiceStatus {
+  id: string;
   label: string;
-  title: string;
+  state: "online" | "offline" | "connecting" | "unavailable" | "degraded";
+  detail: string;
+}
+
+export interface BackendStatus {
+  /** Ordered services shown in the topbar and its expanded status panel. */
+  services: ServiceStatus[];
 }
 
 export interface ImportSummary {

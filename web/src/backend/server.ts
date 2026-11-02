@@ -29,16 +29,60 @@ export function createServerBackend(base = ""): Backend {
   const statusListeners = new Set<() => void>();
   let socket: WebSocket | null = null;
   let retry = 0;
-  let live = false;
-  let status: BackendStatus = { ok: false, label: "Offline", title: "Reconnecting…" };
+  let live: boolean | null = null;
+  let healthTimer: ReturnType<typeof setInterval> | undefined;
+  let checking = false;
+  let status: BackendStatus = {
+    services: [
+      { id: "server", label: "Server", state: "connecting", detail: "Checking the leegen server…" },
+      { id: "mcp", label: "MCP", state: "connecting", detail: "Checking the MCP service…" },
+      { id: "updates", label: "Live updates", state: "connecting", detail: "Opening the WebSocket connection…" },
+    ],
+  };
+
+  const update = (services: BackendStatus["services"]) => {
+    status = { services };
+    statusListeners.forEach((l) => l());
+  };
+
+  const checkHealth = async () => {
+    if (checking) return;
+    checking = true;
+    try {
+      const res = await fetch(`${api}/status`, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+      if (!res.ok) throw new Error(`Server status: ${res.status}`);
+      const health = await res.json() as { server: boolean; mcp: boolean };
+      update(status.services.map((s) => {
+        if (s.id === "server") return {
+          ...s, state: health.server === true ? "online" : "offline",
+          detail: health.server === true ? "The leegen API is reachable." : "The leegen API is offline.",
+        };
+        if (s.id === "mcp") return {
+          ...s, state: health.mcp === true ? "online" : "offline",
+          detail: health.mcp === true
+            ? `MCP is ready at ${new URL(`${base}/mcp`, location.href).href}. Agents can connect here.`
+            : "The MCP service is not running.",
+        };
+        return s;
+      }));
+    } catch {
+      update(status.services.map((s) => s.id === "updates" ? s : {
+        ...s, state: "offline", detail: s.id === "server"
+          ? "Cannot reach the leegen API. Retrying automatically."
+          : "Cannot reach the MCP service. Retrying automatically.",
+      }));
+    } finally {
+      checking = false;
+    }
+  };
 
   const setLive = (v: boolean) => {
     if (live === v) return;
     live = v;
-    status = v
-      ? { ok: true, label: "Live", title: "Connected to the leegen server" }
-      : { ok: false, label: "Offline", title: "Reconnecting…" };
-    statusListeners.forEach((l) => l());
+    update(status.services.map((s) => s.id === "updates" ? {
+      ...s, state: v ? "online" : "offline",
+      detail: v ? "Live runs, edits and agent feedback are connected." : "Live updates disconnected. Reconnecting…",
+    } : s));
   };
 
   const connect = () => {
@@ -47,6 +91,7 @@ export function createServerBackend(base = ""): Backend {
     socket.onopen = () => {
       retry = 0;
       setLive(true);
+      void checkHealth();
     };
     socket.onmessage = (msg) => {
       try {
@@ -59,6 +104,7 @@ export function createServerBackend(base = ""): Backend {
     socket.onclose = () => {
       socket = null;
       setLive(false);
+      void checkHealth();
       retry = Math.min(retry + 1, 6);
       setTimeout(connect, 250 * 2 ** retry);
     };
@@ -93,9 +139,17 @@ export function createServerBackend(base = ""): Backend {
     status: {
       get: () => status,
       subscribe(listener) {
-        ensure();
         statusListeners.add(listener);
-        return () => statusListeners.delete(listener);
+        ensure();
+        void checkHealth();
+        healthTimer ??= setInterval(() => void checkHealth(), 15_000);
+        return () => {
+          statusListeners.delete(listener);
+          if (!statusListeners.size) {
+            clearInterval(healthTimer);
+            healthTimer = undefined;
+          }
+        };
       },
     },
   };

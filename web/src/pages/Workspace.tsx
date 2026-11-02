@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
-import { Brand, ConnectionDot, ThemeToggle } from "../components/Chrome";
+import { Brand, ConnectionDot, RepositoryLink, ThemeToggle } from "../components/Chrome";
 import { Editor, type CursorInfo, type EditorFile, type RevealTarget, type SaveState } from "../components/Editor";
 import { Markdown } from "../components/Markdown";
 import { ProblemDrawer } from "../components/ProblemDrawer";
@@ -412,6 +412,7 @@ export function WorkspacePage({ id }: { id: string }) {
 
         <div className="topbar-side end">
           <ConnectionDot />
+          {api.edition === "browser" && <RepositoryLink />}
           <ThemeToggle />
         </div>
       </header>

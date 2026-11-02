@@ -1,6 +1,6 @@
 import { CircleAlert, Inbox, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Brand, ConnectionDot, ThemeToggle } from "../components/Chrome";
+import { Brand, ConnectionDot, RepositoryLink, ThemeToggle } from "../components/Chrome";
 import { ImportReport, SavedReport, TransferButtons } from "../components/Transfer";
 import type { ImportSummary } from "../backend/types";
 import { filterProblems, ProblemRow } from "../components/ProblemRow";
@@ -62,6 +62,7 @@ export function ProblemList() {
           }}
         />
         <ConnectionDot />
+        {browser && <RepositoryLink />}
         <ThemeToggle />
       </header>
       <main className="list-main">

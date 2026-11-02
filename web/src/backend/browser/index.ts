@@ -82,23 +82,30 @@ export async function createBrowserBackend(): Promise<BrowserBackend> {
     schema: bundle.schema,
   });
 
-  // ------------------------------------------------------------ status pill
+  // ------------------------------------------------------------ service status
   const statusListeners = new Set<() => void>();
-  let agentTools = 0;
+  let agentTools: number | null = null;
+  let agentError: string | null = null;
   const computeStatus = (): BackendStatus => {
-    const agents = agentTools ? `${agentTools} agent tools registered (WebMCP)` : "No WebMCP agent detected";
-    switch (runner.state) {
-      case "failed":
-        return { ok: false, label: "Runner offline", title: `${runner.error ?? "the runner failed"}. ${agents}.` };
-      case "ready":
-        return {
-          ok: true,
-          label: agentTools ? "Agent tools" : "Browser",
-          title: `Python runs in this browser (${runner.hello?.crossOriginIsolated ? "isolated runner" : "runner"} at ${runner.origin}). ${agents}.`,
-        };
-      default:
-        return { ok: true, label: agentTools ? "Agent tools" : "Browser", title: `Starting the runner… ${agents}.` };
-    }
+    const toolCount = bundle.tools.tools.length;
+    return { services: [
+      { id: "browser", label: "Browser", state: "online", detail: "Local storage is ready. Problems and your work are saved in this browser." },
+      {
+        id: "runner", label: "Python runner",
+        state: runner.state === "failed" ? "offline" : runner.state === "ready" ? "online" : "connecting",
+        detail: runner.state === "failed" ? runner.error ?? "The Python runner failed."
+          : runner.state === "ready" ? `Runner connected at ${runner.origin}. Python loads when needed.`
+          : `Connecting to the Python runner at ${runner.origin}…`,
+      },
+      {
+        id: "webmcp", label: "WebMCP",
+        state: agentError ? "offline" : agentTools === null ? "connecting"
+          : agentTools === 0 ? "unavailable" : agentTools < toolCount ? "degraded" : "online",
+        detail: agentError ?? (agentTools === null ? "Registering agent tools…"
+          : agentTools === 0 ? "WebMCP is unavailable in this browser. Use a browser with WebMCP support to connect an agent."
+          : `${agentTools} of ${toolCount} agent tools registered. Tools are available to agents in this browser.`),
+      },
+    ] };
   };
   let status = computeStatus();
   const refresh = () => {
@@ -161,6 +168,8 @@ export async function createBrowserBackend(): Promise<BrowserBackend> {
       get: () => status,
       subscribe(listener) {
         statusListeners.add(listener);
+        // Establish the lightweight runner channel without loading Python yet.
+        void runner.connect().catch(() => undefined);
         return () => statusListeners.delete(listener);
       },
     },
@@ -193,11 +202,15 @@ export async function createBrowserBackend(): Promise<BrowserBackend> {
   }
 
   // WebMCP: register the agent tools on this (top-level) page.
-  const { registerAgentTools } = await import("./tools.ts");
-  registerAgentTools(service, bundle.tools.tools as never).then((n) => {
-    agentTools = n;
-    refresh();
-  });
+  void import("./tools.ts").then(({ registerAgentTools }) => registerAgentTools(service, bundle.tools.tools as never))
+    .then((n) => {
+      agentTools = n;
+      if (n === 0 && (document.modelContext ?? navigator.modelContext)?.registerTool) {
+        agentError = "WebMCP is available, but its agent tools could not be registered. Reload to try again.";
+      }
+    })
+    .catch((e) => { agentError = `Agent tools could not be registered: ${String(e?.message ?? e)}`; })
+    .finally(refresh);
 
   return backend;
 }
