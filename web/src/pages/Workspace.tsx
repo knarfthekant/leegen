@@ -25,13 +25,13 @@ import { Brand, ConnectionDot, ThemeToggle } from "../components/Chrome";
 import { Editor, type CursorInfo, type EditorFile, type RevealTarget, type SaveState } from "../components/Editor";
 import { Markdown } from "../components/Markdown";
 import { ProblemDrawer } from "../components/ProblemDrawer";
-import { hardware } from "../components/ProblemRow";
+import { ElsewhereChip, elsewhere, hardware } from "../components/ProblemRow";
 import { ResultPanel } from "../components/ResultPanel";
 import { ReviewPanel } from "../components/ReviewPanel";
 import { TestcasePanel } from "../components/TestcasePanel";
 import { Button, Chip, DifficultyChip, IconButton, Select, Skeleton, Tabs } from "../components/ui";
+import { eventProblemId, getBackend, useBackendEvents } from "../backend";
 import {
-  api,
   newRunId,
   type Annotation,
   type CustomTest,
@@ -41,7 +41,6 @@ import {
   type Proposal,
   type RunResult,
 } from "../lib/api";
-import { useServerEvents } from "../lib/events";
 import { navigate } from "../lib/router";
 import { useDark } from "../lib/theme";
 
@@ -61,6 +60,7 @@ function useDebounced(fn: () => void, deps: unknown[], ms: number) {
 const isGpu = (device: string | null | undefined) => !!device && !/^cpu/i.test(device);
 
 export function WorkspacePage({ id }: { id: string }) {
+  const api = getBackend();
   const dark = useDark();
   const [problem, setProblem] = useState<Problem | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -77,6 +77,7 @@ export function WorkspacePage({ id }: { id: string }) {
   const [bottomTab, setBottomTab] = useState<BottomTab>("testcase");
   const [leftTab, setLeftTab] = useState<LeftTab>("description");
   const [executors, setExecutors] = useState<ExecutorInfo[]>([]);
+  const [runtimes, setRuntimes] = useState<string[] | undefined>(undefined);
   const [executor, setExecutor] = useState<string | null>(null);
   const [cursor, setCursor] = useState<CursorInfo | null>(null);
   const [revealLine, setRevealLine] = useState<RevealTarget | null>(null);
@@ -104,10 +105,10 @@ export function WorkspacePage({ id }: { id: string }) {
   // ---------------------------------------------------------------- loading
   const loadProblem = useCallback(
     () =>
-      api.problem(id).then(setProblem, (e) => {
+      api.getProblem(id).then(setProblem, (e) => {
         setLoadError(String(e.message ?? e));
       }),
-    [id],
+    [api, id],
   );
 
   useEffect(() => {
@@ -119,7 +120,7 @@ export function WorkspacePage({ id }: { id: string }) {
     setBottomTab("testcase");
     setLeftTab("description");
     setSaveState("saved");
-    Promise.all([api.problem(id), api.workspace(id), api.executors(id), api.problems()])
+    Promise.all([api.getProblem(id), api.getWorkspace(id), api.executors(id), api.listProblems()])
       .then(([p, w, ex, list]) => {
         if (!alive) return;
         setProblem(p);
@@ -131,6 +132,7 @@ export function WorkspacePage({ id }: { id: string }) {
         setHintsRevealed(w.hints_revealed);
         setResult(w.last_run);
         setExecutors(ex.executors);
+        setRuntimes(ex.runtimes);
         const firstCompatible = ex.executors.find((e) => e.compatible);
         setExecutor(firstCompatible?.id ?? null);
         setProblems(list.problems);
@@ -141,7 +143,7 @@ export function WorkspacePage({ id }: { id: string }) {
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [api, id]);
 
   // ---------------------------------------------------------------- persistence
   useDebounced(
@@ -169,7 +171,7 @@ export function WorkspacePage({ id }: { id: string }) {
     () => {
       if (loaded.current !== id) return;
       api
-        .session({
+        .reportSession({
           problem_id: id,
           buffers,
           active_file: active,
@@ -205,12 +207,13 @@ export function WorkspacePage({ id }: { id: string }) {
         run_id: rid, problem_id: id, status: "error", executor: executor ?? "-", device: null,
         started_at: Date.now() / 1000, duration_ms: 0, passed: 0, total: 0, tests: [], metrics: [],
         compile_output: null, error: String((e as Error).message ?? e), stdout: "", stderr: "",
+        mode: "user",
       });
     } finally {
       runId.current = null;
       setRunning(false);
     }
-  }, [running, problem, id, buffers, executor, showBottom]);
+  }, [api, running, problem, id, buffers, executor, showBottom]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -223,16 +226,16 @@ export function WorkspacePage({ id }: { id: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [run]);
 
-  // ---------------------------------------------------------------- server events
-  useServerEvents((e) => {
-    if (e.type === "navigate" && typeof e.problem_id === "string") {
+  // ---------------------------------------------------------------- backend events
+  useBackendEvents((e) => {
+    if (e.type === "navigate") {
       navigate(`/p/${e.problem_id}`);
       return;
     }
     if (e.type === "problems_changed" || e.type === "run_finished") {
-      api.problems().then((r) => setProblems(r.problems));
+      api.listProblems().then((r) => setProblems(r.problems));
     }
-    if (e.problem_id !== id) return;
+    if (eventProblemId(e) !== id) return;
     switch (e.type) {
       case "run_started":
         setRunPhase(null);
@@ -242,17 +245,17 @@ export function WorkspacePage({ id }: { id: string }) {
         }
         break;
       case "run_status":
-        setRunPhase({ phase: String(e.phase), detail: String(e.detail ?? "") });
+        setRunPhase({ phase: e.phase, detail: e.detail ?? "" });
         break;
       case "run_finished":
         setRunPhase(null);
         if (e.run_id !== runId.current) {
           setRunning(false);
-          setResult(e.result as RunResult);
+          setResult(e.result);
         }
         break;
       case "annotations_changed": {
-        const next = e.annotations as Annotation[];
+        const next = e.annotations;
         setAnnotations((prev) => {
           if (next.length > prev.length) showBottom("review");
           return next;
@@ -260,14 +263,14 @@ export function WorkspacePage({ id }: { id: string }) {
         break;
       }
       case "proposals_changed": {
-        const next = e.proposals as Proposal[];
+        const next = e.proposals;
         setProposals(next);
         const latest = next[next.length - 1];
         if (latest && e.added) setActive(latest.file);
         break;
       }
       case "files_changed": {
-        const files = e.files as Record<string, string>;
+        const files = e.files;
         Object.assign(saved.current, files);
         setBuffers((b) => ({ ...b, ...files }));
         break;
@@ -327,7 +330,7 @@ export function WorkspacePage({ id }: { id: string }) {
 
   const reset = async () => {
     if (!confirm("Reset all editable files to the starter code?")) return;
-    const r = await api.reset(id);
+    const r = await api.resetWorkspace(id);
     saved.current = { ...r.files };
     setBuffers(r.files);
   };
@@ -380,7 +383,11 @@ export function WorkspacePage({ id }: { id: string }) {
             title="Where the code runs"
             disabled={compatible.length === 0}
           >
-            {compatible.length === 0 && <option value="">No executor provides {problem.requires.join(", ")}</option>}
+            {compatible.length === 0 && (
+              <option value="">
+                {elsewhere(runtimes) ? `Runs in the ${elsewhere(runtimes)!.label}` : `No executor provides ${problem.requires.join(", ")}`}
+              </option>
+            )}
             {compatible.map((e) => (
               <option key={e.id} value={e.id}>
                 {e.id} · {e.device}
@@ -442,7 +449,7 @@ export function WorkspacePage({ id }: { id: string }) {
                   <h1 className="title">
                     {index >= 0 && <span className="title-index">{index + 1}.</span>} {problem.title}
                   </h1>
-                  <MetaChips problem={problem} hw={hw} />
+                  <MetaChips problem={problem} hw={hw} runtimes={runtimes} />
                   <Markdown source={problem.description} problemId={problem.id} />
                 </>
               ) : (
@@ -587,7 +594,7 @@ export function WorkspacePage({ id }: { id: string }) {
   );
 }
 
-function MetaChips({ problem, hw }: { problem: Problem; hw: string[] }) {
+function MetaChips({ problem, hw, runtimes }: { problem: Problem; hw: string[]; runtimes?: string[] }) {
   const tags = problem.tags.filter((t) => t !== problem.environment);
   const [showTopics, setShowTopics] = useState(tags.length <= 3);
   return (
@@ -601,6 +608,7 @@ function MetaChips({ problem, hw }: { problem: Problem; hw: string[] }) {
           {r}
         </Chip>
       ))}
+      <ElsewhereChip runtimes={runtimes} />
       {tags.length > 0 &&
         (showTopics ? (
           tags.map((t) => (

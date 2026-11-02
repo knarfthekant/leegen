@@ -522,12 +522,13 @@
       "type": "string"
     },
     "requires": {
-      "description": "Hardware needed: `cpu`, `gpu` (cuda or mps), `cuda` (NVIDIA only).",
+      "description": "Hardware needed: `cpu`, `gpu` (cuda or mps), `cuda` (NVIDIA only), `webgpu` (the browser edition's WebGPU device).",
       "items": {
         "enum": [
           "cpu",
           "gpu",
-          "cuda"
+          "cuda",
+          "webgpu"
         ],
         "type": "string"
       },

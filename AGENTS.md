@@ -5,6 +5,12 @@ write problems as YAML files. The user solves them in a browser (description on 
 and tests on the right) and runs tests on CPU or GPU executors. Agents also act as the user's
 tutor through MCP: reading their code, running it, commenting on lines, and proposing edits.
 
+There are two editions. The **server edition** (this repo running locally) uses MCP and native,
+SSH and SLURM executors. The **browser edition** is a static site: IndexedDB for storage,
+Python in a separate-origin Pyodide runner, and WebMCP site tools for agents (Codex's built-in
+browser). The tools have the same names and results in both. See [Browser edition](#browser-edition)
+and `docs/browser.md`.
+
 This file is for any agent working in this repo. There are three jobs:
 
 1. **Authoring**: create or improve problems. See [Authoring protocol](#authoring-protocol).
@@ -47,6 +53,7 @@ CLI, for agents without MCP. Run from `server/`:
 | `uv run leetclaude validate --all` / `<id>` / `--file x.yaml` | Schema check + reference must pass every test + starter must fail |
 | `uv run leetclaude run <id> [--reference] [--json]` | Run the user's workspace code (or the reference) |
 | `uv run leetclaude schema` | Regenerate `schema/problem.schema.json` from the Pydantic models |
+| `uv run leetclaude browser build` / `serve` | Build the browser edition's two static sites / serve them locally with their headers |
 
 ## Repo map
 
@@ -56,12 +63,19 @@ problems/<id>/assets/       optional images referenced from the description
 environments/<id>.yaml      runtimes: language, python version, dependencies, hardware needs
 workspace/<id>/             the user's code (real files) + .leetclaude/*.json state (gitignored)
 docs/authoring.md           full authoring guide (also served by the get_authoring_guide tool)
+docs/browser.md             the browser edition: architecture, build, deploy, limits
 docs/executors.md           executor kinds and executors.yaml
 docs/clusters/README.md     shared guide for setting up remote cluster backends
 docs/clusters/<name>.md     local per-cluster notes (gitignored)
 schema/problem.schema.json  generated JSON Schema for problem YAML
+contracts/                  generated: records/events schemas, tool manifest, conformance fixtures
 server/src/leetclaude/      FastAPI backend, runner, MCP server (Python package `leetclaude`)
+server/src/leetclaude/core/ pure core shared with the browser runner (stdlib + pydantic only)
 web/src/                    React + Vite + Monaco frontend (primitives in components/ui.tsx)
+web/src/backend/            Backend interface: server.ts (REST/WS) and browser/ (IndexedDB, WebMCP)
+web/runner/                 browser edition's runner origin (Pyodide worker, deadlines, RPC)
+server/src/leetclaude/browser_runner.py   what the Pyodide worker calls (prepare/execute/finish)
+server/src/leetclaude/browser_edition/    browser build: Pyodide fetch, data bundle, _headers
 ```
 
 ## Authoring protocol
@@ -152,7 +166,12 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
 (what)          (how tested)  (how built/run)     (deps/runtime) (where it runs)
 ```
 
-- **Job bundle:** for each run, `runner/orchestrator.py` builds a temp dir containing:
+- **Core** (`server/src/leetclaude/core/`): the schema models, run planning (`plan.py`), result
+  assembly (`assemble.py`), views, review logic (annotations, edits, proposals), validation rules
+  and the tool spec. It is pure (stdlib + pydantic, pyyaml in `parse.py`) because the browser
+  edition's runner imports the same modules inside Pyodide. Never add I/O or server imports here.
+- **Job bundle:** for each run, `runner/orchestrator.py` writes `core.plan.plan_run()`'s plan to a
+  temp dir containing:
   - `user/`: the user's files, readonly files and hidden files
   - `ref/`: the same, with the reference solution swapped in (only when needed)
   - `_lc/leetclaude_harness/`: the harness library
@@ -166,7 +185,9 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   lines.
 - **Harness** (`server/src/leetclaude/harness/leetclaude_harness/`): standard library only (plus
   pytest for the pytest judge). It is copied into every bundle and runs inside the problem's
-  environment, never in the server process.
+  environment, never in the server process. It also runs unmodified in Pyodide: `alarm()` falls
+  back to deadline checks where `signal.setitimer` is missing, `run_coro()` handles Pyodide's
+  running event loop, and `protocol.set_sink()` streams events.
   - `function_judge.py`: generators, then the reference phase, then the user phase, then the
     optional benchmark. Reference and user code share module names; `module_scope()` isolates
     them.
@@ -175,7 +196,9 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   - `local` runs a subprocess in a uv venv (`~/.cache/leetclaude/envs/<id>-<hash>`), with a
     timeout, a process group and CPU rlimits.
   - Capabilities (`cpu`, `mps`, `cuda`) are detected automatically. Problems and environments
-    declare `requires`, and only compatible executors are offered.
+    declare `requires`, and only compatible executors are offered. Executors also have a
+    `runtime` (`native` here, `pyodide` for the browser runner); environments list theirs
+    (`native: true`, plus a `browser:` block if they run in the browser). See `core/compat.py`.
   - Remote executors (`ssh`, `slurm`) are configured in `~/.config/leetclaude/executors.yaml`.
     See `docs/executors.md`. Never put credentials in that file; it relies on the user's own
     ssh setup.
@@ -190,13 +213,45 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
     WebSocket hub.
   - `watcher.py` pushes `problems/` changes to the UI and turns direct edits to workspace files
     into proposals.
-- **MCP** (`mcp_server/server.py`) and the REST API (`api/routes.py`) share `services.py`,
-  `tutor.py` and `validate.py`.
+- **ToolService** (`service.py`) holds every operation the UI and agents perform, with its stores,
+  session, event sink and orchestrator injected (wired in `state.py`). MCP (`mcp_server/server.py`)
+  and REST (`api/routes.py`) are thin adapters over it: put new behaviour in the service, then
+  expose it in both. `services.py`, `tutor.py` and `validate.py` are compatibility wrappers.
+- **Contracts** (`contracts/`, generated by `uv run leetclaude schema` from `core/`): record and
+  event schemas, `tools.json` (MCP tool definitions + `core/toolspec.py` hints, which the browser
+  edition registers as WebMCP tools), conformance fixtures, and `web/src/contracts/generated.ts`.
+  `uv run leetclaude schema --check` fails when they are stale; a test enforces it.
+
+### Browser edition
+
+- **Same core, different shell.** The UI talks to a `Backend` (`web/src/backend/types.ts`). The
+  build picks one: `vite build` gives `server.ts`, and `vite build --mode browser` (what
+  `leetclaude browser build` runs) gives `browser/`.
+- **App origin:** `browser/service.ts` is `BrowserToolService`, the TS twin of `ToolService`.
+  `browser/core.ts` ports `core/views.py` and `core/review.py`, and `npm test` checks it against
+  `contracts/fixtures`. `browser/tools.ts` registers every tool in `contracts/tools.json` with
+  `document.modelContext` and validates inputs itself. Storage is `browser/db.ts` (IndexedDB) and
+  cross-tab events are `browser/events.ts` (BroadcastChannel). `browser/transfer.ts` exports and
+  imports zips in the repo layout, and `browser/folder.ts` saves to and loads from a folder
+  (File System Access). Service workers (`web/sw/app-sw.js`, `web/runner/sw.js`; the build fills
+  in their precache lists) make both origins work offline.
+- **Runner origin** (`web/runner/`): stateless and allow-listed. It runs `browser_runner.py`
+  (core `plan_run` → harness → core `assemble`) in Pyodide. Validation follows the
+  `core.validation` steps (`precheck`, `after_reference`, `after_starter`), with a deadline per
+  run. Timeouts and cancels use the interrupt buffer first, then terminate the worker.
+- **Rules:**
+  - Behaviour that both editions need goes into `leetclaude.core` (Python, which Pyodide runs) or
+    into the service on both sides.
+  - Any change to `core/views.py` or `core/review.py` must be mirrored in `browser/core.ts`, then
+    run `uv run leetclaude schema` and `npm test`.
+  - An environment runs in the browser only if it has a `browser:` block (Pyodide packages).
 
 ## Extending
 
 - **New environment:** add `environments/<id>.yaml` (`language`, `python`, `dependencies`,
-  `requires`, `env`, `env_without_cuda`). Provisioning is automatic on first run.
+  `requires`, `env`, `env_without_cuda`). Provisioning is automatic on first run. Add
+  `browser: {packages: [...]}` (Pyodide packages) if it can run in the browser edition, and
+  `native: false` if it can't run natively.
 - **New language:** add `languages/<lang>.py` subclassing `LanguageAdapter`, decorate it with
   `@register("language", "<lang>")`, and import it in `languages/__init__.py`.
 - **New judge kind:** add `judges/<kind>.py` (returns a `JudgePlan`: run.json config, command,
@@ -205,16 +260,23 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
 - **New executor:** subclass `Executor` (`capabilities`, `prepare`, `run`, `cancel`), register it
   with `@register("executor", "<kind>")`, and import it in `executors/__init__.py`. Executor
   config allows extra fields.
-- **Schema changes:** edit `schema/models.py`, then run `uv run leetclaude schema`, and update
+- **Schema changes:** edit `core/models.py`, then run `uv run leetclaude schema`, and update
   `docs/authoring.md` and the seed problems.
+- **New agent tool:** add the operation to `ToolService`, an MCP tool in `mcp_server/server.py`
+  (its docstring is the description), an entry in `core/toolspec.py`, then regenerate contracts and
+  add the browser implementation (`web/src/backend/browser/`).
 
 ## Conventions and checks
 
 - Backend: `cd server && uv run pytest`. All seed problems must stay valid
   (`uv run leetclaude validate --all`).
-- Frontend: `cd web && npm run typecheck && npm run build`. Browser smoke test against a running
-  server: `make smoke` / `node tests/smoke.mjs` (uses the installed Chrome through playwright-core).
-  `make check` runs the backend tests, problem validation and the frontend build.
+- Frontend: `cd web && npm test && npm run typecheck && npm run build`. Browser smoke test against
+  a running server: `make smoke` / `node tests/smoke.mjs` (uses the installed Chrome through
+  playwright-core). `make check` runs the backend tests, problem validation, the TS conformance
+  tests and the frontend build.
+- Browser edition: `make browser && make browser-serve`, then `make browser-smoke` (fresh Chrome
+  profile; validates the python seeds in Pyodide, then runs, times out, cancels, uses the tools,
+  reloads, and does an export/import round trip).
 - UI style: minimal, tonal surfaces. Rounded cards (`--r-*` tokens) sit on a soft canvas and
   sections are separated by shade, not borders (at most a low-alpha `--line` hairline). One
   accent colour; pass/warn/fail appear only as faded tints (`.tone-*` classes). lucide-react

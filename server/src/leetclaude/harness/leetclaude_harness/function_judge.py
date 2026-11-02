@@ -8,7 +8,6 @@ Phases, all in one process:
 
 from __future__ import annotations
 
-import asyncio
 import copy
 import inspect
 import statistics
@@ -25,6 +24,7 @@ from leetclaude_harness._common import (
     load_isolated,
     module_scope,
     resolve,
+    run_coro,
     sync_device,
     user_traceback,
 )
@@ -34,12 +34,12 @@ from leetclaude_harness.protocol import describe, emit, truncate
 def _finish(value: Any) -> Any:
     """Await coroutines; drain (async) generators into lists."""
     if inspect.iscoroutine(value):
-        value = asyncio.run(value)
+        value = run_coro(value)
     if inspect.isasyncgen(value):
         async def drain(agen: Any) -> list[Any]:
             return [x async for x in agen]
 
-        value = asyncio.run(drain(value))
+        value = run_coro(drain(value))
     elif inspect.isgenerator(value):
         value = list(value)
     return value

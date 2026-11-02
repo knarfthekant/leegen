@@ -1,0 +1,217 @@
+schema_version: 1
+id: webgpu-tiled-matmul
+title: "WebGPU 3: Tiled Matrix Multiply"
+difficulty: hard
+tags: [webgpu, wgsl, gpu, matmul, tiling, shared-memory]
+track: webgpu-101
+order: 3
+environment: webgpu
+requires: [webgpu]
+description: |
+  Multiply an $m \times k$ matrix $A$ by a $k \times n$ matrix $B$:
+
+  $$C_{rc} = \sum_{i=0}^{k-1} A_{ri}\, B_{ic}$$
+
+  All matrices are `f32`, stored **row-major** in flat arrays (`A[r][i]` is `a[r * k + i]`).
+  The host launches a 2-D grid of $16 \times 16$ workgroups, one invocation per element of $C$:
+  `gid.x` is the column and `gid.y` is the row.
+
+  ### Why tile
+
+  A naive kernel reads $2k$ values from storage for each output. Neighbouring invocations read
+  the same rows and columns again and again. Tiling loads each $16 \times 16$ block of $A$ and of
+  $B$ into `var<workgroup>` memory **once per workgroup**, and every invocation reuses it 16
+  times:
+
+  ```mermaid
+  flowchart LR
+      subgraph per tile t
+          LA["load A block (row tile, column tile t)"] --> BAR1[workgroupBarrier]
+          LB["load B block (row tile t, column tile)"] --> BAR1
+          BAR1 --> MAC["16 multiply-adds from workgroup memory"]
+          MAC --> BAR2[workgroupBarrier]
+      end
+      BAR2 -->|next t| LA
+      BAR2 -->|done| W["write C[row][col] when inside m x n"]
+  ```
+
+  Pad with zeros when a block reaches past the edge of $A$ or $B$. Matrix sizes are not
+  multiples of 16, and every invocation must still reach both barriers, including those outside
+  $C$.
+
+  :::note
+  **If you know CUDA:** this is the classic shared-memory tiled SGEMM. Here `tile_a` and
+  `tile_b` are `__shared__ float[16][16]`, and the two barriers are the two `__syncthreads()`
+  calls.
+  :::
+
+  ### Bindings
+
+  | Binding | Variable | Contents |
+  |---|---|---|
+  | 0 | `a: array<f32>` (read) | $A$, $m \cdot k$ values |
+  | 1 | `b: array<f32>` (read) | $B$, $k \cdot n$ values |
+  | 2 | `c: array<f32>` (read_write) | $C$, $m \cdot n$ values |
+  | 3 | `dims: Dims` (uniform) | `m`, `k`, `n` |
+
+  The host passes $A$ and $B$ as lists of rows and returns $C$ as a list of rows. The comparison
+  uses a relative tolerance. On the largest case it also reports the GPU time of your kernel
+  (timestamp queries, rounded by the browser to about 0.1 ms) as a metric.
+
+  ### Example
+
+  ```text
+  A = [[1, 2],      B = [[5, 6],      C = [[19, 22],
+       [3, 4]]           [7, 8]]           [43, 50]]
+  ```
+hints:
+  - "Start with a correct naive kernel (loop over `i`, read `a` and `b` directly), then add tiling."
+  - "Per tile `t`, invocation (lid.x, lid.y) loads `A[row][t*16 + lid.x]` into `tile_a[lid.y][lid.x]` and `B[t*16 + lid.y][col]` into `tile_b[lid.y][lid.x]`, or 0 when out of range."
+  - "The tile loop runs `(k + 15) / 16` times for every invocation. Don't return early for invocations outside C; only skip the final write."
+files:
+  - path: kernel.wgsl
+    role: editable
+    content: |
+      struct Dims { m: u32, k: u32, n: u32, _pad: u32 }
+
+      @group(0) @binding(0) var<storage, read> a: array<f32>;
+      @group(0) @binding(1) var<storage, read> b: array<f32>;
+      @group(0) @binding(2) var<storage, read_write> c: array<f32>;
+      @group(0) @binding(3) var<uniform> dims: Dims;
+
+      const TILE: u32 = 16u;
+      var<workgroup> tile_a: array<array<f32, 16>, 16>;
+      var<workgroup> tile_b: array<array<f32, 16>, 16>;
+
+      @compute @workgroup_size(16, 16)
+      fn main(@builtin(global_invocation_id) gid: vec3<u32>,
+              @builtin(local_invocation_id) lid: vec3<u32>) {
+          let row = gid.y;
+          let col = gid.x;
+          // TODO: c[row * dims.n + col] = sum over i of a[row * dims.k + i] * b[i * dims.n + col]
+      }
+  - path: _host.py
+    role: hidden
+    content: |
+      from pathlib import Path
+
+      from leetclaude_harness import webgpu as wg
+      from leetclaude_harness.protocol import emit
+
+      def matmul(a, b):
+          m, k, n = len(a), len(b), len(b[0])
+          flat_a = [x for row in a for x in row]
+          flat_b = [x for row in b for x in row]
+          big = m * n >= 256 * 256
+          out = wg.dispatch(
+              wg.source("kernel.wgsl", __file__),
+              [wg.storage(wg.f32(flat_a)), wg.storage(wg.f32(flat_b)),
+               wg.storage(size=4 * m * n, read_only=False), wg.uniform(wg.u32([m, k, n, 0]))],
+              workgroups=(wg.groups(n, 16), wg.groups(m, 16)),
+              timed=big,
+          )
+          if big and wg.last_gpu_ms is not None and Path(__file__).parent.name != "ref":
+              emit({"type": "metric", "name": f"kernel time {m}x{k}x{n}", "value": round(wg.last_gpu_ms, 3),
+                    "unit": "ms", "reference": None})
+          c = wg.to_f32(out[2], m * n)
+          return [c[r * n:(r + 1) * n] for r in range(m)]
+  - path: _gen.py
+    role: hidden
+    content: |
+      import random
+
+      def matrices(seed: int, m: int, k: int, n: int):
+          rng = random.Random(seed)
+          a = [[rng.uniform(-1, 1) for _ in range(k)] for _ in range(m)]
+          b = [[rng.uniform(-1, 1) for _ in range(n)] for _ in range(k)]
+          return [a, b]
+reference:
+  files:
+    - path: kernel.wgsl
+      content: |
+        struct Dims { m: u32, k: u32, n: u32, _pad: u32 }
+
+        @group(0) @binding(0) var<storage, read> a: array<f32>;
+        @group(0) @binding(1) var<storage, read> b: array<f32>;
+        @group(0) @binding(2) var<storage, read_write> c: array<f32>;
+        @group(0) @binding(3) var<uniform> dims: Dims;
+
+        const TILE: u32 = 16u;
+        var<workgroup> tile_a: array<array<f32, 16>, 16>;
+        var<workgroup> tile_b: array<array<f32, 16>, 16>;
+
+        @compute @workgroup_size(16, 16)
+        fn main(@builtin(global_invocation_id) gid: vec3<u32>,
+                @builtin(local_invocation_id) lid: vec3<u32>) {
+            let row = gid.y;
+            let col = gid.x;
+            var acc = 0.0;
+            let tiles = (dims.k + TILE - 1u) / TILE;
+            for (var t = 0u; t < tiles; t++) {
+                let ak = t * TILE + lid.x;
+                let bk = t * TILE + lid.y;
+                var va = 0.0;
+                if (row < dims.m && ak < dims.k) {
+                    va = a[row * dims.k + ak];
+                }
+                var vb = 0.0;
+                if (bk < dims.k && col < dims.n) {
+                    vb = b[bk * dims.n + col];
+                }
+                tile_a[lid.y][lid.x] = va;
+                tile_b[lid.y][lid.x] = vb;
+                workgroupBarrier();
+                for (var i = 0u; i < TILE; i++) {
+                    acc += tile_a[lid.y][i] * tile_b[i][lid.x];
+                }
+                workgroupBarrier();
+            }
+            if (row < dims.m && col < dims.n) {
+                c[row * dims.n + col] = acc;
+            }
+        }
+judge:
+  kind: function
+  entry: _host.py:matmul
+  params: [a, b]
+  compare: {kind: float, rtol: 1.0e-4, atol: 1.0e-4}
+sections:
+  - id: basics
+    title: Basics
+    description: The example and a non-square product.
+  - id: edges
+    title: Edges
+    description: Sizes that are not multiples of the tile, thin matrices.
+  - id: scale
+    title: Scale
+    description: A 256 x 256 product; reports the kernel's GPU time.
+tests:
+  - name: Example
+    section: basics
+    description: The 2 x 2 example from the statement.
+    input: {args: [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]}
+    expected: [[19, 22], [43, 50]]
+  - name: Rectangular
+    section: basics
+    description: (2 x 3) times (3 x 1).
+    input: {args: [[[1, 2, 3], [4, 5, 6]], [[1], [0], [-1]]]}
+    expected: [[-2], [-2]]
+  - name: Ragged tiles
+    section: edges
+    visible: false
+    description: 37 x 23 times 23 x 41, every dimension cuts a tile.
+    input: {gen: _gen.py:matrices, seed: 1, kwargs: {m: 37, k: 23, n: 41}}
+  - name: Long inner dimension
+    section: edges
+    visible: false
+    description: k = 300 spans 19 tiles.
+    input: {gen: _gen.py:matrices, seed: 2, kwargs: {m: 5, k: 300, n: 7}}
+  - name: Single row and column
+    section: edges
+    visible: false
+    input: {gen: _gen.py:matrices, seed: 3, kwargs: {m: 1, k: 17, n: 1}}
+  - name: 256 x 256
+    section: scale
+    visible: false
+    input: {gen: _gen.py:matrices, seed: 4, kwargs: {m: 256, k: 256, n: 256}}
+limits: {timeout_s: 60}

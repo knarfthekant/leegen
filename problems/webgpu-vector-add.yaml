@@ -1,0 +1,157 @@
+schema_version: 1
+id: webgpu-vector-add
+title: "WebGPU 1: Vector Add"
+difficulty: intro
+tags: [webgpu, wgsl, gpu, parallel]
+track: webgpu-101
+order: 1
+environment: webgpu
+requires: [webgpu]
+description: |
+  Your first GPU kernel. Write a WGSL compute shader that adds two vectors element by element:
+
+  $$out_i = a_i + b_i \qquad 0 \le i < n$$
+
+  The GPU runs your `main` function once per **invocation**, and many invocations run at once.
+  Invocations are grouped into **workgroups** of `@workgroup_size(64)`. The host launches
+  $\lceil n / 64 \rceil$ workgroups, so every element has an invocation, and the last workgroup
+  may have invocations past the end of the arrays.
+
+  ```mermaid
+  flowchart LR
+      H[host: dispatch ceil n/64 workgroups] --> W0[workgroup 0: i = 0..63]
+      H --> W1[workgroup 1: i = 64..127]
+      H --> Wk[last workgroup: some i >= n]
+  ```
+
+  Each invocation finds its element through the built-in `global_invocation_id`:
+  `id.x = workgroup_id.x * 64 + local_invocation_id.x`.
+
+  :::note
+  **If you know CUDA:** a workgroup is a thread block, an invocation is a thread, and
+  `global_invocation_id.x` is `blockIdx.x * blockDim.x + threadIdx.x`. The bounds check is the
+  same `if (i < n)` you would write there.
+  :::
+
+  ### Bindings
+
+  | Binding | Variable | Contents |
+  |---|---|---|
+  | 0 | `a: array<f32>` (read) | first vector |
+  | 1 | `b: array<f32>` (read) | second vector |
+  | 2 | `out: array<f32>` (read_write) | where the sum goes, same length |
+
+  Use `arrayLength(&out)` for $n$.
+
+  ### Example
+
+  ```text
+  a   = [1, 2, 3]
+  b   = [10, 20, 30]
+  out = [11, 22, 33]
+  ```
+
+  :::details{summary="How the test calls your kernel"}
+  A hidden Python host packs the inputs as `f32` buffers, dispatches `kernel.wgsl`, reads `out`
+  back and returns it as a list, which is compared with a small tolerance. Compile errors show up
+  as the test's message, with `kernel.wgsl:line:column`.
+  :::
+hints:
+  - Every invocation handles exactly one index. Which built-in gives you that index?
+  - "`let i = id.x;`, then only write when `i < arrayLength(&out)`."
+  - "`out[i] = a[i] + b[i];` inside the bounds check."
+files:
+  - path: kernel.wgsl
+    role: editable
+    content: |
+      @group(0) @binding(0) var<storage, read> a: array<f32>;
+      @group(0) @binding(1) var<storage, read> b: array<f32>;
+      @group(0) @binding(2) var<storage, read_write> out: array<f32>;
+
+      @compute @workgroup_size(64)
+      fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+          // TODO: out[i] = a[i] + b[i] for the element this invocation owns.
+          //       The last workgroup can run past the end of the arrays.
+      }
+  - path: _host.py
+    role: hidden
+    content: |
+      from leetclaude_harness import webgpu as wg
+
+      def vector_add(a, b):
+          n = len(a)
+          out = wg.dispatch(
+              wg.source("kernel.wgsl", __file__),
+              [wg.storage(wg.f32(a)), wg.storage(wg.f32(b)), wg.storage(size=4 * n, read_only=False)],
+              workgroups=(wg.groups(n, 64),),
+          )
+          return wg.to_f32(out[2], n)
+  - path: _gen.py
+    role: hidden
+    content: |
+      import random
+
+      def vectors(seed: int, n: int):
+          rng = random.Random(seed)
+          a = [round(rng.uniform(-1000, 1000), 2) for _ in range(n)]
+          b = [round(rng.uniform(-1000, 1000), 2) for _ in range(n)]
+          return [a, b]
+reference:
+  files:
+    - path: kernel.wgsl
+      content: |
+        @group(0) @binding(0) var<storage, read> a: array<f32>;
+        @group(0) @binding(1) var<storage, read> b: array<f32>;
+        @group(0) @binding(2) var<storage, read_write> out: array<f32>;
+
+        @compute @workgroup_size(64)
+        fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+            let i = id.x;
+            if (i < arrayLength(&out)) {
+                out[i] = a[i] + b[i];
+            }
+        }
+judge:
+  kind: function
+  entry: _host.py:vector_add
+  params: [a, b]
+  compare: {kind: float, rtol: 1.0e-5, atol: 1.0e-3}
+sections:
+  - id: basics
+    title: Basics
+    description: The example, and a length that is not a multiple of the workgroup size.
+  - id: edges
+    title: Edges
+    description: One element, and lengths around the workgroup boundary.
+  - id: scale
+    title: Scale
+    description: A large random vector, checked against the reference kernel.
+tests:
+  - name: Example
+    section: basics
+    description: The example from the statement.
+    input: {args: [[1, 2, 3], [10, 20, 30]]}
+    expected: [11, 22, 33]
+  - name: Partial workgroup
+    section: basics
+    description: 100 elements is one full workgroup and a partial one.
+    input: {gen: _gen.py:vectors, seed: 1, kwargs: {n: 100}}
+  - name: One element
+    section: edges
+    visible: false
+    input: {args: [[-1.5], [0.25]]}
+    expected: [-1.25]
+  - name: Exactly one workgroup
+    section: edges
+    visible: false
+    input: {gen: _gen.py:vectors, seed: 2, kwargs: {n: 64}}
+  - name: One past a workgroup
+    section: edges
+    visible: false
+    input: {gen: _gen.py:vectors, seed: 3, kwargs: {n: 65}}
+  - name: Large
+    section: scale
+    visible: false
+    description: 200,000 elements, 3,125 workgroups.
+    input: {gen: _gen.py:vectors, seed: 4, kwargs: {n: 200000}}
+limits: {timeout_s: 20}

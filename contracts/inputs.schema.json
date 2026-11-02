@@ -1,0 +1,845 @@
+{
+  "$defs": {
+    "Benchmark": {
+      "additionalProperties": false,
+      "properties": {
+        "against": {
+          "const": "reference",
+          "default": "reference",
+          "title": "Against",
+          "type": "string"
+        },
+        "repeats": {
+          "default": 20,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Repeats",
+          "type": "integer"
+        },
+        "max_slowdown": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fail if the user's code is more than this many times slower.",
+          "title": "Max Slowdown"
+        }
+      },
+      "title": "Benchmark",
+      "type": "object"
+    },
+    "BrowserRuntime": {
+      "additionalProperties": false,
+      "description": "How the environment runs in the browser edition (Pyodide in a separate-origin runner).",
+      "properties": {
+        "packages": {
+          "description": "Pyodide packages (or pure-Python wheels) to load, e.g. `pytest`, `numpy`.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Packages",
+          "type": "array"
+        }
+      },
+      "title": "BrowserRuntime",
+      "type": "object"
+    },
+    "Call": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "title": "Method",
+          "type": "string"
+        },
+        "args": {
+          "items": {},
+          "title": "Args",
+          "type": "array"
+        },
+        "kwargs": {
+          "additionalProperties": true,
+          "title": "Kwargs",
+          "type": "object"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "Call",
+      "type": "object"
+    },
+    "Compare": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "default": "exact",
+          "description": "`exact`: ==, tuples and lists treated alike. `float`: recursive isclose. `unordered`: order-insensitive list compare. `allclose`: tensors/arrays (torch, numpy) or nested floats. `custom`: `fn(actual, expected, inputs) -> bool | (bool, message)`.",
+          "enum": [
+            "exact",
+            "float",
+            "unordered",
+            "allclose",
+            "custom"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "rtol": {
+          "default": 1e-06,
+          "title": "Rtol",
+          "type": "number"
+        },
+        "atol": {
+          "default": 1e-08,
+          "title": "Atol",
+          "type": "number"
+        },
+        "fn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For `custom`: `file.py:function` (usually hidden).",
+          "title": "Fn"
+        }
+      },
+      "title": "Compare",
+      "type": "object"
+    },
+    "CustomTest": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "section": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section"
+        },
+        "input": {
+          "additionalProperties": true,
+          "title": "Input",
+          "type": "object"
+        },
+        "expected": {
+          "default": null,
+          "title": "Expected"
+        }
+      },
+      "title": "CustomTest",
+      "type": "object"
+    },
+    "Environment": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language adapter id: python, cuda, ...",
+          "title": "Language",
+          "type": "string"
+        },
+        "python": {
+          "default": "3.13",
+          "title": "Python",
+          "type": "string"
+        },
+        "dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "requires": {
+          "items": {
+            "enum": [
+              "cpu",
+              "gpu",
+              "cuda",
+              "webgpu"
+            ],
+            "type": "string"
+          },
+          "title": "Requires",
+          "type": "array"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Env",
+          "type": "object"
+        },
+        "env_without_cuda": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra env vars when the executor has no CUDA.",
+          "title": "Env Without Cuda",
+          "type": "object"
+        },
+        "native": {
+          "default": true,
+          "description": "Runs on native executors (local, ssh, slurm) in a uv venv built from `python` + `dependencies`.",
+          "title": "Native",
+          "type": "boolean"
+        },
+        "browser": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BrowserRuntime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Set to make the environment runnable in the browser edition (Pyodide)."
+        }
+      },
+      "required": [
+        "id",
+        "language"
+      ],
+      "title": "Environment",
+      "type": "object"
+    },
+    "Judge": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "description": "`function`: call `entry` per test and compare to `expected`. `pytest`: run test files (readonly = visible, hidden = hidden). `script`: run `command`, which writes result events itself.",
+          "enum": [
+            "function",
+            "pytest",
+            "script"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "entry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "function kind: `file.py:name`. A function is called with the test's args/kwargs. A class is driven by the test's `calls` (design-problem style).",
+          "title": "Entry"
+        },
+        "params": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "function kind: display names for positional args in the Testcase panel.",
+          "title": "Params"
+        },
+        "compare": {
+          "$ref": "#/$defs/Compare"
+        },
+        "test_files": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "pytest kind: test files to run. Default: every `test_*.py` file.",
+          "title": "Test Files"
+        },
+        "build": {
+          "description": "script kind: build commands run before `command`.",
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Build",
+          "type": "array"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "script kind: the harness command.",
+          "title": "Command"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Judge",
+      "type": "object"
+    },
+    "Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "timeout_s": {
+          "default": 10.0,
+          "exclusiveMinimum": 0,
+          "maximum": 600,
+          "title": "Timeout S",
+          "type": "number"
+        },
+        "memory_mb": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Mb"
+        }
+      },
+      "title": "Limits",
+      "type": "object"
+    },
+    "Problem": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "id": {
+          "description": "Slug; also the file name.",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "difficulty": {
+          "default": "medium",
+          "enum": [
+            "intro",
+            "easy",
+            "medium",
+            "hard"
+          ],
+          "title": "Difficulty",
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "track": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional curriculum this problem belongs to.",
+          "title": "Track"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Position within the track.",
+          "title": "Order"
+        },
+        "environment": {
+          "description": "Environment id from `environments/`, e.g. `python`.",
+          "title": "Environment",
+          "type": "string"
+        },
+        "requires": {
+          "description": "Hardware needed: `cpu`, `gpu` (cuda or mps), `cuda` (NVIDIA only), `webgpu` (the browser edition's WebGPU device).",
+          "items": {
+            "enum": [
+              "cpu",
+              "gpu",
+              "cuda",
+              "webgpu"
+            ],
+            "type": "string"
+          },
+          "title": "Requires",
+          "type": "array"
+        },
+        "description": {
+          "description": "Markdown with math, mermaid, inline SVG and directives.",
+          "title": "Description",
+          "type": "string"
+        },
+        "hints": {
+          "description": "Revealed one at a time.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Hints",
+          "type": "array"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/ProblemFile"
+          },
+          "minItems": 1,
+          "title": "Files",
+          "type": "array"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Reference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Correct solution. Required to validate the problem and for `expected: from_reference` and user-added tests."
+        },
+        "judge": {
+          "$ref": "#/$defs/Judge"
+        },
+        "sections": {
+          "description": "Optional groups for tests. Each test opts in with `section: <id>`.",
+          "items": {
+            "$ref": "#/$defs/TestSection"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
+        "tests": {
+          "items": {
+            "$ref": "#/$defs/TestCase"
+          },
+          "title": "Tests",
+          "type": "array"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "benchmark": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Benchmark"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "environment",
+        "description",
+        "files",
+        "judge"
+      ],
+      "title": "Problem",
+      "type": "object"
+    },
+    "ProblemFile": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Relative path, e.g. `solution.py` or `app/service.py`.",
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "default": "editable",
+          "description": "`editable`: starter code the user writes in. `readonly`: shown but locked (context code, visible tests). `hidden`: never shown (setup, generators, hidden tests).",
+          "enum": [
+            "editable",
+            "readonly",
+            "hidden"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "content": {
+          "default": "",
+          "title": "Content",
+          "type": "string"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Editor language override; inferred from the extension when omitted.",
+          "title": "Language"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "ProblemFile",
+      "type": "object"
+    },
+    "Reference": {
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "description": "Replacements for editable files that make up a correct solution.",
+          "items": {
+            "$ref": "#/$defs/ReferenceFile"
+          },
+          "title": "Files",
+          "type": "array"
+        }
+      },
+      "required": [
+        "files"
+      ],
+      "title": "Reference",
+      "type": "object"
+    },
+    "ReferenceFile": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "content"
+      ],
+      "title": "ReferenceFile",
+      "type": "object"
+    },
+    "RunnerRequest": {
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "problem_yaml": {
+          "description": "The full problem, including hidden files and reference.",
+          "title": "Problem Yaml",
+          "type": "string"
+        },
+        "files": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Editable file overrides.",
+          "title": "Files",
+          "type": "object"
+        },
+        "mode": {
+          "default": "user",
+          "enum": [
+            "user",
+            "reference"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "custom_tests": {
+          "items": {
+            "$ref": "#/$defs/CustomTest"
+          },
+          "title": "Custom Tests",
+          "type": "array"
+        },
+        "only_visible": {
+          "default": false,
+          "title": "Only Visible",
+          "type": "boolean"
+        },
+        "packages": {
+          "description": "Pyodide packages to load.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Packages",
+          "type": "array"
+        },
+        "device": {
+          "default": "cpu",
+          "title": "Device",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "problem_yaml"
+      ],
+      "title": "RunnerRequest",
+      "type": "object"
+    },
+    "TestCase": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "visible": {
+          "default": true,
+          "description": "Visible tests show inputs before running.",
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Shown with the case; Markdown allowed.",
+          "title": "Description"
+        },
+        "section": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Id of an entry in the problem's `sections`; groups this case.",
+          "title": "Section"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TestInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "function kind only."
+        },
+        "expected": {
+          "default": "from_reference",
+          "description": "Expected value (JSON), or `from_reference` to compute it with the reference solution at run time.",
+          "title": "Expected"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "TestCase",
+      "type": "object"
+    },
+    "TestInput": {
+      "additionalProperties": false,
+      "properties": {
+        "args": {
+          "description": "Positional args, JSON values.",
+          "items": {},
+          "title": "Args",
+          "type": "array"
+        },
+        "kwargs": {
+          "additionalProperties": true,
+          "title": "Kwargs",
+          "type": "object"
+        },
+        "gen": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "`file.py:fn` generator returning `(args, kwargs)`, a list of args, or a dict of kwargs. Called as `fn(seed=..., **kwargs)`. Use for tensors and large inputs.",
+          "title": "Gen"
+        },
+        "seed": {
+          "default": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "calls": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Call"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Class entry: the class is constructed with args/kwargs, then each call runs in order. The compared value is the list of call return values.",
+          "title": "Calls"
+        }
+      },
+      "title": "TestInput",
+      "type": "object"
+    },
+    "TestSection": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Slug that tests reference.",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Shown under the section header.",
+          "title": "Description"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "title": "TestSection",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "problem": {
+      "$ref": "#/$defs/Problem"
+    },
+    "environment": {
+      "$ref": "#/$defs/Environment"
+    },
+    "runner_request": {
+      "$ref": "#/$defs/RunnerRequest"
+    }
+  },
+  "required": [
+    "problem",
+    "environment",
+    "runner_request"
+  ],
+  "title": "_Inputs",
+  "type": "object"
+}

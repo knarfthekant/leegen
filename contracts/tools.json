@@ -1,0 +1,687 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "add_test_case",
+      "title": "Add a test case",
+      "description": "Add a custom test case to the user's Testcase panel (function-judge problems only).\nThe expected output is computed by the reference solution. Unnamed cases are called\n`Test <n>`. `section` must be one of the problem's section ids (see get_problem).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "args": {
+            "items": {},
+            "title": "Args",
+            "type": "array"
+          },
+          "kwargs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Kwargs"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Section"
+          },
+          "problem_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Problem Id"
+          }
+        },
+        "required": [
+          "args"
+        ],
+        "title": "add_test_caseArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "annotate",
+      "title": "Annotate code",
+      "description": "Comment on the user's code. Each annotation marks an exact character range in a\nvisible file (or is a general comment when file is omitted). In the editor it shows as a\nhighlight plus one gutter dot (a bar for several lines); hovering peeks at it and\nclicking focuses it in the Review tab. Lines and columns are 1-based and refer to the\ncurrent code from get_session; end_col is exclusive. Always prefer start_col/end_col\nthat cover just the offending token or expression; without columns the whole text of\nthe line(s) is marked. Comments may overlap, and each stays visible.",
+      "inputSchema": {
+        "type": "object",
+        "$defs": {
+          "AnnotationIn": {
+            "properties": {
+              "file": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Visible file path; omit for a general comment.",
+                "title": "File"
+              },
+              "start_line": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "1-based first line (required with file).",
+                "title": "Start Line"
+              },
+              "end_line": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "1-based last line; defaults to start_line.",
+                "title": "End Line"
+              },
+              "start_col": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "1-based column where the highlight starts on start_line. Give exact columns whenever the problem is one token or expression. Omit both columns to mark the text of the line(s), without indentation.",
+                "title": "Start Col"
+              },
+              "end_col": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "1-based column on end_line, exclusive (one past the last highlighted character). Defaults to the end of the text on end_line when start_col is given.",
+                "title": "End Col"
+              },
+              "severity": {
+                "default": "info",
+                "enum": [
+                  "info",
+                  "hint",
+                  "warning",
+                  "error",
+                  "praise"
+                ],
+                "title": "Severity",
+                "type": "string"
+              },
+              "message": {
+                "description": "Markdown. Keep it short and specific.",
+                "title": "Message",
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "title": "AnnotationIn",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "annotations": {
+            "items": {
+              "$ref": "#/$defs/AnnotationIn"
+            },
+            "title": "Annotations",
+            "type": "array"
+          },
+          "problem_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Problem Id"
+          },
+          "author": {
+            "default": "assistant",
+            "title": "Author",
+            "type": "string"
+          }
+        },
+        "required": [
+          "annotations"
+        ],
+        "title": "annotateArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "clear_annotations",
+      "title": "Clear annotations",
+      "description": "Remove review comments (all of them, or only those on one file).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "problem_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Problem Id"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File"
+          }
+        },
+        "title": "clear_annotationsArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "create_problem",
+      "title": "Create problem",
+      "description": "Validate and save a problem to problems/<id>.yaml. Nothing is saved if validation fails\n(a problem is saved unvalidated only when no executor can run it, and the response\nsays so). Use overwrite=true to replace an existing problem.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "yaml": {
+            "title": "Yaml",
+            "type": "string"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "yaml"
+        ],
+        "title": "create_problemArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "delete_problem",
+      "title": "Delete problem",
+      "description": "Delete a problem file (and optionally the user's workspace for it).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "problem_id": {
+            "title": "Problem Id",
+            "type": "string"
+          },
+          "delete_user_code": {
+            "default": false,
+            "title": "Delete User Code",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "problem_id"
+        ],
+        "title": "delete_problemArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": true,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "get_authoring_guide",
+      "title": "Authoring guide",
+      "description": "How to write leetclaude problems: schema walkthrough, judge kinds, test design, markup,\nand worked examples. Read this before creating problems.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "get_authoring_guideArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "get_problem",
+      "title": "Get problem",
+      "description": "A problem. With include_hidden (default) returns the full YAML, including hidden files\nand the reference solution. Otherwise returns only what the user can see.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "problem_id": {
+            "title": "Problem Id",
+            "type": "string"
+          },
+          "include_hidden": {
+            "default": true,
+            "title": "Include Hidden",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "problem_id"
+        ],
+        "title": "get_problemArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": true
+      },
+      "browser": true
+    },
+    {
+      "name": "get_problem_schema",
+      "title": "Problem JSON Schema",
+      "description": "JSON Schema of the problem YAML format.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "get_problem_schemaArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "get_session",
+      "title": "Get the user's session",
+      "description": "What the user is doing right now: the open problem, their current code (including\nunsaved edits), cursor and selection, the last run's results, custom tests, and existing\nreview comments and pending suggestions. Call this first when helping the user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "get_sessionArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": true
+      },
+      "browser": true
+    },
+    {
+      "name": "get_tutoring_guide",
+      "title": "Tutoring guide",
+      "description": "How to tutor the user in leetclaude: call get_session first, hint in small steps,\nannotate exact ranges, change code only through propose_edit. Read this before helping\nwith a problem.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "get_tutoring_guideArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "list_environments",
+      "title": "List environments",
+      "description": "Environments problems can use, and which executors can run each of them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "list_environmentsArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "list_executors",
+      "title": "List executors",
+      "description": "Configured executors (where code runs) and their capabilities (cpu, mps, cuda).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "list_executorsArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "list_problems",
+      "title": "List problems",
+      "description": "All problems (optionally only one track), plus files that failed to load.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "track": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Track"
+          }
+        },
+        "title": "list_problemsArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "open_problem",
+      "title": "Open problem",
+      "description": "Open a problem in the user's browser.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "problem_id": {
+            "title": "Problem Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "problem_id"
+        ],
+        "title": "open_problemArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "propose_edit",
+      "title": "Propose an edit",
+      "description": "Suggest a change to one of the user's editable files. Shown as a diff the user accepts\nor rejects. Give either the full new `content` or a list of exact search/replace\n`edits`. A newer proposal for the same file replaces the pending one.",
+      "inputSchema": {
+        "type": "object",
+        "$defs": {
+          "EditIn": {
+            "properties": {
+              "old": {
+                "description": "Exact text currently in the file; must match exactly once.",
+                "title": "Old",
+                "type": "string"
+              },
+              "new": {
+                "description": "Replacement text.",
+                "title": "New",
+                "type": "string"
+              }
+            },
+            "required": [
+              "old",
+              "new"
+            ],
+            "title": "EditIn",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Content"
+          },
+          "edits": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/EditIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Edits"
+          },
+          "problem_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Problem Id"
+          },
+          "author": {
+            "default": "assistant",
+            "title": "Author",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "rationale"
+        ],
+        "title": "propose_editArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "run_tests",
+      "title": "Run tests",
+      "description": "Run the user's current code against all tests (the same as clicking Run). Results\nappear in the UI too. Returns failing tests (or every test with full=true).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "problem_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Problem Id"
+          },
+          "full": {
+            "default": false,
+            "title": "Full",
+            "type": "boolean"
+          }
+        },
+        "title": "run_testsArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": true
+      },
+      "browser": true
+    },
+    {
+      "name": "update_problem",
+      "title": "Update problem",
+      "description": "Replace an existing problem with new YAML (validated the same way as create_problem).\nThe user's saved code for the problem is kept.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "problem_id": {
+            "title": "Problem Id",
+            "type": "string"
+          },
+          "yaml": {
+            "title": "Yaml",
+            "type": "string"
+          }
+        },
+        "required": [
+          "problem_id",
+          "yaml"
+        ],
+        "title": "update_problemArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "validate_problem_yaml",
+      "title": "Validate problem YAML",
+      "description": "Check a problem without saving it: the schema, then the reference solution must pass\nevery test and the starter code must fail at least one.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "yaml": {
+            "title": "Yaml",
+            "type": "string"
+          }
+        },
+        "required": [
+          "yaml"
+        ],
+        "title": "validate_problem_yamlArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    }
+  ]
+}

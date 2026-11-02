@@ -1,0 +1,648 @@
+{
+  "merge-ranges": {
+    "schema_version": 1,
+    "id": "merge-ranges",
+    "title": "Merge Booking Ranges",
+    "difficulty": "easy",
+    "tags": [
+      "arrays",
+      "sorting",
+      "intervals"
+    ],
+    "track": null,
+    "order": null,
+    "environment": "python",
+    "requires": [
+      "cpu"
+    ],
+    "description": "A meeting room keeps a list of bookings. Each booking is a pair `[start, end]` with\n`start <= end`, both integers. Bookings that overlap or **touch** (one ends exactly when the\nnext starts) should be shown as a single block.\n\nWrite `merge_ranges(bookings)` that returns the merged blocks, sorted by start time.\n\n:::figure{caption=\"Bookings [1,3], [2,6] and [8,10] become [1,6] and [8,10]\"}\n<svg viewBox=\"0 0 330 70\" width=\"330\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"monospace\" font-size=\"11\">\n  <line x1=\"10\" y1=\"60\" x2=\"320\" y2=\"60\" stroke=\"currentColor\" stroke-width=\"1\"/>\n  <rect x=\"40\" y=\"8\" width=\"60\" height=\"12\" fill=\"none\" stroke=\"currentColor\"/>\n  <rect x=\"70\" y=\"24\" width=\"120\" height=\"12\" fill=\"none\" stroke=\"currentColor\"/>\n  <rect x=\"250\" y=\"8\" width=\"60\" height=\"12\" fill=\"none\" stroke=\"currentColor\"/>\n  <rect x=\"40\" y=\"42\" width=\"150\" height=\"8\" fill=\"currentColor\" opacity=\"0.35\"/>\n  <rect x=\"250\" y=\"42\" width=\"60\" height=\"8\" fill=\"currentColor\" opacity=\"0.35\"/>\n</svg>\n:::\n\n### Example\n\n```text\nInput:  bookings = [[1, 3], [2, 6], [8, 10], [10, 12]]\nOutput: [[1, 6], [8, 12]]\n```\n\n### Constraints\n\n- $0 \\le n \\le 10^5$\n- $-10^9 \\le start \\le end \\le 10^9$\n- The input is **not** necessarily sorted. Don't modify the input list.\n\n:::note\nAim for $O(n \\log n)$ time.\n:::\n",
+    "hints": [
+      "What becomes easy if the bookings are sorted by start time?",
+      "After sorting, compare each booking with the last merged block only.",
+      "Touching counts as overlapping, so use `<=` when comparing the next start with the current end."
+    ],
+    "files": [
+      {
+        "path": "solution.py",
+        "role": "editable",
+        "content": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    pass\n",
+        "language": null
+      },
+      {
+        "path": "_gen.py",
+        "role": "hidden",
+        "content": "import random\n\ndef random_bookings(seed: int, n: int):\n    rng = random.Random(seed)\n    out = []\n    for _ in range(n):\n        s = rng.randint(-10**6, 10**6)\n        out.append([s, s + rng.randint(0, 500)])\n    return [out]\n",
+        "language": null
+      }
+    ],
+    "reference": {
+      "files": [
+        {
+          "path": "solution.py",
+          "content": "def merge_ranges(bookings: list[list[int]]) -> list[list[int]]:\n    merged: list[list[int]] = []\n    for start, end in sorted(bookings):\n        if merged and start <= merged[-1][1]:\n            merged[-1][1] = max(merged[-1][1], end)\n        else:\n            merged.append([start, end])\n    return merged\n"
+        }
+      ]
+    },
+    "judge": {
+      "kind": "function",
+      "entry": "solution.py:merge_ranges",
+      "params": [
+        "bookings"
+      ],
+      "compare": {
+        "kind": "exact",
+        "rtol": 1e-06,
+        "atol": 1e-08,
+        "fn": null
+      },
+      "test_files": null,
+      "build": [],
+      "command": null
+    },
+    "sections": [
+      {
+        "id": "basics",
+        "title": "Basics",
+        "description": "The examples from the statement, plus the empty input."
+      },
+      {
+        "id": "edge-cases",
+        "title": "Edge cases",
+        "description": "Ranges that nest, touch, or sit at unusual coordinates."
+      },
+      {
+        "id": "scale",
+        "title": "Scale",
+        "description": "A large random input; an accidental quadratic merge times out."
+      }
+    ],
+    "tests": [
+      {
+        "name": "Example",
+        "visible": true,
+        "description": "The example from the statement; `[8, 10]` and `[10, 12]` touch and merge.",
+        "section": "basics",
+        "input": {
+          "args": [
+            [
+              [
+                1,
+                3
+              ],
+              [
+                2,
+                6
+              ],
+              [
+                8,
+                10
+              ],
+              [
+                10,
+                12
+              ]
+            ]
+          ],
+          "kwargs": {},
+          "gen": null,
+          "seed": 0,
+          "calls": null
+        },
+        "expected": [
+          [
+            1,
+            6
+          ],
+          [
+            8,
+            12
+          ]
+        ]
+      },
+      {
+        "name": "Unsorted input",
+        "visible": true,
+        "description": "Bookings arrive out of order, so sort before merging.",
+        "section": "basics",
+        "input": {
+          "args": [
+            [
+              [
+                5,
+                7
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                3,
+                4
+              ]
+            ]
+          ],
+          "kwargs": {},
+          "gen": null,
+          "seed": 0,
+          "calls": null
+        },
+        "expected": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            5,
+            7
+          ]
+        ]
+      },
+      {
+        "name": "Empty",
+        "visible": true,
+        "description": null,
+        "section": "basics",
+        "input": {
+          "args": [
+            []
+          ],
+          "kwargs": {},
+          "gen": null,
+          "seed": 0,
+          "calls": null
+        },
+        "expected": []
+      },
+      {
+        "name": "Nested ranges",
+        "visible": false,
+        "description": "A range fully inside another must not shrink the merged end.",
+        "section": "edge-cases",
+        "input": {
+          "args": [
+            [
+              [
+                1,
+                10
+              ],
+              [
+                2,
+                3
+              ],
+              [
+                4,
+                5
+              ],
+              [
+                9,
+                12
+              ]
+            ]
+          ],
+          "kwargs": {},
+          "gen": null,
+          "seed": 0,
+          "calls": null
+        },
+        "expected": [
+          [
+            1,
+            12
+          ]
+        ]
+      },
+      {
+        "name": "Single point bookings",
+        "visible": false,
+        "description": "Zero-length ranges, including duplicates.",
+        "section": "edge-cases",
+        "input": {
+          "args": [
+            [
+              [
+                3,
+                3
+              ],
+              [
+                3,
+                3
+              ],
+              [
+                1,
+                1
+              ]
+            ]
+          ],
+          "kwargs": {},
+          "gen": null,
+          "seed": 0,
+          "calls": null
+        },
+        "expected": [
+          [
+            1,
+            1
+          ],
+          [
+            3,
+            3
+          ]
+        ]
+      },
+      {
+        "name": "Negative times",
+        "visible": false,
+        "description": null,
+        "section": "edge-cases",
+        "input": {
+          "args": [
+            [
+              [
+                -5,
+                -1
+              ],
+              [
+                -2,
+                0
+              ],
+              [
+                2,
+                4
+              ]
+            ]
+          ],
+          "kwargs": {},
+          "gen": null,
+          "seed": 0,
+          "calls": null
+        },
+        "expected": [
+          [
+            -5,
+            0
+          ],
+          [
+            2,
+            4
+          ]
+        ]
+      },
+      {
+        "name": "Large random",
+        "visible": false,
+        "description": null,
+        "section": "scale",
+        "input": {
+          "args": [],
+          "kwargs": {
+            "n": 20000
+          },
+          "gen": "_gen.py:random_bookings",
+          "seed": 7,
+          "calls": null
+        },
+        "expected": "from_reference"
+      }
+    ],
+    "limits": {
+      "timeout_s": 5.0,
+      "memory_mb": null
+    },
+    "benchmark": null
+  },
+  "py-async-generators": {
+    "schema_version": 1,
+    "id": "py-async-generators",
+    "title": "Async Generators from Scratch",
+    "difficulty": "intro",
+    "tags": [
+      "python",
+      "asyncio",
+      "generators"
+    ],
+    "track": "python-fundamentals",
+    "order": 1,
+    "environment": "python",
+    "requires": [
+      "cpu"
+    ],
+    "description": "An **async generator** is an `async def` function that contains `yield`. Calling it does not\nrun any code yet. It returns an object you consume with `async for`, and between items it may\n`await` other things (network reads, sleeps, queues).\n\n```python\nasync def numbers():\n    yield 1\n    await asyncio.sleep(0.1)   # can await between items\n    yield 2\n\nasync for n in numbers():      # only valid inside another async function\n    print(n)\n```\n\n```mermaid\nsequenceDiagram\n    participant C as consumer (async for)\n    participant G as async generator\n    C->>G: __anext__()\n    G-->>C: yield 1\n    C->>G: __anext__()\n    Note over G: await asyncio.sleep(...)\n    G-->>C: yield 2\n    C->>G: __anext__()\n    G-->>C: StopAsyncIteration\n```\n\nImplement three functions in `solution.py`.\n\n### 1. `countdown(n)`\nYield `n, n-1, ..., 1`, calling `await asyncio.sleep(0)` before each item so other tasks get a\nturn. `countdown(0)` yields nothing.\n\n### 2. `batched(stream, size)`\n`stream` is any *async iterable*. Yield lists of up to `size` consecutive items. The last batch\nmay be shorter. Raise `ValueError` if `size < 1`, but only once iteration starts (that is the\nnatural behaviour of a generator, so you don't need anything special).\n\n### 3. `read_lines(conn)`\n`conn` has `async def readline() -> str | None` (returns `None` at end of input) and a plain\n`close()` method. Yield each line with surrounding whitespace stripped, skipping empty lines.\n**`conn.close()` must be called exactly once**, whether the consumer reads everything, stops\nearly with `break`, or an exception is raised.\n\n:::details{summary=\"What happens when the consumer breaks early?\"}\nWhen an `async for` loop exits early, the generator is not resumed again. Python later calls\nits `aclose()` method, which raises `GeneratorExit` at the paused `yield`. Code in a\n`try/finally` around the `yield` still runs. Tests here call `aclose()` explicitly, the same\nway `contextlib.aclosing` does.\n:::\n\n`test_visible.py` shows some of the tests. More are hidden.\n",
+    "hints": [
+      "`countdown`: a plain `for i in range(n, 0, -1)` loop with `await asyncio.sleep(0)` and `yield i` inside works.",
+      "`batched`: keep a list, append each item from `async for`, and yield and reset it when it reaches `size`. Don't forget what's left at the end.",
+      "`read_lines`: wrap the whole loop in `try: ... finally: conn.close()`."
+    ],
+    "files": [
+      {
+        "path": "solution.py",
+        "role": "editable",
+        "content": "import asyncio\nfrom typing import AsyncIterable, AsyncIterator, Protocol, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass Connection(Protocol):\n    async def readline(self) -> str | None: ...\n    def close(self) -> None: ...\n\n\nasync def countdown(n: int) -> AsyncIterator[int]:\n    # yield n, n-1, ..., 1\n    raise NotImplementedError\n    yield  # makes this an async generator\n\n\nasync def batched(stream: AsyncIterable[T], size: int) -> AsyncIterator[list[T]]:\n    raise NotImplementedError\n    yield\n\n\nasync def read_lines(conn: Connection) -> AsyncIterator[str]:\n    raise NotImplementedError\n    yield\n",
+        "language": null
+      },
+      {
+        "path": "test_visible.py",
+        "role": "readonly",
+        "content": "import asyncio\n\nfrom solution import batched, countdown, read_lines\n\n\nasync def collect(agen):\n    return [x async for x in agen]\n\n\nasync def aiter_list(items):\n    for x in items:\n        await asyncio.sleep(0)\n        yield x\n\n\nclass FakeConn:\n    def __init__(self, lines):\n        self.lines = list(lines)\n        self.closed = 0\n\n    async def readline(self):\n        await asyncio.sleep(0)\n        return self.lines.pop(0) if self.lines else None\n\n    def close(self):\n        self.closed += 1\n\n\nasync def test_countdown_three():\n    \"\"\"countdown(3) yields 3, 2, 1\"\"\"\n    assert await collect(countdown(3)) == [3, 2, 1]\n\n\nasync def test_batched_uneven():\n    \"\"\"batched splits 5 items into [2, 2, 1]\"\"\"\n    assert await collect(batched(aiter_list([1, 2, 3, 4, 5]), 2)) == [[1, 2], [3, 4], [5]]\n\n\nasync def test_read_lines_closes():\n    \"\"\"read_lines strips, skips blanks, and closes the connection\"\"\"\n    conn = FakeConn([\" a \\n\", \"\\n\", \"b\\n\"])\n    assert await collect(read_lines(conn)) == [\"a\", \"b\"]\n    assert conn.closed == 1\n",
+        "language": null
+      },
+      {
+        "path": "test_hidden.py",
+        "role": "hidden",
+        "content": "import asyncio\nimport inspect\n\nimport pytest\n\nfrom solution import batched, countdown, read_lines\nfrom test_visible import FakeConn, aiter_list, collect\n\n\ndef test_functions_are_async_generators():\n    \"\"\"all three functions are async generator functions\"\"\"\n    for fn in (countdown, batched, read_lines):\n        assert inspect.isasyncgenfunction(fn), f\"{fn.__name__} must be an async generator\"\n\n\nasync def test_countdown_zero():\n    \"\"\"countdown(0) yields nothing\"\"\"\n    assert await collect(countdown(0)) == []\n\n\nasync def test_countdown_yields_control():\n    \"\"\"countdown lets other tasks run between items\"\"\"\n    seen = []\n\n    async def other():\n        for _ in range(3):\n            seen.append(\"other\")\n            await asyncio.sleep(0)\n\n    async def consume():\n        async for n in countdown(3):\n            seen.append(n)\n\n    await asyncio.gather(consume(), other())\n    assert seen.index(\"other\") < seen.index(1)\n\n\nasync def test_batched_exact_multiple():\n    \"\"\"no empty trailing batch when items divide evenly\"\"\"\n    assert await collect(batched(aiter_list(range(6)), 3)) == [[0, 1, 2], [3, 4, 5]]\n\n\nasync def test_batched_empty_stream():\n    \"\"\"an empty stream gives no batches\"\"\"\n    assert await collect(batched(aiter_list([]), 4)) == []\n\n\nasync def test_batched_invalid_size():\n    \"\"\"size < 1 raises ValueError when iteration starts\"\"\"\n    gen = batched(aiter_list([1]), 0)\n    with pytest.raises(ValueError):\n        await gen.__anext__()\n\n\nasync def test_read_lines_early_break_closes():\n    \"\"\"breaking early still closes the connection exactly once\"\"\"\n    conn = FakeConn([\"one\", \"two\", \"three\"])\n    gen = read_lines(conn)\n    async for line in gen:\n        break\n    await gen.aclose()\n    assert conn.closed == 1\n\n\nasync def test_read_lines_error_closes():\n    \"\"\"an error from readline() still closes the connection\"\"\"\n\n    class Broken(FakeConn):\n        async def readline(self):\n            raise ConnectionError(\"reset\")\n\n    conn = Broken([])\n    with pytest.raises(ConnectionError):\n        await collect(read_lines(conn))\n    assert conn.closed == 1\n",
+        "language": null
+      }
+    ],
+    "reference": {
+      "files": [
+        {
+          "path": "solution.py",
+          "content": "import asyncio\nfrom typing import AsyncIterable, AsyncIterator, Protocol, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass Connection(Protocol):\n    async def readline(self) -> str | None: ...\n    def close(self) -> None: ...\n\n\nasync def countdown(n: int) -> AsyncIterator[int]:\n    for i in range(n, 0, -1):\n        await asyncio.sleep(0)\n        yield i\n\n\nasync def batched(stream: AsyncIterable[T], size: int) -> AsyncIterator[list[T]]:\n    if size < 1:\n        raise ValueError(\"size must be >= 1\")\n    batch: list[T] = []\n    async for item in stream:\n        batch.append(item)\n        if len(batch) == size:\n            yield batch\n            batch = []\n    if batch:\n        yield batch\n\n\nasync def read_lines(conn: Connection) -> AsyncIterator[str]:\n    try:\n        while (line := await conn.readline()) is not None:\n            line = line.strip()\n            if line:\n                yield line\n    finally:\n        conn.close()\n"
+        }
+      ]
+    },
+    "judge": {
+      "kind": "pytest",
+      "entry": null,
+      "params": null,
+      "compare": {
+        "kind": "exact",
+        "rtol": 1e-06,
+        "atol": 1e-08,
+        "fn": null
+      },
+      "test_files": null,
+      "build": [],
+      "command": null
+    },
+    "sections": [],
+    "tests": [],
+    "limits": {
+      "timeout_s": 10.0,
+      "memory_mb": null
+    },
+    "benchmark": null
+  },
+  "rate-limiter-service": {
+    "schema_version": 1,
+    "id": "rate-limiter-service",
+    "title": "Finish the API Rate Limiter",
+    "difficulty": "medium",
+    "tags": [
+      "python",
+      "system-design",
+      "application"
+    ],
+    "track": null,
+    "order": null,
+    "environment": "python",
+    "requires": [
+      "cpu"
+    ],
+    "description": "You joined a team whose small HTTP-style API service is almost done. The request handler,\nclock and response types are written and **read-only**. What's missing is the rate limiter in\n`app/limiter.py`.\n\n```mermaid\nflowchart LR\n    R[Request] --> S[ApiService.handle]\n    S -->|key = api_key or client_ip| L[TokenBucketLimiter.check]\n    L -->|allowed| H[route handler] --> OK[200]\n    L -->|denied| TM[429 + Retry-After]\n```\n\n### The token bucket\n\nEach key (an API key or a client IP) has a bucket holding at most `capacity` tokens. A new key\nstarts with a **full** bucket. Tokens refill continuously at `refill_per_sec`. That means\nfractional tokens accumulate, but the bucket never goes above `capacity`. Each request costs\n`cost` tokens (default 1).\n\n- If the bucket has at least `cost` tokens, take them. The request is **allowed** and\n  `retry_after` is `0.0`.\n- Otherwise nothing is taken. The request is **denied** and `retry_after` is the number of\n  seconds until enough tokens will exist:\n\n$$\\text{retry\\_after} = \\frac{\\text{cost} - \\text{tokens}}{\\text{refill\\_per\\_sec}}$$\n\n- If `cost > capacity`, the request can never succeed. Raise `ValueError`.\n\nTime comes from the injected `clock` (`clock.now()` returns seconds as a float). Never call\n`time.time()` directly, because the tests use a fake clock.\n\n:::warning\nBuckets for different keys are independent. Read `app/service.py` to see how keys and\nper-route costs are chosen. The `/export` route costs 5 tokens.\n:::\n\n`test_service.py` holds the team's existing tests. Hidden tests check refill math, isolation\nbetween keys, and edge cases.\n",
+    "hints": [
+      "Store `(tokens, last_seen_time)` per key in a dict.",
+      "On each check: `tokens = min(capacity, tokens + (now - last) * refill_per_sec)`, then update `last = now` before deciding.",
+      "Only subtract when allowed. A denied request must not use up tokens."
+    ],
+    "files": [
+      {
+        "path": "app/__init__.py",
+        "role": "readonly",
+        "content": "",
+        "language": null
+      },
+      {
+        "path": "app/clock.py",
+        "role": "readonly",
+        "content": "import time\nfrom typing import Protocol\n\n\nclass Clock(Protocol):\n    def now(self) -> float: ...\n\n\nclass SystemClock:\n    def now(self) -> float:\n        return time.monotonic()\n\n\nclass FakeClock:\n    \"\"\"Manually advanced clock used in tests.\"\"\"\n\n    def __init__(self, start: float = 1000.0) -> None:\n        self._now = start\n\n    def now(self) -> float:\n        return self._now\n\n    def advance(self, seconds: float) -> None:\n        self._now += seconds\n",
+        "language": null
+      },
+      {
+        "path": "app/limiter.py",
+        "role": "editable",
+        "content": "from dataclasses import dataclass\n\nfrom app.clock import Clock\n\n\n@dataclass(frozen=True)\nclass Decision:\n    allowed: bool\n    retry_after: float = 0.0\n\n\nclass TokenBucketLimiter:\n    def __init__(self, capacity: float, refill_per_sec: float, clock: Clock) -> None:\n        self.capacity = capacity\n        self.refill_per_sec = refill_per_sec\n        self.clock = clock\n        # TODO: per-key state\n\n    def check(self, key: str, cost: float = 1.0) -> Decision:\n        # TODO: implement the token bucket described in the problem\n        return Decision(allowed=True)\n",
+        "language": null
+      },
+      {
+        "path": "app/service.py",
+        "role": "readonly",
+        "content": "from dataclasses import dataclass, field\n\nfrom app.limiter import TokenBucketLimiter\n\nROUTE_COST = {\"/export\": 5.0}\n\n\n@dataclass\nclass Request:\n    path: str\n    client_ip: str\n    api_key: str | None = None\n\n\n@dataclass\nclass Response:\n    status: int\n    body: str = \"\"\n    headers: dict[str, str] = field(default_factory=dict)\n\n\nclass ApiService:\n    def __init__(self, limiter: TokenBucketLimiter) -> None:\n        self.limiter = limiter\n\n    def handle(self, req: Request) -> Response:\n        key = f\"key:{req.api_key}\" if req.api_key else f\"ip:{req.client_ip}\"\n        decision = self.limiter.check(key, ROUTE_COST.get(req.path, 1.0))\n        if not decision.allowed:\n            return Response(429, \"rate limited\",\n                            {\"Retry-After\": f\"{decision.retry_after:.3f}\"})\n        return Response(200, f\"ok {req.path}\")\n",
+        "language": null
+      },
+      {
+        "path": "test_service.py",
+        "role": "readonly",
+        "content": "from app.clock import FakeClock\nfrom app.limiter import TokenBucketLimiter\nfrom app.service import ApiService, Request\n\n\ndef make(capacity=3, rate=1.0):\n    clock = FakeClock()\n    return clock, ApiService(TokenBucketLimiter(capacity, rate, clock))\n\n\ndef test_allows_up_to_capacity():\n    \"\"\"a new client can make `capacity` requests at once\"\"\"\n    _, svc = make()\n    assert [svc.handle(Request(\"/\", \"1.1.1.1\")).status for _ in range(3)] == [200] * 3\n\n\ndef test_denies_when_empty():\n    \"\"\"the next request gets 429 and a Retry-After header\"\"\"\n    _, svc = make()\n    for _ in range(3):\n        svc.handle(Request(\"/\", \"1.1.1.1\"))\n    res = svc.handle(Request(\"/\", \"1.1.1.1\"))\n    assert res.status == 429\n    assert float(res.headers[\"Retry-After\"]) == 1.0\n\n\ndef test_refills_over_time():\n    \"\"\"waiting one second refills one token\"\"\"\n    clock, svc = make()\n    for _ in range(3):\n        svc.handle(Request(\"/\", \"1.1.1.1\"))\n    clock.advance(1.0)\n    assert svc.handle(Request(\"/\", \"1.1.1.1\")).status == 200\n",
+        "language": null
+      },
+      {
+        "path": "test_hidden.py",
+        "role": "hidden",
+        "content": "import pytest\n\nfrom app.clock import FakeClock\nfrom app.limiter import TokenBucketLimiter\nfrom app.service import ApiService, Request\n\n\ndef make(capacity=3, rate=1.0):\n    clock = FakeClock()\n    return clock, TokenBucketLimiter(capacity, rate, clock)\n\n\ndef test_keys_are_independent():\n    \"\"\"one client's usage doesn't affect another\"\"\"\n    _, lim = make(capacity=1)\n    assert lim.check(\"a\").allowed\n    assert not lim.check(\"a\").allowed\n    assert lim.check(\"b\").allowed\n\n\ndef test_fractional_refill():\n    \"\"\"half a second at 1 token/s is not enough for one more request\"\"\"\n    clock, lim = make(capacity=1)\n    lim.check(\"a\")\n    clock.advance(0.5)\n    d = lim.check(\"a\")\n    assert not d.allowed\n    assert d.retry_after == pytest.approx(0.5)\n\n\ndef test_denied_requests_do_not_consume():\n    \"\"\"a denied request leaves the bucket unchanged\"\"\"\n    clock, lim = make(capacity=2, rate=1.0)\n    lim.check(\"a\", 2)\n    clock.advance(1.0)\n    assert not lim.check(\"a\", 2).allowed\n    clock.advance(1.0)\n    assert lim.check(\"a\", 2).allowed\n\n\ndef test_never_exceeds_capacity():\n    \"\"\"a long idle period doesn't overfill the bucket\"\"\"\n    clock, lim = make(capacity=3)\n    clock.advance(1000)\n    results = [lim.check(\"a\").allowed for _ in range(4)]\n    assert results == [True, True, True, False]\n\n\ndef test_cost_above_capacity_raises():\n    \"\"\"a cost larger than capacity is a ValueError\"\"\"\n    _, lim = make(capacity=3)\n    with pytest.raises(ValueError):\n        lim.check(\"a\", 4)\n\n\ndef test_export_route_costs_five():\n    \"\"\"/export uses 5 tokens; api keys are bucketed separately from IPs\"\"\"\n    clock = FakeClock()\n    svc = ApiService(TokenBucketLimiter(10, 2.0, clock))\n    assert svc.handle(Request(\"/export\", \"9.9.9.9\", api_key=\"k\")).status == 200\n    assert svc.handle(Request(\"/export\", \"9.9.9.9\", api_key=\"k\")).status == 200\n    res = svc.handle(Request(\"/export\", \"9.9.9.9\", api_key=\"k\"))\n    assert res.status == 429\n    assert float(res.headers[\"Retry-After\"]) == pytest.approx(2.5)\n    assert svc.handle(Request(\"/\", \"9.9.9.9\")).status == 200\n",
+        "language": null
+      }
+    ],
+    "reference": {
+      "files": [
+        {
+          "path": "app/limiter.py",
+          "content": "from dataclasses import dataclass\n\nfrom app.clock import Clock\n\n\n@dataclass(frozen=True)\nclass Decision:\n    allowed: bool\n    retry_after: float = 0.0\n\n\nclass TokenBucketLimiter:\n    def __init__(self, capacity: float, refill_per_sec: float, clock: Clock) -> None:\n        self.capacity = capacity\n        self.refill_per_sec = refill_per_sec\n        self.clock = clock\n        self._buckets: dict[str, tuple[float, float]] = {}\n\n    def check(self, key: str, cost: float = 1.0) -> Decision:\n        if cost > self.capacity:\n            raise ValueError(\"cost exceeds bucket capacity\")\n        now = self.clock.now()\n        tokens, last = self._buckets.get(key, (self.capacity, now))\n        tokens = min(self.capacity, tokens + (now - last) * self.refill_per_sec)\n        if tokens >= cost:\n            self._buckets[key] = (tokens - cost, now)\n            return Decision(True, 0.0)\n        self._buckets[key] = (tokens, now)\n        return Decision(False, (cost - tokens) / self.refill_per_sec)\n"
+        }
+      ]
+    },
+    "judge": {
+      "kind": "pytest",
+      "entry": null,
+      "params": null,
+      "compare": {
+        "kind": "exact",
+        "rtol": 1e-06,
+        "atol": 1e-08,
+        "fn": null
+      },
+      "test_files": null,
+      "build": [],
+      "command": null
+    },
+    "sections": [],
+    "tests": [],
+    "limits": {
+      "timeout_s": 10.0,
+      "memory_mb": null
+    },
+    "benchmark": null
+  },
+  "kv-cache-basics": {
+    "schema_version": 1,
+    "id": "kv-cache-basics",
+    "title": "Decode with a KV Cache",
+    "difficulty": "medium",
+    "tags": [
+      "pytorch",
+      "attention",
+      "transformers",
+      "inference"
+    ],
+    "track": "ml-fundamentals",
+    "order": 1,
+    "environment": "pytorch",
+    "requires": [
+      "gpu"
+    ],
+    "description": "An autoregressive transformer generates one token at a time. At step $t$ the new token's\nquery attends to the keys and values of **every** position $0..t$. Recomputing $K$ and $V$\nfor the whole prefix at every step repeats work: step $t$ re-projects $t$ old tokens.\n\nA **KV cache** stores each position's key and value the first time they're computed. Each\ndecode step then projects only the new token, appends its $k, v$ to the cache, and attends\nover the cached tensors.\n\n```mermaid\nflowchart LR\n    x[\"x_t (new token)\"] --> P[\"project: q_t, k_t, v_t\"]\n    P -->|append k_t, v_t| C[(\"KV cache<br/>[B, H, t+1, Dh]\")]\n    P -->|q_t| A[\"attend(q_t, K, V)\"]\n    C -->|K, V| A\n    A --> o[o_t]\n```\n\nFor one head with head size $d_h$:\n\n$$o_t = \\operatorname{softmax}\\!\\left(\\frac{q_t K_{0..t}^\\top}{\\sqrt{d_h}}\\right) V_{0..t}$$\n\n### Your task\n\nIn `solution.py`:\n\n1. **`KVCache`** preallocates key and value buffers of shape\n   `[batch, n_heads, max_len, head_dim]` on the given device.\n   - `append(k, v)` writes `t_new` new positions (`k`, `v` are `[batch, n_heads, t_new, head_dim]`)\n     and raises `ValueError` if the cache would go past `max_len`.\n   - `get()` returns `(k, v)` for the positions written so far. Return slices of the buffers\n     (views), not copies.\n   - `len(cache)` is the number of positions written so far.\n2. **`decode_with_cache(x, w_q, w_k, w_v, n_heads)`** processes `x` (`[B, T, D]`) **one\n   position at a time**, using a `KVCache` and the read-only helpers in `attention.py`. It\n   returns the attention output `[B, T, D]`, where row $t$ attends to positions $0..t$\n   (causal). Projections are `x @ w_q`, `x @ w_k`, `x @ w_v`, each with weight shape `[D, D]`.\n\n:::note\n`attend()` only accepts a single query position, so a full-sequence shortcut won't work.\nTests run on the selected device (`mps` on Apple silicon, `cuda` on NVIDIA). Keep every tensor\non `x.device`.\n:::\n\n:::details{summary=\"Why preallocate?\"}\nGrowing the cache with `torch.cat` at every step allocates a new tensor and copies the whole\nprefix each time, which is $O(T^2)$ memory traffic. Writing into a preallocated buffer keeps\neach step $O(1)$ apart from the attention itself. Real inference engines go further and page\nthe cache into fixed-size blocks.\n:::\n",
+    "hints": [
+      "In `__init__`: `self.k = torch.zeros(batch, n_heads, max_len, head_dim, device=device, dtype=dtype)`, the same for `v`, and `self.length = 0`.",
+      "`append`: `self.k[:, :, self.length:self.length + t_new] = k`, then advance `self.length`.",
+      "Decode loop: `x_t = x[:, t:t+1]` keeps the time dimension. Project it, `split_heads`, append, `attend`, `merge_heads`, then collect the outputs and `torch.cat` them along dim 1."
+    ],
+    "files": [
+      {
+        "path": "solution.py",
+        "role": "editable",
+        "content": "import torch\n\nfrom attention import attend, merge_heads, split_heads\n\n\nclass KVCache:\n    def __init__(self, batch: int, n_heads: int, max_len: int, head_dim: int, *,\n                 device: torch.device, dtype: torch.dtype = torch.float32) -> None:\n        # TODO: preallocate key/value buffers [batch, n_heads, max_len, head_dim]\n        ...\n\n    def append(self, k: torch.Tensor, v: torch.Tensor) -> None:\n        \"\"\"k, v: [batch, n_heads, t_new, head_dim]. Raise ValueError on overflow.\"\"\"\n        raise NotImplementedError\n\n    def get(self) -> tuple[torch.Tensor, torch.Tensor]:\n        \"\"\"(k, v) for all positions so far: [batch, n_heads, length, head_dim].\"\"\"\n        raise NotImplementedError\n\n    def __len__(self) -> int:\n        raise NotImplementedError\n\n\ndef decode_with_cache(x: torch.Tensor, w_q: torch.Tensor, w_k: torch.Tensor,\n                      w_v: torch.Tensor, n_heads: int) -> torch.Tensor:\n    \"\"\"x: [B, T, D] -> [B, T, D], one position at a time with a KVCache.\"\"\"\n    raise NotImplementedError\n",
+        "language": null
+      },
+      {
+        "path": "attention.py",
+        "role": "readonly",
+        "content": "import math\n\nimport torch\n\n\ndef split_heads(x: torch.Tensor, n_heads: int) -> torch.Tensor:\n    \"\"\"[B, T, D] -> [B, H, T, D // H]\"\"\"\n    b, t, d = x.shape\n    return x.view(b, t, n_heads, d // n_heads).transpose(1, 2)\n\n\ndef merge_heads(x: torch.Tensor) -> torch.Tensor:\n    \"\"\"[B, H, T, Dh] -> [B, T, H * Dh]\"\"\"\n    b, h, t, dh = x.shape\n    return x.transpose(1, 2).reshape(b, t, h * dh)\n\n\ndef attend(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> torch.Tensor:\n    \"\"\"One decode step. q: [B, H, 1, Dh]; k, v: [B, H, T, Dh] -> [B, H, 1, Dh]\"\"\"\n    if q.shape[-2] != 1:\n        raise ValueError(\"attend() handles a single decode step: q must have length 1\")\n    scores = q @ k.transpose(-1, -2) / math.sqrt(q.shape[-1])\n    return torch.softmax(scores, dim=-1) @ v\n",
+        "language": null
+      },
+      {
+        "path": "_setup.py",
+        "role": "hidden",
+        "content": "import torch\n\nfrom leetclaude_harness import device\n\n\ndef make_inputs(seed: int, B: int, T: int, D: int, H: int):\n    g = torch.Generator().manual_seed(seed)\n    dev = device()\n    scale = D ** -0.5\n\n    def rand(*shape, s=1.0):\n        return (torch.randn(*shape, generator=g) * s).to(dev)\n\n    return {\"x\": rand(B, T, D), \"w_q\": rand(D, D, s=scale), \"w_k\": rand(D, D, s=scale),\n            \"w_v\": rand(D, D, s=scale), \"n_heads\": H}\n\n\ndef full_causal_attention(x, w_q, w_k, w_v, n_heads):\n    \"\"\"Independent check used while authoring: non-cached causal attention.\"\"\"\n    b, t, d = x.shape\n    q, k, v = (m.view(b, t, n_heads, d // n_heads).transpose(1, 2)\n               for m in (x @ w_q, x @ w_k, x @ w_v))\n    mask = torch.ones(t, t, dtype=torch.bool, device=x.device).tril()\n    scores = (q @ k.transpose(-1, -2)) / (d // n_heads) ** 0.5\n    scores = scores.masked_fill(~mask, float(\"-inf\"))\n    out = torch.softmax(scores, -1) @ v\n    return out.transpose(1, 2).reshape(b, t, d)\n",
+        "language": null
+      }
+    ],
+    "reference": {
+      "files": [
+        {
+          "path": "solution.py",
+          "content": "import torch\n\nfrom attention import attend, merge_heads, split_heads\n\n\nclass KVCache:\n    def __init__(self, batch: int, n_heads: int, max_len: int, head_dim: int, *,\n                 device: torch.device, dtype: torch.dtype = torch.float32) -> None:\n        shape = (batch, n_heads, max_len, head_dim)\n        self.k = torch.zeros(shape, device=device, dtype=dtype)\n        self.v = torch.zeros(shape, device=device, dtype=dtype)\n        self.max_len = max_len\n        self.length = 0\n\n    def append(self, k: torch.Tensor, v: torch.Tensor) -> None:\n        t_new = k.shape[-2]\n        if self.length + t_new > self.max_len:\n            raise ValueError(\"KV cache overflow\")\n        self.k[:, :, self.length:self.length + t_new] = k\n        self.v[:, :, self.length:self.length + t_new] = v\n        self.length += t_new\n\n    def get(self) -> tuple[torch.Tensor, torch.Tensor]:\n        return self.k[:, :, :self.length], self.v[:, :, :self.length]\n\n    def __len__(self) -> int:\n        return self.length\n\n\ndef decode_with_cache(x: torch.Tensor, w_q: torch.Tensor, w_k: torch.Tensor,\n                      w_v: torch.Tensor, n_heads: int) -> torch.Tensor:\n    b, t, d = x.shape\n    cache = KVCache(b, n_heads, t, d // n_heads, device=x.device, dtype=x.dtype)\n    outs = []\n    for i in range(t):\n        x_t = x[:, i:i + 1]\n        q = split_heads(x_t @ w_q, n_heads)\n        cache.append(split_heads(x_t @ w_k, n_heads), split_heads(x_t @ w_v, n_heads))\n        outs.append(merge_heads(attend(q, *cache.get())))\n    return torch.cat(outs, dim=1)\n"
+        }
+      ]
+    },
+    "judge": {
+      "kind": "function",
+      "entry": "solution.py:decode_with_cache",
+      "params": null,
+      "compare": {
+        "kind": "allclose",
+        "rtol": 0.0001,
+        "atol": 1e-05,
+        "fn": null
+      },
+      "test_files": null,
+      "build": [],
+      "command": null
+    },
+    "sections": [],
+    "tests": [
+      {
+        "name": "Tiny (B=1, T=3, D=8, H=2)",
+        "visible": true,
+        "description": null,
+        "section": null,
+        "input": {
+          "args": [],
+          "kwargs": {
+            "B": 1,
+            "T": 3,
+            "D": 8,
+            "H": 2
+          },
+          "gen": "_setup.py:make_inputs",
+          "seed": 0,
+          "calls": null
+        },
+        "expected": "from_reference"
+      },
+      {
+        "name": "Batch of 2, four heads",
+        "visible": true,
+        "description": null,
+        "section": null,
+        "input": {
+          "args": [],
+          "kwargs": {
+            "B": 2,
+            "T": 6,
+            "D": 16,
+            "H": 4
+          },
+          "gen": "_setup.py:make_inputs",
+          "seed": 1,
+          "calls": null
+        },
+        "expected": "from_reference"
+      },
+      {
+        "name": "Single position",
+        "visible": false,
+        "description": null,
+        "section": null,
+        "input": {
+          "args": [],
+          "kwargs": {
+            "B": 1,
+            "T": 1,
+            "D": 8,
+            "H": 1
+          },
+          "gen": "_setup.py:make_inputs",
+          "seed": 2,
+          "calls": null
+        },
+        "expected": "from_reference"
+      },
+      {
+        "name": "Long sequence",
+        "visible": false,
+        "description": null,
+        "section": null,
+        "input": {
+          "args": [],
+          "kwargs": {
+            "B": 2,
+            "T": 96,
+            "D": 64,
+            "H": 8
+          },
+          "gen": "_setup.py:make_inputs",
+          "seed": 3,
+          "calls": null
+        },
+        "expected": "from_reference"
+      },
+      {
+        "name": "Wide heads",
+        "visible": false,
+        "description": null,
+        "section": null,
+        "input": {
+          "args": [],
+          "kwargs": {
+            "B": 3,
+            "T": 24,
+            "D": 128,
+            "H": 2
+          },
+          "gen": "_setup.py:make_inputs",
+          "seed": 4,
+          "calls": null
+        },
+        "expected": "from_reference"
+      }
+    ],
+    "limits": {
+      "timeout_s": 60.0,
+      "memory_mb": null
+    },
+    "benchmark": null
+  }
+}

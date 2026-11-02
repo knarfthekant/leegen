@@ -1,13 +1,13 @@
 """pytest plugin: turns pytest reports into result events.
 
 Config comes from env: LEETCLAUDE_VISIBLE_FILES (comma-separated test files the user can see)
-and LEETCLAUDE_DEADLINE (time.monotonic() value at which the run must stop).
-Also runs `async def test_*` functions with asyncio.run, so no pytest-asyncio is needed.
+and LEETCLAUDE_DEADLINE (time.monotonic() value at which the run must stop). It is read when
+pytest configures the plugin, so a long-lived interpreter (Pyodide) can run many sessions.
+Also runs `async def test_*` functions itself, so no pytest-asyncio is needed.
 """
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 import os
 import time
@@ -15,12 +15,19 @@ from typing import Any
 
 import pytest
 
-from leetclaude_harness._common import TestTimeout, alarm
+from leetclaude_harness._common import TestTimeout, alarm, run_coro
 from leetclaude_harness.protocol import emit, truncate
 
-_VISIBLE = {p for p in os.environ.get("LEETCLAUDE_VISIBLE_FILES", "").split(",") if p}
-_DEADLINE = float(os.environ.get("LEETCLAUDE_DEADLINE", "0")) or None
+_VISIBLE: set[str] = set()
+_DEADLINE: float | None = None
 _SEEN: set[str] = set()
+
+
+def pytest_configure(config: Any) -> None:
+    global _VISIBLE, _DEADLINE
+    _VISIBLE = {p for p in os.environ.get("LEETCLAUDE_VISIBLE_FILES", "").split(",") if p}
+    _DEADLINE = float(os.environ.get("LEETCLAUDE_DEADLINE", "0")) or None
+    _SEEN.clear()
 
 
 def _name(nodeid: str) -> str:
@@ -42,7 +49,7 @@ def pytest_pyfunc_call(pyfuncitem: Any) -> bool | None:
     if inspect.iscoroutinefunction(pyfuncitem.obj):
         names = pyfuncitem._fixtureinfo.argnames
         kwargs = {n: pyfuncitem.funcargs[n] for n in names}
-        asyncio.run(pyfuncitem.obj(**kwargs))
+        run_coro(pyfuncitem.obj(**kwargs))
         return True
     return None
 

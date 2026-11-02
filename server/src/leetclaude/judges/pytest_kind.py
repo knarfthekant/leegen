@@ -5,7 +5,8 @@ from typing import Any
 from leetclaude.judges.base import JudgeKind, JudgePlan
 from leetclaude.languages.base import LanguageAdapter
 from leetclaude.registry import register
-from leetclaude.schema.models import Problem
+from leetclaude.core.models import Problem
+from leetclaude.core.plan import judge_config
 
 
 @register("judge", "pytest")
@@ -14,10 +15,5 @@ class PytestJudge(JudgeKind):
 
     def plan(self, problem: Problem, tests: list[dict[str, Any]], lang: LanguageAdapter,
              mode: str) -> JudgePlan:
-        files = problem.pytest_files()
-        visible = [p for p in files if (f := problem.file(p)) and f.role != "hidden"]
-        return JudgePlan(
-            config={"judge": problem.judge.model_dump(mode="json"), "test_files": files,
-                    "visible_files": visible},
-            command=lang.harness_command(),
-        )
+        config, _ = judge_config(problem, tests)
+        return JudgePlan(config=config, command=lang.harness_command())

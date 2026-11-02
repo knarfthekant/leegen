@@ -7,8 +7,9 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from leetclaude.envs.registry import satisfies
-from leetclaude.schema.models import Environment, ExecutorConfig
+from leetclaude.core.assemble import ExecOutcome  # noqa: F401  (re-exported for executors)
+from leetclaude.core.compat import can_run, device_for, satisfies
+from leetclaude.core.models import Environment, ExecutorConfig
 
 
 @dataclass
@@ -22,19 +23,6 @@ class JobSpec:
     timeout_s: float = 10.0
     build_timeout_s: float = 120.0
     results_file: str = "results.jsonl"
-
-
-@dataclass
-class ExecOutcome:
-    exit_code: int | None
-    stdout: str = ""
-    stderr: str = ""
-    results: str = ""                 # raw JSONL written by the harness
-    timed_out: bool = False
-    cancelled: bool = False
-    build_failed: bool = False
-    build_output: str = ""
-    duration_ms: float = 0.0
 
 
 # Progress callback: on_status("preparing" | "queued" | "running", detail)
@@ -58,22 +46,21 @@ class Executor(ABC):
     @abstractmethod
     def capabilities(self) -> set[str]: ...
 
-    def supports(self, requires: list[str]) -> bool:
-        return satisfies(self.capabilities(), requires)
+    @property
+    def runtime(self) -> str:
+        return self.config.runtime
+
+    def supports(self, requires: list[str], env: Environment | None = None) -> bool:
+        if env is None:
+            return satisfies(self.capabilities(), requires)
+        return can_run(self.capabilities(), self.runtime, requires, env)
 
     def device_for(self, requires: list[str]) -> str:
-        caps = self.capabilities()
-        if not ({"gpu", "cuda"} & set(requires)):
-            return "cpu"
-        if "cuda" in caps:
-            return "cuda"
-        if "mps" in caps:
-            return "mps"
-        return "cpu"
+        return device_for(self.capabilities(), requires)
 
     def describe(self) -> dict:
         return {"id": self.id, "kind": self.kind, "capabilities": sorted(self.capabilities()),
-                "description": self.config.description}
+                "runtime": self.runtime, "description": self.config.description}
 
     @abstractmethod
     async def prepare(self, env: Environment, extra_deps: list[str]) -> dict[str, str]:

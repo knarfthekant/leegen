@@ -17,7 +17,7 @@ class _Manager:
     def __init__(self, ex):
         self.ex = ex
 
-    def choose(self, requires, preferred=None):
+    def choose(self, requires, preferred=None, env=None):
         return self.ex
 
     def get(self, _id):

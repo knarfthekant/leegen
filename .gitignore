@@ -13,3 +13,6 @@ config/executors.yaml
 /docs/clusters/*.md
 !/docs/clusters/README.md
 .DS_Store
+# wrangler local state
+.wrangler/
+web/dist-browser/

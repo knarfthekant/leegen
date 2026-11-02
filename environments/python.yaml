@@ -1,6 +1,8 @@
 id: python
-description: CPython 3.13 with the standard library and pytest.
+description: CPython 3.13 with the standard library and pytest. Also runs in the browser (Pyodide).
 language: python
 python: "3.13"
 dependencies: [pytest]
 requires: [cpu]
+browser:
+  packages: [pytest]

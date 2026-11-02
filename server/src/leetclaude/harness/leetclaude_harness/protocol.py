@@ -1,19 +1,33 @@
-"""Result events: one JSON object per line, appended to $LEETCLAUDE_RESULTS."""
+"""Result events: one JSON object per line, appended to $LEETCLAUDE_RESULTS.
+
+The path is read on every emit (a warm Pyodide interpreter runs many bundles), and an optional
+sink also receives each event as it happens (the browser runner streams them to the UI).
+"""
 
 from __future__ import annotations
 
 import json
 import math
 import os
+from collections.abc import Callable
 from typing import Any
 
-_RESULTS = os.environ.get("LEETCLAUDE_RESULTS", "results.jsonl")
 MAX_TEXT = 4000
+_SINK: Callable[[str], None] | None = None
+
+
+def set_sink(sink: Callable[[str], None] | None) -> None:
+    """Also hand every event line to `sink` (or stop, with None)."""
+    global _SINK
+    _SINK = sink
 
 
 def emit(event: dict[str, Any]) -> None:
-    with open(_RESULTS, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps(event, default=str) + "\n")
+    line = json.dumps(event, default=str)
+    with open(os.environ.get("LEETCLAUDE_RESULTS", "results.jsonl"), "a", encoding="utf-8") as fh:
+        fh.write(line + "\n")
+    if _SINK is not None:
+        _SINK(line)
 
 
 def device() -> str:

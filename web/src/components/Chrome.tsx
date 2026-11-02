@@ -1,13 +1,13 @@
 import { Monitor, Moon, Sun } from "lucide-react";
-import { useConnection } from "../lib/events";
-import { navigate } from "../lib/router";
+import { useBackendStatus } from "../backend";
+import { href, navigate } from "../lib/router";
 import { useTheme } from "../lib/theme";
 import { IconButton, Logo } from "./ui";
 
 export function Brand() {
   return (
     <a
-      href="/"
+      href={href("/")}
       className="brand"
       onClick={(e) => {
         e.preventDefault();
@@ -27,11 +27,11 @@ export function ThemeToggle() {
 }
 
 export function ConnectionDot() {
-  const live = useConnection();
+  const status = useBackendStatus();
   return (
-    <span className={"live" + (live ? " on" : "")} title={live ? "Connected to the leetclaude server" : "Reconnecting…"}>
+    <span className={"live" + (status.ok ? " on" : "")} title={status.title}>
       <span className="live-dot" />
-      {live ? "Live" : "Offline"}
+      {status.label}
     </span>
   );
 }

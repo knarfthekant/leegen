@@ -5,7 +5,8 @@ from typing import Any
 from leetclaude.judges.base import JudgeKind, JudgePlan
 from leetclaude.languages.base import LanguageAdapter
 from leetclaude.registry import register
-from leetclaude.schema.models import Problem
+from leetclaude.core.models import Problem
+from leetclaude.core.plan import judge_config
 
 
 @register("judge", "script")
@@ -20,8 +21,9 @@ class ScriptJudge(JudgeKind):
     def plan(self, problem: Problem, tests: list[dict[str, Any]], lang: LanguageAdapter,
              mode: str) -> JudgePlan:
         assert problem.judge.command
+        config, _ = judge_config(problem, tests)
         return JudgePlan(
-            config={"judge": problem.judge.model_dump(mode="json"), "tests": tests},
+            config=config,
             command=list(problem.judge.command),
             build=[list(c) for c in problem.judge.build],
         )

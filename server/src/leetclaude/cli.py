@@ -1,4 +1,4 @@
-"""leetclaude CLI: start | dev | stop | serve | validate | run | schema | list."""
+"""leetclaude CLI: start | dev | stop | serve | validate | run | schema | list | browser."""
 
 from __future__ import annotations
 
@@ -36,12 +36,22 @@ def _cmd_dev(args: argparse.Namespace) -> int:
 
 
 def _cmd_schema(args: argparse.Namespace) -> int:
-    from leetclaude.schema.export import problem_json_schema, write_schema
+    from leetclaude.schema.contracts import check_all, write_all
+    from leetclaude.schema.export import problem_json_schema
 
     if args.stdout:
         print(json.dumps(problem_json_schema(), indent=2))
-    else:
-        print(write_schema())
+        return 0
+    root = settings().root
+    if args.check:
+        stale = check_all()
+        for p in stale:
+            print(f"out of date: {p.relative_to(root)}")
+        if stale:
+            print("run `uv run leetclaude schema` and commit the result")
+        return 1 if stale else 0
+    for p in write_all():
+        print(p.relative_to(root))
     return 0
 
 
@@ -123,6 +133,19 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0 if result.status == "passed" else 1
 
 
+def _cmd_browser_build(args: argparse.Namespace) -> int:
+    from leetclaude.browser_edition.build import build
+
+    build(args.app_origin, args.runner_origin, Path(args.out), skip_vite=args.skip_vite)
+    return 0
+
+
+def _cmd_browser_serve(args: argparse.Namespace) -> int:
+    from leetclaude.browser_edition.serve import serve
+
+    return serve(Path(args.out), args.app_port, args.runner_port)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="leetclaude", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -152,8 +175,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--reload", action="store_true")
     s.set_defaults(fn=_cmd_serve)
 
-    s = sub.add_parser("schema", help="write schema/problem.schema.json")
-    s.add_argument("--stdout", action="store_true")
+    s = sub.add_parser("schema", help="regenerate schema/, contracts/ and the web app's types")
+    s.add_argument("--stdout", action="store_true", help="print the problem JSON Schema only")
+    s.add_argument("--check", action="store_true", help="fail if generated files are stale")
     s.set_defaults(fn=_cmd_schema)
 
     s = sub.add_parser("list", help="list problems")
@@ -172,6 +196,21 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--executor")
     s.add_argument("--json", action="store_true")
     s.set_defaults(fn=_cmd_run)
+
+    s = sub.add_parser("browser", help="build or serve the browser edition (static sites)")
+    bsub = s.add_subparsers(dest="browser_cmd", required=True)
+    default_out = str(cfg.root / "web" / "dist-browser")
+    b = bsub.add_parser("build", help="build the app and runner sites")
+    b.add_argument("--app-origin", default="http://localhost:13380")
+    b.add_argument("--runner-origin", default="http://127.0.0.1:13381")
+    b.add_argument("--out", default=default_out)
+    b.add_argument("--skip-vite", action="store_true", help="reuse the app's last Vite build")
+    b.set_defaults(fn=_cmd_browser_build)
+    b = bsub.add_parser("serve", help="serve a build locally with its production headers")
+    b.add_argument("--out", default=default_out)
+    b.add_argument("--app-port", type=int, default=13380)
+    b.add_argument("--runner-port", type=int, default=13381)
+    b.set_defaults(fn=_cmd_browser_serve)
 
     args = parser.parse_args(argv)
     return args.fn(args)

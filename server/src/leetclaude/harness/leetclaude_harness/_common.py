@@ -1,7 +1,14 @@
-"""Shared helpers: module scoping, timeouts, stdout capture, user-facing tracebacks."""
+"""Shared helpers: module scoping, timeouts, stdout capture, user-facing tracebacks.
+
+Runs natively (CPython in a venv) and in the browser (Pyodide). Where the two differ:
+- per-test timeouts: SIGALRM natively; in Pyodide (no setitimer) the runner enforces wall time
+  from outside (interrupt buffer, then worker termination), so `alarm` only checks the deadline;
+- coroutines: `asyncio.run` natively; Pyodide's running WebLoop needs `pyodide.ffi.run_sync`.
+"""
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import importlib
 import importlib.util
@@ -30,10 +37,16 @@ class Deadline:
         return self.remaining() <= 0
 
 
+HAS_ALARM = hasattr(signal, "setitimer") and hasattr(signal, "SIGALRM")
+
+
 @contextlib.contextmanager
 def alarm(seconds: float) -> Iterator[None]:
     if seconds <= 0:
         raise TestTimeout()
+    if not HAS_ALARM:   # Pyodide: the runner stops runaway code from outside the interpreter
+        yield
+        return
 
     def handler(signum: int, frame: Any) -> None:
         raise TestTimeout()
@@ -45,6 +58,20 @@ def alarm(seconds: float) -> Iterator[None]:
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, old)
+
+
+def run_coro(coro: Any) -> Any:
+    """Run a coroutine to completion, natively or under Pyodide's already-running loop."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    try:   # a loop is running: only possible in Pyodide, via JSPI stack switching
+        from pyodide.ffi import run_sync  # type: ignore[import-not-found]
+    except ImportError:
+        coro.close()
+        raise RuntimeError("cannot run a coroutine inside a running event loop") from None
+    return run_sync(coro)
 
 
 @contextlib.contextmanager
