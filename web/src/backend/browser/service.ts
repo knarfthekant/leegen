@@ -27,7 +27,6 @@ import {
   makeAnnotations,
   makeCustomTest,
   makeProposal,
-  problemFile,
   problemSummary,
   publicProblem,
   pyRepr,
@@ -610,11 +609,6 @@ export class BrowserToolService {
   async assetBlob(problemId: string, src: string): Promise<Blob | undefined> {
     const rel = src.replace(/^\.\//, "");
     return this.db.get<Blob>("assets", `${problemId}/${rel}`);
-  }
-
-  async hasProblemFile(problemId: string, path: string): Promise<boolean> {
-    const p = await this.problem(problemId);
-    return problemFile(p, path) !== null;
   }
 }
 

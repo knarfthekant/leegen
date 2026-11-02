@@ -1,7 +1,7 @@
 import { CircleAlert, Inbox, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Brand, ConnectionDot, ThemeToggle } from "../components/Chrome";
-import { ImportReport, TransferButtons } from "../components/Transfer";
+import { ImportReport, SavedReport, TransferButtons } from "../components/Transfer";
 import type { ImportSummary } from "../backend/types";
 import { filterProblems, ProblemRow } from "../components/ProblemRow";
 import { Chip, DIFFICULTY_TONE, IconButton, Skeleton } from "../components/ui";
@@ -19,7 +19,8 @@ export function ProblemList() {
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [track, setTrack] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [imported, setImported] = useState<ImportSummary | null>(null);
+  const [imported, setImported] = useState<(ImportSummary & { folder?: string }) | null>(null);
+  const [saved, setSaved] = useState<{ folder: string; written: number } | null>(null);
 
   const load = () =>
     getBackend().listProblems().then((r) => {
@@ -50,7 +51,16 @@ export function ProblemList() {
       <header className="topbar">
         <Brand />
         <div className="spacer" />
-        <TransferButtons onImported={setImported} />
+        <TransferButtons
+          onImported={(s) => {
+            setSaved(null);
+            setImported(s);
+          }}
+          onSaved={(s) => {
+            setImported(null);
+            setSaved(s);
+          }}
+        />
         <ConnectionDot />
         <ThemeToggle />
       </header>
@@ -68,6 +78,7 @@ export function ProblemList() {
         </div>
 
         {imported && <ImportReport summary={imported} onClose={() => setImported(null)} />}
+        {saved && <SavedReport saved={saved} onClose={() => setSaved(null)} />}
 
         {errors.length > 0 && !errorsHidden && (
           <div className="soft-alert tone-fail">

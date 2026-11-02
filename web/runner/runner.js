@@ -283,6 +283,9 @@ function serve(port) {
       port.postMessage({ id, error: cleanError(e) });
     } finally {
       setStatus("ready");
+
+// offline + fast restarts: cache Pyodide (a partitioned worker when embedded cross-site)
+navigator.serviceWorker?.register("./sw.js").catch(() => {});
     }
   };
   port.postMessage({ type: "ready", origin: location.origin });
@@ -299,3 +302,6 @@ if (window.parent !== window) {
   for (const origin of allowed) window.parent.postMessage({ type: "lc-runner-loaded" }, origin);
 }
 setStatus("ready");
+
+// offline + fast restarts: cache Pyodide (a partitioned worker when embedded cross-site)
+navigator.serviceWorker?.register("./sw.js").catch(() => {});

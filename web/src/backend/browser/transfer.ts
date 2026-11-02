@@ -25,7 +25,8 @@ const dec = new TextDecoder();
 const STATE_DIR = ".leetclaude";
 const SAFE_SEGMENT = /^(?!\.\.?$)[^/\\\0]+$/;
 
-export async function exportZip(db: Db, seedAssets: (id: string, rel: string) => Promise<Blob | undefined>): Promise<Blob> {
+/** Everything in the repo layout: problems, assets, the user's files and state. */
+export async function collectEntries(db: Db, seedAssets: (id: string, rel: string) => Promise<Blob | undefined>): Promise<ZipEntry[]> {
   const entries: ZipEntry[] = [];
   const problems = await db.all<ProblemRecord>("problems");
   const assetKeys = (await db.keys("assets")).map(String);
@@ -52,7 +53,11 @@ export async function exportZip(db: Db, seedAssets: (id: string, rel: string) =>
       entries.push({ path: `workspace/${w.id}/${STATE_DIR}/${name}.json`, data: enc.encode(JSON.stringify(value, null, 2)) });
     }
   }
-  return writeZip(entries);
+  return entries;
+}
+
+export async function exportZip(db: Db, seedAssets: (id: string, rel: string) => Promise<Blob | undefined>): Promise<Blob> {
+  return writeZip(await collectEntries(db, seedAssets));
 }
 
 /** Paths relative to the repo root: tolerate one leading folder (a zipped checkout). */
@@ -65,8 +70,13 @@ function normalise(entries: ZipEntry[]): ZipEntry[] {
 }
 
 export async function importZip(blob: Blob, db: Db, runner: RunnerClient, service: BrowserToolService): Promise<ImportSummary> {
+  return importEntries(await readZip(blob), db, runner, service);
+}
+
+/** Import repo-layout entries (from a zip or a folder). */
+export async function importEntries(raw: ZipEntry[], db: Db, runner: RunnerClient, service: BrowserToolService): Promise<ImportSummary> {
   const summary: ImportSummary = { problems: [], unchanged: [], workspaces: [], errors: [] };
-  const entries = normalise(await readZip(blob));
+  const entries = normalise(raw);
 
   // problems first, so workspace files can be checked against them
   for (const e of entries) {

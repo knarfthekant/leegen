@@ -37,12 +37,9 @@ APP_HEADERS = """\
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-src {runner}; object-src 'none'; base-uri 'none'; form-action 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
-/config.json
   Cache-Control: no-cache
-/data/*
-  Cache-Control: no-cache
-/index.html
-  Cache-Control: no-cache
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
 """
 
 RUNNER_HEADERS = """\
@@ -52,12 +49,9 @@ RUNNER_HEADERS = """\
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors {app}; object-src 'none'; base-uri 'none'; form-action 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
-/*.js
   Cache-Control: no-cache
-/*.json
-  Cache-Control: no-cache
-/index.html
-  Cache-Control: no-cache
+/pyodide-*
+  Cache-Control: public, max-age=31536000, immutable
 """
 
 
@@ -139,6 +133,13 @@ def app_data() -> tuple[dict, list[tuple[Path, str]]]:
     return data, assets
 
 
+def _service_worker(template: Path, dest: Path, version: str, precache: list[str]) -> None:
+    text = template.read_text()
+    text = text.replace('"__VERSION__"', json.dumps(version))
+    text = text.replace("__PRECACHE__", json.dumps(precache))
+    dest.write_text(text)
+
+
 def build(app_origin: str, runner_origin: str, out: Path, *, skip_vite: bool = False) -> None:
     app_origin, runner_origin = origin(app_origin), origin(runner_origin)
     if app_origin == runner_origin:
@@ -168,6 +169,10 @@ def build(app_origin: str, runner_origin: str, out: Path, *, skip_vite: bool = F
     (app / "config.json").write_text(json.dumps({"runner_origin": runner_origin,
                                                   "version": data["version"]}))
     (app / "_headers").write_text(APP_HEADERS.format(runner=runner_origin))
+    entry = [str(f.relative_to(app)) for f in (app / "assets").glob("index-*") if f.is_file()]
+    _service_worker(web / "sw" / "app-sw.js", app / "sw.js", data["version"],
+                    ["/", "/theme-init.js", "/config.json", "/data/bundle.json",
+                     *[f"/{e}" for e in sorted(entry)]])
 
     # ------------------------------------------------------------ runner
     shutil.rmtree(runner, ignore_errors=True)
@@ -180,9 +185,17 @@ def build(app_origin: str, runner_origin: str, out: Path, *, skip_vite: bool = F
         "allowed_parents": [app_origin],
         "pyodide": f"pyodide-{pyodide.VERSION}/",
         "preload": CORE_PACKAGES,
-        "version": hashlib.sha256(json.dumps(sources, sort_keys=True).encode()).hexdigest()[:12],
+        "version": hashlib.sha256(json.dumps(sources, sort_keys=True).encode() + b"".join(
+            (web / "runner" / n).read_bytes() for n in ("runner.js", "py-worker.js", "sw.js"))
+            + pyodide.VERSION.encode()).hexdigest()[:12],
     }))
     (runner / "_headers").write_text(RUNNER_HEADERS.format(app=app_origin))
+    runner_version = json.loads((runner / "config.json").read_text())["version"]
+    pyodide_files = sorted(f"/pyodide-{pyodide.VERSION}/{f.name}"
+                           for f in (runner / f"pyodide-{pyodide.VERSION}").iterdir() if f.is_file())
+    _service_worker(runner / "sw.js", runner / "sw.js", runner_version,
+                    ["/", "/runner.js", "/py-worker.js", "/config.json", "/lc-python.json",
+                     *pyodide_files])
 
     # ------------------------------------------------------------ wrangler configs
     for site, name in (("app", "leetclaude"), ("runner", "leetclaude-runner")):

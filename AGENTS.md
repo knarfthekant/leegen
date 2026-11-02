@@ -231,7 +231,9 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   `contracts/fixtures`. `browser/tools.ts` registers every tool in `contracts/tools.json` with
   `document.modelContext` and validates inputs itself. Storage is `browser/db.ts` (IndexedDB) and
   cross-tab events are `browser/events.ts` (BroadcastChannel). `browser/transfer.ts` exports and
-  imports zips in the repo layout.
+  imports zips in the repo layout, and `browser/folder.ts` saves to and loads from a folder
+  (File System Access). Service workers (`web/sw/app-sw.js`, `web/runner/sw.js`; the build fills
+  in their precache lists) make both origins work offline.
 - **Runner origin** (`web/runner/`): stateless and allow-listed. It runs `browser_runner.py`
   (core `plan_run` → harness → core `assemble`) in Pyodide. Validation follows the
   `core.validation` steps (`precheck`, `after_reference`, `after_starter`), with a deadline per

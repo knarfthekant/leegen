@@ -8,7 +8,8 @@ import { Db, type ProblemRecord } from "./db.ts";
 import { EventHub } from "./events.ts";
 import { RunnerClient } from "./runner.ts";
 import { BrowserToolService, type Guides } from "./service.ts";
-import { exportZip, importZip } from "./transfer.ts";
+import { folderName, folderSupported, readFolder, saveToFolder } from "./folder.ts";
+import { collectEntries, exportZip, importEntries, importZip } from "./transfer.ts";
 
 interface AppConfig {
   runner_origin: string;
@@ -171,8 +172,25 @@ export async function createBrowserBackend(): Promise<BrowserBackend> {
         hub.broadcast({ type: "problems_changed" });
         return summary;
       },
+      folder: folderSupported()
+        ? {
+            name: () => folderName(db),
+            save: async (pickNew) => saveToFolder(db, await collectEntries(db, seedAsset), pickNew),
+            async load(pickNew) {
+              const { folder, entries } = await readFolder(db, pickNew);
+              const summary = await importEntries(entries, db, runner, service);
+              hub.broadcast({ type: "problems_changed" });
+              return { ...summary, folder };
+            },
+          }
+        : undefined,
     },
   };
+
+  // Offline: the app shell and data are cached by a service worker (the runner has its own).
+  if ("serviceWorker" in navigator && import.meta.env.PROD) {
+    navigator.serviceWorker.register(`${BASE}sw.js`).catch((e) => console.warn("service worker:", e));
+  }
 
   // WebMCP: register the agent tools on this (top-level) page.
   const { registerAgentTools } = await import("./tools.ts");

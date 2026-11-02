@@ -87,5 +87,11 @@ export interface Backend {
   transfer?: {
     exportZip(): Promise<Blob>;
     importZip(file: Blob): Promise<ImportSummary>;
+    /** File System Access folder sync (Chromium); absent where unsupported. */
+    folder?: {
+      name(): Promise<string | null>;
+      save(pickNew?: boolean): Promise<{ folder: string; written: number }>;
+      load(pickNew?: boolean): Promise<ImportSummary & { folder: string }>;
+    };
   };
 }

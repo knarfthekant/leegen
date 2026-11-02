@@ -106,7 +106,23 @@ page navigates (the app routes with `pushState` only). The tools also work in Ch
 - **Import** reads the same layout (also a zipped checkout with one top-level folder). Problems
   are schema-checked in the runner. Identical problems are skipped and changed ones replace the
   stored copy.
+- **Folder sync** (Chromium, File System Access API): the folder icons save everything to a
+  folder, or load from one, in the same layout. Pick your leetclaude checkout and the local
+  server and the browser edition share `problems/` and `workspace/`. The folder is remembered
+  (shift-click to choose another). Saving rewrites only files that changed and never touches
+  anything outside `problems/` and `workspace/`. Sync is manual, not continuous.
 - Shipped problems update with new builds unless the user changed or deleted them.
+
+## Offline and multiple tabs
+
+- Each origin has a service worker. The app caches its shell, data and the code chunks it has
+  used, and the runner precaches Pyodide and its packages. After one online visit, the app opens
+  and runs code offline. Hashed and versioned files are cached for good, and everything else is
+  fetched network-first, so a new deploy takes effect on the next load.
+- Tabs share one IndexedDB. Events (runs, annotations, proposals, problem changes) reach every
+  tab through a BroadcastChannel. Runs of the same problem take a Web Lock, so two tabs never run
+  it at once. Each tab has its own runner and its own editor session; an agent sees the tab
+  whose tools it calls.
 
 ## Limits
 
@@ -119,6 +135,8 @@ page navigates (the app routes with `pushState` only). The tools also work in Ch
   read IndexedDB). This is a training tool, so that is accepted. Don't treat redaction as a
   security boundary here.
 - WebMCP needs a browser that implements it (Codex's built-in browser today).
+- Not built yet: running `webgpu` problems from the server edition by delegating to a browser
+  runner (the plan's optional bridge). Use the browser edition for them.
 
 ## Notes for agents
 

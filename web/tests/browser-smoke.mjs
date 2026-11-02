@@ -254,6 +254,34 @@ try {
   await page.goto(APP + "/");
   await page.locator(".problem-row", { hasText: "Decode with a KV Cache" }).getByText("server edition").waitFor();
 
+  step("offline: service workers cache the app and Python; a run works without the network");
+  await page.goto(APP + "/p/" + PID);
+  await page.locator(".monaco-editor").first().waitFor();
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
+  const runnerFrame = () => page.frames().find((f) => f !== page.mainFrame() && f.url().includes(":13381"));
+  await page.waitForFunction(() => document.querySelector("iframe[title='leetclaude runner']"));
+  for (let i = 0; i < 100 && !runnerFrame(); i++) await page.waitForTimeout(100);
+  const precached = await runnerFrame().evaluate(async () => {
+    const reg = await navigator.serviceWorker.ready;
+    // wait for the install (precache) to finish
+    for (let i = 0; i < 600 && !reg.active; i++) await new Promise((r) => setTimeout(r, 100));
+    const keys = await caches.keys();
+    let n = 0;
+    for (const k of keys) n += (await (await caches.open(k)).keys()).length;
+    return n;
+  });
+  console.log(`  runner cache: ${precached} files`);
+  await context.setOffline(true);
+  await page.reload();
+  await page.locator(".monaco-editor").first().waitFor({ timeout: 30_000 });
+  await page.waitForFunction(() => window.monaco.editor.getEditors().some((e) => e.getValue().includes("sorted(bookings)")));
+  const offline = await tool("run_tests", { problem_id: PID });
+  console.log(`  offline run: ${offline.status} (${offline.passed}/${offline.total})`);
+  if (offline.status !== "passed") throw new Error("offline run: " + JSON.stringify(offline).slice(0, 400));
+  const offlineValidate = await tool("validate_problem_yaml", { yaml: (await tool("get_problem", { problem_id: "py-async-generators" })).yaml });
+  if (!offlineValidate.ok) throw new Error("offline validation (loads pytest): " + JSON.stringify(offlineValidate.issues));
+  await context.setOffline(false);
+
   const unexpected = problems.filter((p) => !/Failed to load resource/.test(p));
   if (unexpected.length) throw new Error("console errors:\n" + unexpected.join("\n"));
   console.log("\nbrowser smoke: OK");
