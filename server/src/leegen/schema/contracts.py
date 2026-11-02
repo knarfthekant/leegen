@@ -207,7 +207,7 @@ def _case(fn: str, args: dict[str, Any], call: Any) -> dict[str, Any]:
 
 def review_fixtures(problems: dict[str, Problem]) -> dict[str, Any]:
     mr = problems["merge-ranges"]
-    pa = problems["py-async-generators"]
+    language = problems["iterators-and-await"]
     code = mr.editable_files()[0].content
     files = {mr.editable_files()[0].path: code}
     main = mr.editable_files()[0].path
@@ -291,9 +291,9 @@ def review_fixtures(problems: dict[str, Problem]) -> dict[str, Any]:
         {"problem": "merge-ranges", "existing": [], "args": [[]], "name": mr.tests[0].name},
         {"problem": "merge-ranges", "existing": [], "args": [[]], "section": "nope"},
         {"problem": "merge-ranges", "existing": [], "args": "not-a-list"},
-        {"problem": "py-async-generators", "existing": [], "args": []},
+        {"problem": "iterators-and-await", "existing": [], "args": []},
     ]:
-        p = mr if args["problem"] == "merge-ranges" else pa
+        p = mr if args["problem"] == "merge-ranges" else language
         cases.append(_case("make_custom_test", args, lambda a=args, p=p: review.make_custom_test(
             p, a["existing"], a["args"], a.get("kwargs"), a.get("name"), a.get("description"),
             a.get("section"))))
@@ -332,8 +332,8 @@ def views_fixtures(problems: dict[str, Problem]) -> dict[str, Any]:
 # ------------------------------------------------------------------ write / check
 
 
-FIXTURE_PROBLEMS = ["merge-ranges", "py-async-generators", "rate-limiter-service",
-                    "kv-cache-basics"]
+FIXTURE_PROBLEMS = ["merge-ranges", "iterators-and-await", "kv-cache-basics",
+                    "cuda-vector-add", "webgpu-tiled-matmul"]
 
 
 def outputs() -> dict[Path, str]:

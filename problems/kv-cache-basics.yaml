@@ -3,8 +3,6 @@ id: kv-cache-basics
 title: Decode with a KV Cache
 difficulty: medium
 tags: [pytorch, attention, transformers, inference]
-track: ml-fundamentals
-order: 1
 environment: pytorch
 requires: [gpu]
 description: |

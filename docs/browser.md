@@ -94,9 +94,9 @@ a WGSL kernel (`kernel.wgsl`, highlighted in the editor). A hidden Python host d
 The normal `function` judge compares the results. Compile and validation errors come back as
 `kernel.wgsl:line:col` messages. GPU time from timestamp queries can be reported as a metric. A
 kernel that never finishes is stopped by the same wall-clock deadline as runaway Python. The
-seed track is `webgpu-101`: vector add, workgroup reduction, tiled matrix multiply. The server
-edition lists these problems with a "browser edition" badge, and the browser edition marks
-CUDA/PyTorch problems "server edition".
+WebGPU signature example is `webgpu-tiled-matmul`, which covers workgroup memory, barriers,
+boundary handling and GPU timing. The server edition lists it with a "browser edition" badge,
+and the browser edition marks CUDA/PyTorch problems "server edition".
 
 ## Using it with Codex
 

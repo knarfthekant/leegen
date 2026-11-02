@@ -12,8 +12,8 @@ def test_seed_problems_load():
     store = ProblemStore()
     assert store.errors() == []
     ids = {p.id for p in store.list()}
-    assert {"merge-ranges", "py-async-generators", "rate-limiter-service", "kv-cache-basics",
-            "cuda-vector-add"} <= ids
+    assert ids == {"merge-ranges", "iterators-and-await", "kv-cache-basics",
+                   "cuda-vector-add", "webgpu-tiled-matmul"}
 
 
 def test_yaml_round_trip():

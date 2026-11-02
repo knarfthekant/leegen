@@ -207,19 +207,20 @@
     {
       "fn": "problem_summary",
       "args": {
-        "problem": "py-async-generators"
+        "problem": "iterators-and-await"
       },
       "result": {
-        "id": "py-async-generators",
-        "title": "Async Generators from Scratch",
-        "difficulty": "intro",
+        "id": "iterators-and-await",
+        "title": "Iterators, Await, and the Two Kinds of Suspension",
+        "difficulty": "easy",
         "tags": [
           "python",
           "asyncio",
+          "iterators",
           "generators"
         ],
-        "track": "python-fundamentals",
-        "order": 1,
+        "track": null,
+        "order": null,
         "environment": "python",
         "requires": [
           "cpu"
@@ -230,19 +231,20 @@
     {
       "fn": "public_problem",
       "args": {
-        "problem": "py-async-generators"
+        "problem": "iterators-and-await"
       },
       "result": {
-        "id": "py-async-generators",
-        "title": "Async Generators from Scratch",
-        "difficulty": "intro",
+        "id": "iterators-and-await",
+        "title": "Iterators, Await, and the Two Kinds of Suspension",
+        "difficulty": "easy",
         "tags": [
           "python",
           "asyncio",
+          "iterators",
           "generators"
         ],
-        "track": "python-fundamentals",
-        "order": 1,
+        "track": null,
+        "order": null,
         "environment": "python",
         "requires": [
           "cpu"
@@ -253,120 +255,23 @@
           "params": null,
           "compare": "exact"
         },
-        "description": "An **async generator** is an `async def` function that contains `yield`. Calling it does not\nrun any code yet. It returns an object you consume with `async for`, and between items it may\n`await` other things (network reads, sleeps, queues).\n\n```python\nasync def numbers():\n    yield 1\n    await asyncio.sleep(0.1)   # can await between items\n    yield 2\n\nasync for n in numbers():      # only valid inside another async function\n    print(n)\n```\n\n```mermaid\nsequenceDiagram\n    participant C as consumer (async for)\n    participant G as async generator\n    C->>G: __anext__()\n    G-->>C: yield 1\n    C->>G: __anext__()\n    Note over G: await asyncio.sleep(...)\n    G-->>C: yield 2\n    C->>G: __anext__()\n    G-->>C: StopAsyncIteration\n```\n\nImplement three functions in `solution.py`.\n\n### 1. `countdown(n)`\nYield `n, n-1, ..., 1`, calling `await asyncio.sleep(0)` before each item so other tasks get a\nturn. `countdown(0)` yields nothing.\n\n### 2. `batched(stream, size)`\n`stream` is any *async iterable*. Yield lists of up to `size` consecutive items. The last batch\nmay be shorter. Raise `ValueError` if `size < 1`, but only once iteration starts (that is the\nnatural behaviour of a generator, so you don't need anything special).\n\n### 3. `read_lines(conn)`\n`conn` has `async def readline() -> str | None` (returns `None` at end of input) and a plain\n`close()` method. Yield each line with surrounding whitespace stripped, skipping empty lines.\n**`conn.close()` must be called exactly once**, whether the consumer reads everything, stops\nearly with `break`, or an exception is raised.\n\n:::details{summary=\"What happens when the consumer breaks early?\"}\nWhen an `async for` loop exits early, the generator is not resumed again. Python later calls\nits `aclose()` method, which raises `GeneratorExit` at the paused `yield`. Code in a\n`try/finally` around the `yield` still runs. Tests here call `aclose()` explicitly, the same\nway `contextlib.aclosing` does.\n:::\n\n`test_visible.py` shows some of the tests. More are hidden.\n",
+        "description": "Python has **two** different things that can pause, and confusing them is the most common\nasync bug. This problem climbs the whole ladder — plain iterators, then `await`, then async\ngenerators — so you can tell the two apart by building each one.\n\n| | what pauses | control goes to | resumes when |\n|---|---|---|---|\n| **generator frame** | a `yield` | the consumer (`next()` / `async for`) | the consumer asks for the next item |\n| **task** | an `await` of something *still pending* | the event loop | that awaitable completes |\n\nThree consequences, each tested below:\n\n1. One `next()` runs the body up to exactly **one** `yield`. The frame really is frozen.\n2. Freezing a frame is **not** the same as giving the event loop a turn. `async for` over a\n   generator that never awaits is a tight loop with no scheduling points at all.\n3. Anything written **after** a `yield` may never run, because the consumer can walk away.\n   Cleanup belongs in `finally`.\n\n```mermaid\nsequenceDiagram\n    participant L as event loop\n    participant C as consumer\n    participant G as async generator\n    C->>G: __anext__()\n    G->>G: await asyncio.sleep(0)\n    Note over L,G: the await suspends the TASK\n    L-->>G: resumed\n    G-->>C: yield n\n    Note over C,G: the yield suspends the FRAME only\n```\n\n## 1. `Peekable` — the sync iterator protocol\n\n```python\nclass Peekable:\n    def __init__(self, items: Iterable[T]) -> None: ...\n    def __iter__(self) -> Peekable: ...\n    def __next__(self) -> T: ...\n    def peek(self) -> T: ...\n```\n\n`peek()` returns the next item **without consuming it**, so the following `next()` returns that\nsame item.\n\n- `iter(p) is p` — an iterator is its own iterable.\n- `peek()` can be called repeatedly; it returns the same item every time.\n- Once exhausted, both `peek()` and `next()` raise `StopIteration` — every time, not just the\n  first.\n- `items` may be a **one-shot** iterator (a generator, a file handle, a stream), so you cannot\n  use `len()`, indexing or `list()` to look ahead. You have to buffer one item.\n\n## 2. `take` — a sync generator, and who runs between resumes\n\n```python\ndef take(items: Iterable[T], k: int) -> Iterator[T]\n```\n\nYield at most `k` items from `items`, stopping early if the source runs out.\n\n- Constructing the generator runs no code; nothing is read before the first `next()`.\n- Each `next()` advances the source by **exactly one** item.\n- `k <= 0` yields nothing and never touches `items`.\n\nThere is no `await` anywhere on this rung. Watch the interleaving, with a source that logs\nevery time it hands out an item:\n\n```text\nlog = []\ng = take(source, 3)\nnext(g)  ->  source logs \"step\",  caller logs \"got 1\"\nnext(g)  ->  source logs \"step\",  caller logs \"got 2\"\nnext(g)  ->  source logs \"step\",  caller logs \"got 3\"\n```\n\nThe generator's frame froze at the `yield` and **the caller kept running** before asking for\nthe next item. That is \"one `next()` = one `yield`\", and it needs no event loop at all.\n\n## 3. `fair_countdown` — an async generator that actually suspends\n\n```python\nasync def fair_countdown(n: int) -> AsyncIterator[int]\n```\n\nYield `n, n-1, ..., 1`, calling `await asyncio.sleep(0)` **before each** item.\n\nThe position of that line is the whole lesson, and only a scheduling test can see it. With one\nother task taking two turns:\n\n```text\nfair_countdown(2):  ['other', 2, 'other', 1]\n```\n\nEvery item is gated — no value is delivered until the loop has given somebody else a turn,\nincluding the *first* one.\n\n:::note\n`await asyncio.sleep(0)` is not a timer. Internally it is a bare `yield` aimed at the **task\ndriver** instead of at a consumer. Same keyword, different recipient, completely different\nconsequence.\n:::\n\n## 4. `burst` — the control group\n\n```python\nasync def burst(n: int) -> AsyncIterator[int]\n```\n\nYield `n, n-1, ..., 1` with **no `await` anywhere**.\n\nThis is the anti-pattern, kept deliberately so the difference is measurable:\n\n```text\nburst(2):           [2, 1, 'other', 'other']\n```\n\nIt is a perfectly valid async generator and still yields one item per `__anext__()`. But each\nof those calls completes **synchronously**, so the consumer drains every item inside one task\nstep, and the other task does not get a turn until the generator is exhausted.\n\n:::warning\nAn async generator that never awaits is indistinguishable, to the scheduler, from\n`iter([n, n-1, ..., 1])`. It only becomes cooperative where it awaits something pending.\n:::\n\n## 5. `drain` — cleanup that always runs\n\n```python\nasync def drain(conn: Connection) -> AsyncIterator[str]\n```\n\n`conn.readline()` is `async` and returns `None` at end of input; `conn.close()` is a plain\nmethod. Yield each line with surrounding whitespace stripped, skipping empty lines.\n`conn.close()` must be called **exactly once**, whether the consumer reads everything, breaks\nout early, or `readline()` raises.\n\n:::details{summary=\"Why does cleanup written after the loop fail?\"}\nWhen the consumer leaves early, the generator is paused **at the `yield`**. Python later calls\n`aclose()`, which throws `GeneratorExit` there. Statements after your loop are never reached;\nonly a `finally` block runs.\n\n```python\nasync def good(conn):\n    try:\n        while (line := await conn.readline()) is not None:\n            yield line.strip()\n    finally:\n        conn.close()              # always runs\n\nasync def bad(conn):\n    while (line := await conn.readline()) is not None:\n        yield line.strip()\n    conn.close()                  # skipped on an early break\n```\n:::\n\n## Worked example\n\n`fair_countdown(2)` and `burst(2)`, each racing one other task that takes two turns:\n\n```text\nfair_countdown      await sleep(0)   other: 'other'\n                    yield 2          consumer: 2\n                    await sleep(0)   other: 'other'\n                    yield 1          consumer: 1\nresult  ['other', 2, 'other', 1]\n\nburst               yield 2          consumer: 2\n                    yield 1          consumer: 1\n                    (exhausted)      other: 'other', 'other'\nresult  [2, 1, 'other', 'other']\n```\n\n## Constraints\n\n- `0 <= n <= 10_000` for both countdowns, and `0 <= k <= 10_000` for `take`.\n- Use `asyncio.sleep(0)` — never a real delay. The tests assert exact interleavings.\n- Standard library only. `test_visible.py` shows some of the tests.\n",
         "hints": [
-          "`countdown`: a plain `for i in range(n, 0, -1)` loop with `await asyncio.sleep(0)` and `yield i` inside works.",
-          "`batched`: keep a list, append each item from `async for`, and yield and reset it when it reaches `size`. Don't forget what's left at the end.",
-          "`read_lines`: wrap the whole loop in `try: ... finally: conn.close()`."
+          "`Peekable` needs one slot of state: the buffered item and whether that slot is filled.\n`__next__` returns the buffer when it is filled and pulls from the source otherwise.\n`__iter__` returns `self`.\n",
+          "`take`: call `iter(items)` once, then loop over `range(max(k, 0))`, pull one item with\n`next()` inside `try/except StopIteration: return`, and `yield` what you pulled.\n",
+          "In `fair_countdown` the only difference from `burst` is where the `await` sits — it must be\n*before* the `yield`, not after it and not missing. In `drain`, wrap the whole `while` loop\nin `try: ... finally: conn.close()`.\n"
         ],
         "files": [
           {
             "path": "solution.py",
             "role": "editable",
-            "content": "import asyncio\nfrom typing import AsyncIterable, AsyncIterator, Protocol, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass Connection(Protocol):\n    async def readline(self) -> str | None: ...\n    def close(self) -> None: ...\n\n\nasync def countdown(n: int) -> AsyncIterator[int]:\n    # yield n, n-1, ..., 1\n    raise NotImplementedError\n    yield  # makes this an async generator\n\n\nasync def batched(stream: AsyncIterable[T], size: int) -> AsyncIterator[list[T]]:\n    raise NotImplementedError\n    yield\n\n\nasync def read_lines(conn: Connection) -> AsyncIterator[str]:\n    raise NotImplementedError\n    yield\n",
+            "content": "import asyncio\nfrom typing import AsyncIterator, Iterable, Iterator, Protocol, TypeVar\n\nT = TypeVar(\"T\")\n\n\nclass Connection(Protocol):\n    async def readline(self) -> str | None: ...\n    def close(self) -> None: ...\n\n\nclass Peekable:\n    \"\"\"A sync iterator that can look one step ahead without consuming.\"\"\"\n\n    def __init__(self, items: Iterable[T]) -> None:\n        raise NotImplementedError\n\n    def __iter__(self) -> \"Peekable\":\n        raise NotImplementedError\n\n    def __next__(self) -> T:\n        raise NotImplementedError\n\n    def peek(self) -> T:\n        raise NotImplementedError\n\n\ndef take(items: Iterable[T], k: int) -> Iterator[T]:\n    \"\"\"Yield at most k items from items, reading lazily.\"\"\"\n    raise NotImplementedError\n    yield  # keep this a generator function\n\n\nasync def fair_countdown(n: int) -> AsyncIterator[int]:\n    \"\"\"Yield n, n-1, ..., 1, awaiting asyncio.sleep(0) before EACH item.\"\"\"\n    raise NotImplementedError\n    yield\n\n\nasync def burst(n: int) -> AsyncIterator[int]:\n    \"\"\"Yield n, n-1, ..., 1 with no await at all. Used as the control group.\"\"\"\n    raise NotImplementedError\n    yield\n\n\nasync def drain(conn: Connection) -> AsyncIterator[str]:\n    \"\"\"Yield stripped non-empty lines, closing conn exactly once.\"\"\"\n    raise NotImplementedError\n    yield\n",
             "language": null
           },
           {
             "path": "test_visible.py",
             "role": "readonly",
-            "content": "import asyncio\n\nfrom solution import batched, countdown, read_lines\n\n\nasync def collect(agen):\n    return [x async for x in agen]\n\n\nasync def aiter_list(items):\n    for x in items:\n        await asyncio.sleep(0)\n        yield x\n\n\nclass FakeConn:\n    def __init__(self, lines):\n        self.lines = list(lines)\n        self.closed = 0\n\n    async def readline(self):\n        await asyncio.sleep(0)\n        return self.lines.pop(0) if self.lines else None\n\n    def close(self):\n        self.closed += 1\n\n\nasync def test_countdown_three():\n    \"\"\"countdown(3) yields 3, 2, 1\"\"\"\n    assert await collect(countdown(3)) == [3, 2, 1]\n\n\nasync def test_batched_uneven():\n    \"\"\"batched splits 5 items into [2, 2, 1]\"\"\"\n    assert await collect(batched(aiter_list([1, 2, 3, 4, 5]), 2)) == [[1, 2], [3, 4], [5]]\n\n\nasync def test_read_lines_closes():\n    \"\"\"read_lines strips, skips blanks, and closes the connection\"\"\"\n    conn = FakeConn([\" a \\n\", \"\\n\", \"b\\n\"])\n    assert await collect(read_lines(conn)) == [\"a\", \"b\"]\n    assert conn.closed == 1\n",
-            "language": null
-          }
-        ],
-        "sections": [],
-        "tests": [],
-        "has_reference": true,
-        "limits": {
-          "timeout_s": 10.0,
-          "memory_mb": null
-        },
-        "benchmark": null
-      }
-    },
-    {
-      "fn": "problem_summary",
-      "args": {
-        "problem": "rate-limiter-service"
-      },
-      "result": {
-        "id": "rate-limiter-service",
-        "title": "Finish the API Rate Limiter",
-        "difficulty": "medium",
-        "tags": [
-          "python",
-          "system-design",
-          "application"
-        ],
-        "track": null,
-        "order": null,
-        "environment": "python",
-        "requires": [
-          "cpu"
-        ],
-        "judge": "pytest"
-      }
-    },
-    {
-      "fn": "public_problem",
-      "args": {
-        "problem": "rate-limiter-service"
-      },
-      "result": {
-        "id": "rate-limiter-service",
-        "title": "Finish the API Rate Limiter",
-        "difficulty": "medium",
-        "tags": [
-          "python",
-          "system-design",
-          "application"
-        ],
-        "track": null,
-        "order": null,
-        "environment": "python",
-        "requires": [
-          "cpu"
-        ],
-        "judge": {
-          "kind": "pytest",
-          "entry": null,
-          "params": null,
-          "compare": "exact"
-        },
-        "description": "You joined a team whose small HTTP-style API service is almost done. The request handler,\nclock and response types are written and **read-only**. What's missing is the rate limiter in\n`app/limiter.py`.\n\n```mermaid\nflowchart LR\n    R[Request] --> S[ApiService.handle]\n    S -->|key = api_key or client_ip| L[TokenBucketLimiter.check]\n    L -->|allowed| H[route handler] --> OK[200]\n    L -->|denied| TM[429 + Retry-After]\n```\n\n### The token bucket\n\nEach key (an API key or a client IP) has a bucket holding at most `capacity` tokens. A new key\nstarts with a **full** bucket. Tokens refill continuously at `refill_per_sec`. That means\nfractional tokens accumulate, but the bucket never goes above `capacity`. Each request costs\n`cost` tokens (default 1).\n\n- If the bucket has at least `cost` tokens, take them. The request is **allowed** and\n  `retry_after` is `0.0`.\n- Otherwise nothing is taken. The request is **denied** and `retry_after` is the number of\n  seconds until enough tokens will exist:\n\n$$\\text{retry\\_after} = \\frac{\\text{cost} - \\text{tokens}}{\\text{refill\\_per\\_sec}}$$\n\n- If `cost > capacity`, the request can never succeed. Raise `ValueError`.\n\nTime comes from the injected `clock` (`clock.now()` returns seconds as a float). Never call\n`time.time()` directly, because the tests use a fake clock.\n\n:::warning\nBuckets for different keys are independent. Read `app/service.py` to see how keys and\nper-route costs are chosen. The `/export` route costs 5 tokens.\n:::\n\n`test_service.py` holds the team's existing tests. Hidden tests check refill math, isolation\nbetween keys, and edge cases.\n",
-        "hints": [
-          "Store `(tokens, last_seen_time)` per key in a dict.",
-          "On each check: `tokens = min(capacity, tokens + (now - last) * refill_per_sec)`, then update `last = now` before deciding.",
-          "Only subtract when allowed. A denied request must not use up tokens."
-        ],
-        "files": [
-          {
-            "path": "app/__init__.py",
-            "role": "readonly",
-            "content": "",
-            "language": null
-          },
-          {
-            "path": "app/clock.py",
-            "role": "readonly",
-            "content": "import time\nfrom typing import Protocol\n\n\nclass Clock(Protocol):\n    def now(self) -> float: ...\n\n\nclass SystemClock:\n    def now(self) -> float:\n        return time.monotonic()\n\n\nclass FakeClock:\n    \"\"\"Manually advanced clock used in tests.\"\"\"\n\n    def __init__(self, start: float = 1000.0) -> None:\n        self._now = start\n\n    def now(self) -> float:\n        return self._now\n\n    def advance(self, seconds: float) -> None:\n        self._now += seconds\n",
-            "language": null
-          },
-          {
-            "path": "app/limiter.py",
-            "role": "editable",
-            "content": "from dataclasses import dataclass\n\nfrom app.clock import Clock\n\n\n@dataclass(frozen=True)\nclass Decision:\n    allowed: bool\n    retry_after: float = 0.0\n\n\nclass TokenBucketLimiter:\n    def __init__(self, capacity: float, refill_per_sec: float, clock: Clock) -> None:\n        self.capacity = capacity\n        self.refill_per_sec = refill_per_sec\n        self.clock = clock\n        # TODO: per-key state\n\n    def check(self, key: str, cost: float = 1.0) -> Decision:\n        # TODO: implement the token bucket described in the problem\n        return Decision(allowed=True)\n",
-            "language": null
-          },
-          {
-            "path": "app/service.py",
-            "role": "readonly",
-            "content": "from dataclasses import dataclass, field\n\nfrom app.limiter import TokenBucketLimiter\n\nROUTE_COST = {\"/export\": 5.0}\n\n\n@dataclass\nclass Request:\n    path: str\n    client_ip: str\n    api_key: str | None = None\n\n\n@dataclass\nclass Response:\n    status: int\n    body: str = \"\"\n    headers: dict[str, str] = field(default_factory=dict)\n\n\nclass ApiService:\n    def __init__(self, limiter: TokenBucketLimiter) -> None:\n        self.limiter = limiter\n\n    def handle(self, req: Request) -> Response:\n        key = f\"key:{req.api_key}\" if req.api_key else f\"ip:{req.client_ip}\"\n        decision = self.limiter.check(key, ROUTE_COST.get(req.path, 1.0))\n        if not decision.allowed:\n            return Response(429, \"rate limited\",\n                            {\"Retry-After\": f\"{decision.retry_after:.3f}\"})\n        return Response(200, f\"ok {req.path}\")\n",
-            "language": null
-          },
-          {
-            "path": "test_service.py",
-            "role": "readonly",
-            "content": "from app.clock import FakeClock\nfrom app.limiter import TokenBucketLimiter\nfrom app.service import ApiService, Request\n\n\ndef make(capacity=3, rate=1.0):\n    clock = FakeClock()\n    return clock, ApiService(TokenBucketLimiter(capacity, rate, clock))\n\n\ndef test_allows_up_to_capacity():\n    \"\"\"a new client can make `capacity` requests at once\"\"\"\n    _, svc = make()\n    assert [svc.handle(Request(\"/\", \"1.1.1.1\")).status for _ in range(3)] == [200] * 3\n\n\ndef test_denies_when_empty():\n    \"\"\"the next request gets 429 and a Retry-After header\"\"\"\n    _, svc = make()\n    for _ in range(3):\n        svc.handle(Request(\"/\", \"1.1.1.1\"))\n    res = svc.handle(Request(\"/\", \"1.1.1.1\"))\n    assert res.status == 429\n    assert float(res.headers[\"Retry-After\"]) == 1.0\n\n\ndef test_refills_over_time():\n    \"\"\"waiting one second refills one token\"\"\"\n    clock, svc = make()\n    for _ in range(3):\n        svc.handle(Request(\"/\", \"1.1.1.1\"))\n    clock.advance(1.0)\n    assert svc.handle(Request(\"/\", \"1.1.1.1\")).status == 200\n",
+            "content": "\"\"\"Visible tests, one worked example per question type.\n\nThe five question types are declared as pytest classes, so the run results show\nthem as collapsible section headers instead of one flat list:\n\n    1. TestValuesAndOrder    does it produce the right items, in order?\n    2. TestIteratorProtocol  is it really an iterator - iter(), peek(), StopIteration?\n    3. TestLaziness          is anything read before it is asked for?\n    4. TestTaskSuspension    does an await hand the loop a turn?\n    5. TestCleanup           does close() run on every exit path?\n\n`TestTaskSuspension` gets a deliberately weak example: it only checks that the\nother task ran before the first item. The exact interleaving is graded in\ntest_hidden.py.\n\"\"\"\n\nimport asyncio\n\nfrom solution import Peekable, burst, drain, fair_countdown, take\n\n\n# ---------------------------------------------------------------------------\n# Helpers - also imported by test_hidden.py\n# ---------------------------------------------------------------------------\n\n\nclass FakeConn:\n    \"\"\"An async line source that counts how many times it was closed.\"\"\"\n\n    def __init__(self, lines):\n        self.lines = list(lines)\n        self.closed = 0\n\n    async def readline(self):\n        await asyncio.sleep(0)\n        return self.lines.pop(0) if self.lines else None\n\n    def close(self):\n        self.closed += 1\n\n\nclass LogSource:\n    \"\"\"A one-shot iterator that records every time it is stepped.\"\"\"\n\n    def __init__(self, items, log):\n        self._it = iter(items)\n        self.log = log\n\n    def __iter__(self):\n        return self\n\n    def __next__(self):\n        self.log.append(\"step\")\n        return next(self._it)\n\n\nasync def collect(agen):\n    \"\"\"Drain an async generator into a list.\"\"\"\n    return [x async for x in agen]\n\n\n# ---------------------------------------------------------------------------\n# 1. Values and order\n# ---------------------------------------------------------------------------\n\n\nclass TestValuesAndOrder:\n    \"\"\"Does it produce the right items, in the right order?\"\"\"\n\n    async def test_fair_countdown_values(self):\n        \"\"\"fair_countdown(n) yields n, n-1, ..., 1\"\"\"\n        assert await collect(fair_countdown(3)) == [3, 2, 1]\n\n    async def test_burst_values(self):\n        \"\"\"burst(n) yields the same values; only *when* they arrive differs\"\"\"\n        assert await collect(burst(3)) == [3, 2, 1]\n\n\n# ---------------------------------------------------------------------------\n# 2. Iterator protocol\n# ---------------------------------------------------------------------------\n\n\nclass TestIteratorProtocol:\n    \"\"\"Is it really an iterator - iter(), peek(), StopIteration?\"\"\"\n\n    def test_peekable_peek_lookahead(self):\n        \"\"\"peek() shows the next item without consuming it\"\"\"\n        p = Peekable([1, 2])\n        assert iter(p) is p\n        assert p.peek() == 1\n        assert p.peek() == 1\n        assert next(p) == 1\n        assert next(p) == 2\n\n\n# ---------------------------------------------------------------------------\n# 3. Laziness\n# ---------------------------------------------------------------------------\n\n\nclass TestLaziness:\n    \"\"\"Is anything read before it is asked for?\"\"\"\n\n    def test_take_is_lazy(self):\n        \"\"\"take() reads nothing until the first next()\"\"\"\n        log = []\n\n        def source():\n            for i in [1, 2, 3]:\n                log.append(\"read\")\n                yield i\n\n        g = take(source(), 2)\n        assert log == []\n        assert next(g) == 1\n        assert log == [\"read\"]\n\n\n# ---------------------------------------------------------------------------\n# 4. Task suspension\n# ---------------------------------------------------------------------------\n\n\nclass TestTaskSuspension:\n    \"\"\"Does an await hand the event loop a turn?\"\"\"\n\n    async def test_await_lets_the_other_task_run_first(self):\n        \"\"\"the first value arrives only after another task has had a turn\n\n        Deliberately weaker than the hidden tests: this only checks that the\n        other task ran *before* the first item. The exact interleaving for both\n        countdowns is what the hidden tests grade - see the description's\n        \"Worked example\" for the full expected order.\n        \"\"\"\n        seen = []\n\n        async def other():\n            seen.append(\"other\")\n            await asyncio.sleep(0)\n\n        async def consume():\n            async for n in fair_countdown(3):\n                seen.append(n)\n\n        await asyncio.gather(consume(), other())\n        assert seen.index(\"other\") < seen.index(3)\n\n\n# ---------------------------------------------------------------------------\n# 5. Cleanup\n# ---------------------------------------------------------------------------\n\n\nclass TestCleanup:\n    \"\"\"Does close() run on every exit path, exactly once?\"\"\"\n\n    async def test_drain_strips_and_closes(self):\n        \"\"\"drain() strips, skips blanks, and closes the connection\"\"\"\n        conn = FakeConn([\" a \\n\", \"\\n\", \"b\\n\"])\n        assert await collect(drain(conn)) == [\"a\", \"b\"]\n        assert conn.closed == 1\n",
             "language": null
           }
         ],
@@ -395,8 +300,8 @@
           "transformers",
           "inference"
         ],
-        "track": "ml-fundamentals",
-        "order": 1,
+        "track": null,
+        "order": null,
         "environment": "pytorch",
         "requires": [
           "gpu"
@@ -419,8 +324,8 @@
           "transformers",
           "inference"
         ],
-        "track": "ml-fundamentals",
-        "order": 1,
+        "track": null,
+        "order": null,
         "environment": "pytorch",
         "requires": [
           "gpu"
@@ -503,6 +408,288 @@
             "visible": false,
             "description": null,
             "section": null
+          }
+        ],
+        "has_reference": true,
+        "limits": {
+          "timeout_s": 60.0,
+          "memory_mb": null
+        },
+        "benchmark": null
+      }
+    },
+    {
+      "fn": "problem_summary",
+      "args": {
+        "problem": "cuda-vector-add"
+      },
+      "result": {
+        "id": "cuda-vector-add",
+        "title": "Your First CUDA Kernel",
+        "difficulty": "intro",
+        "tags": [
+          "cuda",
+          "gpu",
+          "kernels"
+        ],
+        "track": null,
+        "order": null,
+        "environment": "cuda",
+        "requires": [
+          "cuda"
+        ],
+        "judge": "script"
+      }
+    },
+    {
+      "fn": "public_problem",
+      "args": {
+        "problem": "cuda-vector-add"
+      },
+      "result": {
+        "id": "cuda-vector-add",
+        "title": "Your First CUDA Kernel",
+        "difficulty": "intro",
+        "tags": [
+          "cuda",
+          "gpu",
+          "kernels"
+        ],
+        "track": null,
+        "order": null,
+        "environment": "cuda",
+        "requires": [
+          "cuda"
+        ],
+        "judge": {
+          "kind": "script",
+          "entry": null,
+          "params": null,
+          "compare": "exact"
+        },
+        "description": "A CUDA **kernel** is a function that runs on the GPU, many copies at once. Each copy is a\n**thread** with its own index. Threads are grouped into **blocks**, and blocks form a **grid**.\nYou choose the shape when you launch the kernel:\n\n```cpp\nmy_kernel<<<num_blocks, threads_per_block>>>(args...);\n```\n\nInside the kernel, a thread computes its global index from built-in variables:\n\n$$i = \\texttt{blockIdx.x} \\cdot \\texttt{blockDim.x} + \\texttt{threadIdx.x}$$\n\n:::figure{caption=\"A grid of 3 blocks with 4 threads each covers indices 0-11\"}\n<svg viewBox=\"0 0 372 64\" width=\"372\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"monospace\" font-size=\"10\">\n  <g fill=\"none\" stroke=\"currentColor\">\n    <rect x=\"2\" y=\"16\" width=\"120\" height=\"30\"/><rect x=\"126\" y=\"16\" width=\"120\" height=\"30\"/><rect x=\"250\" y=\"16\" width=\"120\" height=\"30\"/>\n  </g>\n  <g fill=\"currentColor\" opacity=\"0.25\">\n    <rect x=\"6\" y=\"20\" width=\"26\" height=\"22\"/><rect x=\"35\" y=\"20\" width=\"26\" height=\"22\"/><rect x=\"64\" y=\"20\" width=\"26\" height=\"22\"/><rect x=\"93\" y=\"20\" width=\"26\" height=\"22\"/>\n    <rect x=\"130\" y=\"20\" width=\"26\" height=\"22\"/><rect x=\"159\" y=\"20\" width=\"26\" height=\"22\"/><rect x=\"188\" y=\"20\" width=\"26\" height=\"22\"/><rect x=\"217\" y=\"20\" width=\"26\" height=\"22\"/>\n    <rect x=\"254\" y=\"20\" width=\"26\" height=\"22\"/><rect x=\"283\" y=\"20\" width=\"26\" height=\"22\"/><rect x=\"312\" y=\"20\" width=\"26\" height=\"22\"/><rect x=\"341\" y=\"20\" width=\"26\" height=\"22\"/>\n  </g>\n  <g fill=\"currentColor\"><text x=\"40\" y=\"11\">block 0</text><text x=\"164\" y=\"11\">block 1</text><text x=\"288\" y=\"11\">block 2</text>\n  <text x=\"14\" y=\"58\">0</text><text x=\"43\" y=\"58\">1</text><text x=\"72\" y=\"58\">2</text><text x=\"101\" y=\"58\">3</text><text x=\"138\" y=\"58\">4</text><text x=\"355\" y=\"58\">11</text></g>\n</svg>\n:::\n\n### Your task\n\nIn `kernel.cu`:\n\n1. Write the kernel `vector_add(a, b, c, n)` that sets `c[i] = a[i] + b[i]` for every\n   `i < n`. The grid is usually bigger than `n`, so threads with `i >= n` must do nothing.\n2. Write `launch_vector_add(d_a, d_b, d_c, n)`. It receives **device** pointers and launches\n   the kernel with 256 threads per block and enough blocks to cover all `n` elements:\n   $\\lceil n / 256 \\rceil$, or `(n + 255) / 256` in integer arithmetic.\n\nThe hidden harness allocates the device memory, copies the inputs, calls your launcher, and\nchecks every element against a CPU computation. Sizes include `n = 1` and sizes that aren't a\nmultiple of 256.\n\n:::warning\nThis problem needs an NVIDIA GPU. Run it on a CUDA executor: a local Linux machine, or a remote\nSSH or SLURM machine configured in `~/.config/leegen/executors.yaml`.\n:::\n",
+        "hints": [
+          "Inside the kernel: `int i = blockIdx.x * blockDim.x + threadIdx.x; if (i < n) c[i] = a[i] + b[i];`",
+          "Launcher: `int blocks = (n + 255) / 256; vector_add<<<blocks, 256>>>(d_a, d_b, d_c, n);`"
+        ],
+        "files": [
+          {
+            "path": "kernel.cu",
+            "role": "editable",
+            "content": "#include \"kernel.h\"\n\n__global__ void vector_add(const float* a, const float* b, float* c, int n) {\n    // TODO: compute this thread's global index and add one element\n}\n\nvoid launch_vector_add(const float* d_a, const float* d_b, float* d_c, int n) {\n    // TODO: launch vector_add with 256 threads per block\n}\n",
+            "language": null
+          },
+          {
+            "path": "kernel.h",
+            "role": "readonly",
+            "content": "#pragma once\n\n__global__ void vector_add(const float* a, const float* b, float* c, int n);\n\n// d_a, d_b, d_c are device pointers holding n floats\nvoid launch_vector_add(const float* d_a, const float* d_b, float* d_c, int n);\n",
+            "language": null
+          }
+        ],
+        "sections": [],
+        "tests": [],
+        "has_reference": true,
+        "limits": {
+          "timeout_s": 30.0,
+          "memory_mb": null
+        },
+        "benchmark": null
+      }
+    },
+    {
+      "fn": "problem_summary",
+      "args": {
+        "problem": "webgpu-tiled-matmul"
+      },
+      "result": {
+        "id": "webgpu-tiled-matmul",
+        "title": "Tiled Matrix Multiply in WebGPU",
+        "difficulty": "hard",
+        "tags": [
+          "webgpu",
+          "wgsl",
+          "gpu",
+          "matmul",
+          "tiling",
+          "shared-memory"
+        ],
+        "track": null,
+        "order": null,
+        "environment": "webgpu",
+        "requires": [
+          "webgpu"
+        ],
+        "judge": "function"
+      }
+    },
+    {
+      "fn": "public_problem",
+      "args": {
+        "problem": "webgpu-tiled-matmul"
+      },
+      "result": {
+        "id": "webgpu-tiled-matmul",
+        "title": "Tiled Matrix Multiply in WebGPU",
+        "difficulty": "hard",
+        "tags": [
+          "webgpu",
+          "wgsl",
+          "gpu",
+          "matmul",
+          "tiling",
+          "shared-memory"
+        ],
+        "track": null,
+        "order": null,
+        "environment": "webgpu",
+        "requires": [
+          "webgpu"
+        ],
+        "judge": {
+          "kind": "function",
+          "entry": "_host.py:matmul",
+          "params": [
+            "a",
+            "b"
+          ],
+          "compare": "float"
+        },
+        "description": "Multiply an $m \\times k$ matrix $A$ by a $k \\times n$ matrix $B$:\n\n$$C_{rc} = \\sum_{i=0}^{k-1} A_{ri}\\, B_{ic}$$\n\nAll matrices are `f32`, stored **row-major** in flat arrays (`A[r][i]` is `a[r * k + i]`).\nThe host launches a 2-D grid of $16 \\times 16$ workgroups, one invocation per element of $C$:\n`gid.x` is the column and `gid.y` is the row.\n\n### Why tile\n\nA naive kernel reads $2k$ values from storage for each output. Neighbouring invocations read\nthe same rows and columns again and again. Tiling loads each $16 \\times 16$ block of $A$ and of\n$B$ into `var<workgroup>` memory **once per workgroup**, and every invocation reuses it 16\ntimes:\n\n```mermaid\nflowchart LR\n    subgraph per tile t\n        LA[\"load A block (row tile, column tile t)\"] --> BAR1[workgroupBarrier]\n        LB[\"load B block (row tile t, column tile)\"] --> BAR1\n        BAR1 --> MAC[\"16 multiply-adds from workgroup memory\"]\n        MAC --> BAR2[workgroupBarrier]\n    end\n    BAR2 -->|next t| LA\n    BAR2 -->|done| W[\"write C[row][col] when inside m x n\"]\n```\n\nPad with zeros when a block reaches past the edge of $A$ or $B$. Matrix sizes are not\nmultiples of 16, and every invocation must still reach both barriers, including those outside\n$C$.\n\n:::note\n**If you know CUDA:** this is the classic shared-memory tiled SGEMM. Here `tile_a` and\n`tile_b` are `__shared__ float[16][16]`, and the two barriers are the two `__syncthreads()`\ncalls.\n:::\n\n### Bindings\n\n| Binding | Variable | Contents |\n|---|---|---|\n| 0 | `a: array<f32>` (read) | $A$, $m \\cdot k$ values |\n| 1 | `b: array<f32>` (read) | $B$, $k \\cdot n$ values |\n| 2 | `c: array<f32>` (read_write) | $C$, $m \\cdot n$ values |\n| 3 | `dims: Dims` (uniform) | `m`, `k`, `n` |\n\nThe host passes $A$ and $B$ as lists of rows and returns $C$ as a list of rows. The comparison\nuses a relative tolerance. On the largest case it also reports the GPU time of your kernel\n(timestamp queries, rounded by the browser to about 0.1 ms) as a metric.\n\n### Example\n\n```text\nA = [[1, 2],      B = [[5, 6],      C = [[19, 22],\n     [3, 4]]           [7, 8]]           [43, 50]]\n```\n",
+        "hints": [
+          "Start with a correct naive kernel (loop over `i`, read `a` and `b` directly), then add tiling.",
+          "Per tile `t`, invocation (lid.x, lid.y) loads `A[row][t*16 + lid.x]` into `tile_a[lid.y][lid.x]` and `B[t*16 + lid.y][col]` into `tile_b[lid.y][lid.x]`, or 0 when out of range.",
+          "The tile loop runs `(k + 15) / 16` times for every invocation. Don't return early for invocations outside C; only skip the final write."
+        ],
+        "files": [
+          {
+            "path": "kernel.wgsl",
+            "role": "editable",
+            "content": "struct Dims { m: u32, k: u32, n: u32, _pad: u32 }\n\n@group(0) @binding(0) var<storage, read> a: array<f32>;\n@group(0) @binding(1) var<storage, read> b: array<f32>;\n@group(0) @binding(2) var<storage, read_write> c: array<f32>;\n@group(0) @binding(3) var<uniform> dims: Dims;\n\nconst TILE: u32 = 16u;\nvar<workgroup> tile_a: array<array<f32, 16>, 16>;\nvar<workgroup> tile_b: array<array<f32, 16>, 16>;\n\n@compute @workgroup_size(16, 16)\nfn main(@builtin(global_invocation_id) gid: vec3<u32>,\n        @builtin(local_invocation_id) lid: vec3<u32>) {\n    let row = gid.y;\n    let col = gid.x;\n    // TODO: c[row * dims.n + col] = sum over i of a[row * dims.k + i] * b[i * dims.n + col]\n}\n",
+            "language": null
+          }
+        ],
+        "sections": [
+          {
+            "id": "basics",
+            "title": "Basics",
+            "description": "The example and a non-square product."
+          },
+          {
+            "id": "edges",
+            "title": "Edges",
+            "description": "Sizes that are not multiples of the tile, thin matrices."
+          },
+          {
+            "id": "scale",
+            "title": "Scale",
+            "description": "A 256 x 256 product; reports the kernel's GPU time."
+          }
+        ],
+        "tests": [
+          {
+            "name": "Example",
+            "visible": true,
+            "description": "The 2 x 2 example from the statement.",
+            "section": "basics",
+            "input": {
+              "args": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "expected": [
+              [
+                19,
+                22
+              ],
+              [
+                43,
+                50
+              ]
+            ]
+          },
+          {
+            "name": "Rectangular",
+            "visible": true,
+            "description": "(2 x 3) times (3 x 1).",
+            "section": "basics",
+            "input": {
+              "args": [
+                [
+                  [
+                    1,
+                    2,
+                    3
+                  ],
+                  [
+                    4,
+                    5,
+                    6
+                  ]
+                ],
+                [
+                  [
+                    1
+                  ],
+                  [
+                    0
+                  ],
+                  [
+                    -1
+                  ]
+                ]
+              ]
+            },
+            "expected": [
+              [
+                -2
+              ],
+              [
+                -2
+              ]
+            ]
+          },
+          {
+            "name": "Ragged tiles",
+            "visible": false,
+            "description": "37 x 23 times 23 x 41, every dimension cuts a tile.",
+            "section": "edges"
+          },
+          {
+            "name": "Long inner dimension",
+            "visible": false,
+            "description": "k = 300 spans 19 tiles.",
+            "section": "edges"
+          },
+          {
+            "name": "Single row and column",
+            "visible": false,
+            "description": null,
+            "section": "edges"
+          },
+          {
+            "name": "256 x 256",
+            "visible": false,
+            "description": null,
+            "section": "scale"
           }
         ],
         "has_reference": true,

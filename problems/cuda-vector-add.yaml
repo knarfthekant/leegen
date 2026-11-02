@@ -3,8 +3,6 @@ id: cuda-vector-add
 title: Your First CUDA Kernel
 difficulty: intro
 tags: [cuda, gpu, kernels]
-track: cuda-101
-order: 1
 environment: cuda
 requires: [cuda]
 description: |

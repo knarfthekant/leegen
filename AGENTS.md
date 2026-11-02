@@ -119,10 +119,12 @@ Short version:
 8. `id` is a lowercase slug and must equal the file name. Use `track` + `order` for multi-part
    curricula (for example `cuda-101`, orders 1..N).
 
-Good examples to copy from: `merge-ranges` (function + generator), `py-async-generators`
-(pytest, learning-style), `rate-limiter-service` (half-built multi-file app), `kv-cache-basics`
-(PyTorch on GPU, tensor generators, allclose), `triton-vector-add` (Triton, NVIDIA),
-`cuda-vector-add` (script judge with a hidden CUDA harness using `<leegen/judge.h>`).
+The five signature seeds are `merge-ranges` (Python algorithms, function + generator),
+`iterators-and-await` (Python language features, visible and hidden pytest suites),
+`kv-cache-basics` (PyTorch on GPU, tensor generators, allclose), `cuda-vector-add` (script
+judge with a hidden CUDA harness using `<leegen/judge.h>`), and `webgpu-tiled-matmul`
+(WGSL, workgroup memory, barriers and GPU timing). A multi-file application example is kept
+as the regression fixture `server/tests/fixtures/rate-limiter-service.yaml`.
 
 ## Tutoring protocol
 

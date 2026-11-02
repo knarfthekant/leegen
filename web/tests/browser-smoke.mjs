@@ -9,7 +9,7 @@ import { chromium } from "playwright-core";
 const APP = process.env.LEEGEN_APP ?? "http://localhost:13380";
 const SHOTS = process.env.SHOTS ?? "/tmp";
 const PID = "merge-ranges";
-const PYTHON_SEEDS = ["merge-ranges", "iterators-and-await", "py-async-generators", "rate-limiter-service"];
+const PYTHON_SEEDS = ["merge-ranges", "iterators-and-await"];
 const SOLUTION = `def merge_ranges(bookings):
     merged = []
     for start, end in sorted(bookings):
@@ -94,6 +94,9 @@ try {
   step("list page loads the seeds from the static bundle into IndexedDB");
   await page.goto(APP + "/");
   await page.getByText("Merge Booking Ranges").first().waitFor();
+  const seeds = await page.locator(".problem-row").count();
+  if (seeds !== 5) throw new Error(`expected 5 signature seed problems, got ${seeds}`);
+  await page.getByRole("button", { name: "Minimize Codex guide" }).click();
   const isolated = await page.evaluate(() => crossOriginIsolated);
   if (!isolated) throw new Error("the app page is not cross-origin isolated");
 
@@ -218,13 +221,12 @@ try {
   if (!hasGpu) {
     console.log("  skipped: no WebGPU adapter in this browser");
   } else {
-    for (const id of ["webgpu-vector-add", "webgpu-reduction", "webgpu-tiled-matmul"]) {
-      const report = await tool("validate_problem_yaml", { yaml: (await tool("get_problem", { problem_id: id })).yaml });
-      console.log(`  ${id}: ok=${report.ok} ${report.summary}`);
-      if (!report.ok) throw new Error(`${id}: ${JSON.stringify(report.issues)}`);
-    }
-    await tool("open_problem", { problem_id: "webgpu-vector-add" });
-    await page.locator(".title", { hasText: "Vector Add" }).waitFor();
+    const id = "webgpu-tiled-matmul";
+    const report = await tool("validate_problem_yaml", { yaml: (await tool("get_problem", { problem_id: id })).yaml });
+    console.log(`  ${id}: ok=${report.ok} ${report.summary}`);
+    if (!report.ok) throw new Error(`${id}: ${JSON.stringify(report.issues)}`);
+    await tool("open_problem", { problem_id: id });
+    await page.locator(".title", { hasText: "Tiled Matrix" }).waitFor();
     await page.waitForFunction(() => window.monaco.editor.getEditors().some((e) => e.getModel()?.getLanguageId() === "wgsl"));
     await editor((m, ed) => ed.getModel().setValue("@compute @workgroup_size(64)\nfn main() {\n    let x: f32 = 1u;\n}\n"));
     await page.waitForTimeout(700);
@@ -233,18 +235,13 @@ try {
     if (!/kernel\.wgsl:3:\d+/.test(msg)) throw new Error("compile errors should point at kernel.wgsl:3: " + msg);
     console.log("  compile error: " + msg.split("\n").find((l) => l.includes("kernel.wgsl:")).trim().slice(0, 100));
     const ref = (yaml) => yaml.split("reference:")[1].split("content: |\n")[1].split("\n").filter((l, i, all) => all.slice(0, i + 1).every((x) => x.startsWith("        ") || !x.trim())).map((l) => l.slice(8)).join("\n");
-    await editor((m, ed, code) => ed.getModel().setValue(code), ref((await tool("get_problem", { problem_id: "webgpu-vector-add" })).yaml));
+    await editor((m, ed, code) => ed.getModel().setValue(code), ref((await tool("get_problem", { problem_id: id })).yaml));
     await page.waitForTimeout(700);
     await page.keyboard.press("ControlOrMeta+Enter");
     const gpuStatus = await resultStatus();
     console.log("  result:", (await page.locator(".result-head").innerText()).replace(/\s+/g, " "));
-    if (gpuStatus !== "Accepted") throw new Error(`webgpu-vector-add: expected Accepted, got ${gpuStatus}`);
+    if (gpuStatus !== "Accepted") throw new Error(`${id}: expected Accepted, got ${gpuStatus}`);
     await page.screenshot({ path: `${SHOTS}/lc-browser-webgpu.png` });
-    await tool("open_problem", { problem_id: "webgpu-tiled-matmul" });
-    await page.locator(".title", { hasText: "Tiled Matrix" }).waitFor();
-    await page.waitForFunction(() => window.monaco.editor.getEditors().some((e) => e.getModel()?.getLanguageId() === "wgsl"));
-    await editor((m, ed, code) => ed.getModel().setValue(code), ref((await tool("get_problem", { problem_id: "webgpu-tiled-matmul" })).yaml));
-    await page.waitForTimeout(700);
     const mm = await tool("run_tests", {});
     if (mm.status !== "passed") throw new Error("matmul reference: " + JSON.stringify(mm).slice(0, 500));
     console.log("  matmul metrics:", JSON.stringify(mm.metrics));
@@ -278,7 +275,7 @@ try {
   const offline = await tool("run_tests", { problem_id: PID });
   console.log(`  offline run: ${offline.status} (${offline.passed}/${offline.total})`);
   if (offline.status !== "passed") throw new Error("offline run: " + JSON.stringify(offline).slice(0, 400));
-  const offlineValidate = await tool("validate_problem_yaml", { yaml: (await tool("get_problem", { problem_id: "py-async-generators" })).yaml });
+  const offlineValidate = await tool("validate_problem_yaml", { yaml: (await tool("get_problem", { problem_id: "iterators-and-await" })).yaml });
   if (!offlineValidate.ok) throw new Error("offline validation (loads pytest): " + JSON.stringify(offlineValidate.issues));
   await context.setOffline(false);
 

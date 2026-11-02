@@ -7,8 +7,6 @@ tags:
   - asyncio
   - iterators
   - generators
-track: python-fundamentals
-order: 2
 environment: python
 requires: [cpu]
 description: |

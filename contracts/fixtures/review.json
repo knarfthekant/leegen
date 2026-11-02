@@ -746,7 +746,7 @@
     {
       "fn": "make_custom_test",
       "args": {
-        "problem": "py-async-generators",
+        "problem": "iterators-and-await",
         "existing": [],
         "args": []
       },

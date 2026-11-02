@@ -1,10 +1,8 @@
 schema_version: 1
 id: webgpu-tiled-matmul
-title: "WebGPU 3: Tiled Matrix Multiply"
+title: Tiled Matrix Multiply in WebGPU
 difficulty: hard
 tags: [webgpu, wgsl, gpu, matmul, tiling, shared-memory]
-track: webgpu-101
-order: 3
 environment: webgpu
 requires: [webgpu]
 description: |

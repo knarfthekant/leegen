@@ -85,21 +85,22 @@ async def test_hard_crash_marks_remaining_tests():
 
 
 async def test_pytest_judge():
-    ref = await run("rate-limiter-service", mode="reference")
+    p = parse_problem_yaml((FIXTURES / "rate-limiter-service.yaml").read_text())
+    ref = await run(p, mode="reference")
     assert ref.status == "passed" and ref.total == 9
     visible = {t.name for t in ref.tests if t.visible}
     assert "test_allows_up_to_capacity" in visible
     assert "test_keys_are_independent" not in visible
-    starter = await run("rate-limiter-service")
+    starter = await run(p)
     statuses = {t.name: t.status for t in starter.tests}
     assert statuses["test_denies_when_empty"] == "fail"
     assert statuses["test_cost_above_capacity_raises"] == "fail"  # pytest.raises -> fail, not error
 
 
 async def test_pytest_async_tests_and_docstrings():
-    r = await run("py-async-generators", mode="reference")
+    r = await run("iterators-and-await", mode="reference")
     assert r.status == "passed"
-    assert any(t.description == "countdown(3) yields 3, 2, 1" for t in r.tests)
+    assert any(t.description == "fair_countdown(n) yields n, n-1, ..., 1" for t in r.tests)
 
 
 @pytest.mark.skipif(shutil.which("c++") is None, reason="no C++ compiler")

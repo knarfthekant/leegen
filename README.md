@@ -35,6 +35,19 @@ multi-file services, WebGPU, PyTorch, Triton, or CUDA kernels.
 - **Your choice of setup:** open the hosted app or run a local server. Export, import, or manually
   sync files to move problems and work between editions.
 
+## Five signature examples
+
+The starter collection has one example for each technology or programming style. Your agent
+can create more problems whenever you need them.
+
+| Focus | Problem | Judge |
+| --- | --- | --- |
+| CUDA | [Your First CUDA Kernel](problems/cuda-vector-add.yaml) | Compiled CUDA harness |
+| PyTorch | [Decode with a KV Cache](problems/kv-cache-basics.yaml) | Tensor inputs and numerical comparisons |
+| Python algorithms | [Merge Booking Ranges](problems/merge-ranges.yaml) | Function tests with generated inputs |
+| Python language features | [Iterators, Await, and the Two Kinds of Suspension](problems/iterators-and-await.yaml) | Visible and hidden pytest suites |
+| WebGPU | [Tiled Matrix Multiply in WebGPU](problems/webgpu-tiled-matmul.yaml) | WGSL kernel tests and GPU timing |
+
 ## Choose an edition
 
 Both editions use the same problem format, editor, test harness, and core validation rules.

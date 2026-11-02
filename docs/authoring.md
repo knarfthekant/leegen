@@ -310,13 +310,14 @@ A good description has:
 
 - **Learning (language features):** `pytest` judge, `intro`/`easy`. Explain the concept in the
   description, ask for 2–4 small functions, and test each property separately. Example:
-  `py-async-generators`.
+  `iterators-and-await`.
 - **Algorithm (LeetCode-style):** `function` judge, literal expected values for small cases,
   `gen` + `from_reference` for large random cases, timeout tuned to reject brute force. Example:
   `merge-ranges`.
 - **Application (half-built code):** several `readonly` files forming a working system, one
   `editable` file with the missing component, `test_visible.py` + `test_hidden.py`. Describe the
-  architecture with a mermaid diagram. Example: `rate-limiter-service`.
+  architecture with a mermaid diagram. A complete example lives in the regression fixture
+  `server/tests/fixtures/rate-limiter-service.yaml`.
 - **ML fundamentals:** `pytorch` environment, `requires: [gpu]`, `function` judge with tensor
   generators and `allclose`. Put helpers in `readonly` files and keep the user's task focused.
   Example: `kv-cache-basics`.
@@ -324,8 +325,8 @@ A good description has:
   checks results against a CPU computation and prints result events with
   `#include <leegen/judge.h>` (`lc::test`, `lc::error`, `lc::metric`; compile with
   `-I{bundle}/_lc/include`). These only run on NVIDIA executors (local Linux box, SSH host,
-  SLURM cluster). Examples: `cuda-vector-add` (script), `triton-vector-add` (function judge with
-  Triton).
+  SLURM cluster). Example: `cuda-vector-add` (script). Triton exercises use the `triton`
+  environment and the `function` judge instead.
 - **GPU in the browser (WebGPU):** `webgpu` environment, `requires: [webgpu]`, browser edition
   only. The editable file is a `kernel.wgsl`. A hidden `_host.py` is the `function` judge's entry:
   it packs the inputs, calls `leegen_harness.webgpu.dispatch(wg.source("kernel.wgsl",
@@ -335,8 +336,7 @@ A good description has:
   `kernel.wgsl:line:col`. `timed=True` puts the pass's GPU time in `wg.last_gpu_ms` (timestamp
   queries, rounded to ~0.1 ms) for a `metric` event. Teach the concepts that carry over to CUDA
   (workgroups ≈ blocks, `var<workgroup>` ≈ shared memory, `workgroupBarrier()` ≈
-  `__syncthreads()`). Examples: the `webgpu-101` track (`webgpu-vector-add`,
-  `webgpu-reduction`, `webgpu-tiled-matmul`).
+  `__syncthreads()`). Example: `webgpu-tiled-matmul`.
 
 ## 7. Checklist before `create_problem`
 

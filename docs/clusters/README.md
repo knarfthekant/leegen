@@ -120,7 +120,6 @@ GPU backend, run the CUDA and PyTorch references:
 ```bash
 uv run leegen run cuda-vector-add --reference --executor my-cluster
 uv run leegen run kv-cache-basics --reference --executor my-cluster
-uv run leegen run triton-vector-add --reference --executor my-cluster
 ```
 
 Use a CPU exercise such as `merge-ranges` for a CPU-only host. To validate both reference
