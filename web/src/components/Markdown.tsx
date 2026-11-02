@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from "react";
+import { memo, useEffect, useState, type ImgHTMLAttributes, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
@@ -9,6 +9,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { visit } from "unist-util-visit";
 import "katex/dist/katex.min.css";
+import { getBackend } from "../backend";
 import { Mermaid } from "./Mermaid";
 
 /* Directives:  :::note  :::warning  :::details{summary="..."}  :::figure{caption="..."} */
@@ -84,9 +85,21 @@ const schema = {
   },
 };
 
-function resolveAsset(problemId: string | undefined, src: string | undefined) {
-  if (!src || !problemId || /^(https?:|data:|\/)/.test(src)) return src;
-  return `/api/problems/${encodeURIComponent(problemId)}/${src.replace(/^\.\//, "")}`;
+/** Images from the problem's assets/ come from the backend (server URL or a browser blob URL). */
+function AssetImg({ problemId, src, alt, ...rest }: ImgHTMLAttributes<HTMLImageElement> & { problemId?: string }) {
+  const external = !src || !problemId || /^(https?:|data:|blob:|\/)/.test(String(src));
+  const [url, setUrl] = useState<string | undefined>(external ? (src as string | undefined) : undefined);
+  useEffect(() => {
+    if (external) return;
+    let alive = true;
+    getBackend()
+      .assetUrl(problemId!, String(src))
+      .then((u) => alive && setUrl(u), () => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [external, problemId, src]);
+  return url ? <img src={url} alt={alt ?? ""} {...rest} /> : <span className="muted small">[{alt || "image"}]</span>;
 }
 
 function textOf(children: ReactNode): string {
@@ -112,7 +125,7 @@ export const Markdown = memo(function Markdown({
       return <pre>{children}</pre>;
     },
     img({ src, alt, ...rest }) {
-      return <img src={resolveAsset(problemId, src as string)} alt={alt ?? ""} {...rest} />;
+      return <AssetImg problemId={problemId} src={src as string} alt={alt ?? ""} {...rest} />;
     },
     a({ href, children }) {
       return (

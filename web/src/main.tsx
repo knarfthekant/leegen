@@ -1,11 +1,25 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { setBackend, type Backend } from "./backend";
+import { createServerBackend } from "./backend/server";
 import "./lib/monaco";
 import { App } from "./App";
 import "./styles.css";
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+// The edition is chosen at build time: `vite build` (server) or `vite build --mode browser`.
+async function chooseBackend(): Promise<Backend> {
+  if (import.meta.env.VITE_LEETCLAUDE_EDITION === "browser") {
+    const { createBrowserBackend } = await import("./backend/browser");
+    return createBrowserBackend();
+  }
+  return createServerBackend();
+}
+
+chooseBackend().then((backend) => {
+  setBackend(backend);
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+});

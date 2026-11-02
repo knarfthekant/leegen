@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Brand, ConnectionDot, ThemeToggle } from "../components/Chrome";
 import { filterProblems, ProblemRow } from "../components/ProblemRow";
 import { Chip, DIFFICULTY_TONE, IconButton, Skeleton } from "../components/ui";
-import { api, type Difficulty, type ProblemSummary } from "../lib/api";
-import { useServerEvents } from "../lib/events";
+import { getBackend, useBackendEvents } from "../backend";
+import { type Difficulty, type ProblemSummary } from "../lib/api";
 import { navigate } from "../lib/router";
 
 const DIFFICULTIES: Difficulty[] = ["intro", "easy", "medium", "hard"];
@@ -19,7 +19,7 @@ export function ProblemList() {
   const [loading, setLoading] = useState(true);
 
   const load = () =>
-    api.problems().then((r) => {
+    getBackend().listProblems().then((r) => {
       setProblems(r.problems);
       setErrors(r.errors);
       setLoading(false);
@@ -27,10 +27,11 @@ export function ProblemList() {
   useEffect(() => {
     load();
   }, []);
-  useServerEvents((e) => {
+  useBackendEvents((e) => {
     if (e.type === "problems_changed" || e.type === "run_finished") load();
-    if (e.type === "navigate" && typeof e.problem_id === "string") navigate(`/p/${e.problem_id}`);
+    if (e.type === "navigate") navigate(`/p/${e.problem_id}`);
   });
+  const browser = getBackend().edition === "browser";
 
   const tracks = useMemo(() => [...new Set(problems.map((p) => p.track).filter((t): t is string => !!t))], [problems]);
   const filtered = useMemo(
@@ -53,7 +54,11 @@ export function ProblemList() {
         <div className="list-hero">
           <div>
             <h1 className="page-title">Problems</h1>
-            <p className="muted">Written by your agents through MCP. Solved by you.</p>
+            <p className="muted">
+              {browser
+                ? "Written by your agent through WebMCP site tools. Solved by you, in the browser."
+                : "Written by your agents through MCP. Solved by you."}
+            </p>
           </div>
           <Progress problems={problems} loading={loading} />
         </div>
@@ -121,10 +126,17 @@ export function ProblemList() {
           {!loading && problems.length === 0 && (
             <div className="empty">
               <Inbox size={22} strokeWidth={1.6} />
-              <span>
-                No problems yet. Ask an agent to create one through the leetclaude MCP server, or add a YAML file to{" "}
-                <code>problems/</code>.
-              </span>
+              {browser ? (
+                <span>
+                  No problems yet. Ask your agent to create one with the <code>create_problem</code> site tool, or import a
+                  problem bundle.
+                </span>
+              ) : (
+                <span>
+                  No problems yet. Ask an agent to create one through the leetclaude MCP server, or add a YAML file to{" "}
+                  <code>problems/</code>.
+                </span>
+              )}
             </div>
           )}
         </div>

@@ -62,7 +62,9 @@ export function ResultPanel({
           <div className="running-bar" />
           <div className="row between">
             <span className="muted">
-              {phase?.phase === "preparing"
+              {phase?.phase === "loading"
+                ? `${phase.detail}…`
+                : phase?.phase === "preparing"
                 ? `Preparing ${phase.detail}… (the first run of an environment installs its packages)`
                 : phase?.phase === "queued"
                   ? `Queued: ${phase.detail}, waiting for resources…`

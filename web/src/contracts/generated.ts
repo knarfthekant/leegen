@@ -2,11 +2,11 @@
 
 export interface Annotation {
   id: string;
-  file?: string | null;
-  start_line?: number | null;
-  end_line?: number | null;
-  start_col?: number | null;
-  end_col?: number | null;
+  file: string | null;
+  start_line: number | null;
+  end_line: number | null;
+  start_col: number | null;
+  end_col: number | null;
   severity: "info" | "hint" | "warning" | "error" | "praise";
   message: string;
   author: string;
@@ -20,11 +20,11 @@ export interface AnnotationsChangedEvent {
 }
 
 export interface CustomTest {
-  name?: string | null;
-  description?: string | null;
-  section?: string | null;
-  input?: Record<string, unknown>;
-  expected?: unknown;
+  name: string | null;
+  description: string | null;
+  section: string | null;
+  input: Record<string, unknown>;
+  expected: unknown;
 }
 
 export interface CustomTestsChangedEvent {
@@ -43,8 +43,8 @@ export interface FilesChangedEvent {
 export interface Metric {
   name: string;
   value: number;
-  unit?: string;
-  reference?: number | null;
+  unit: string;
+  reference: number | null;
 }
 
 export interface NavigateEvent {
@@ -65,7 +65,7 @@ export interface Proposal {
   id: string;
   file: string;
   content: string;
-  rationale?: string;
+  rationale: string;
   author: string;
   source: "mcp" | "disk" | "webmcp";
   created_at: number;
@@ -75,7 +75,7 @@ export interface ProposalsChangedEvent {
   type: "proposals_changed";
   problem_id: string;
   proposals: Proposal[];
-  added?: boolean;
+  added: boolean;
 }
 
 export interface RunFinishedEvent {
@@ -89,20 +89,20 @@ export interface RunFinishedEvent {
 export interface RunResult {
   run_id: string;
   problem_id: string;
-  mode?: "user" | "reference";
+  mode: "user" | "reference";
   status: "passed" | "failed" | "error" | "timeout" | "compile_error" | "cancelled";
   executor: string;
-  device?: string | null;
+  device: string | null;
   started_at: number;
   duration_ms: number;
-  passed?: number;
-  total?: number;
-  tests?: TestResult[];
-  metrics?: Metric[];
-  compile_output?: string | null;
-  error?: string | null;
-  stdout?: string;
-  stderr?: string;
+  passed: number;
+  total: number;
+  tests: TestResult[];
+  metrics: Metric[];
+  compile_output: string | null;
+  error: string | null;
+  stdout: string;
+  stderr: string;
 }
 
 export interface RunStartedEvent {
@@ -129,16 +129,16 @@ export interface RunnerEvent {
 export interface TestResult {
   name: string;
   status: "pass" | "fail" | "error" | "timeout" | "skipped";
-  visible?: boolean;
-  custom?: boolean;
-  description?: string | null;
-  section?: string | null;
-  input?: unknown;
-  expected?: unknown;
-  actual?: unknown;
-  message?: string | null;
-  stdout?: string | null;
-  duration_ms?: number | null;
+  visible: boolean;
+  custom: boolean;
+  description: string | null;
+  section: string | null;
+  input: unknown;
+  expected: unknown;
+  actual: unknown;
+  message: string | null;
+  stdout: string | null;
+  duration_ms: number | null;
 }
 
 export type BackendEvent = RunStartedEvent | RunStatusEvent | RunFinishedEvent | AnnotationsChangedEvent | ProposalsChangedEvent | FilesChangedEvent | CustomTestsChangedEvent | NavigateEvent | ProblemsChangedEvent | ProblemChangedEvent;

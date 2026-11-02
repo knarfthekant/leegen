@@ -57,6 +57,14 @@ class _Inputs(BaseModel):
     runner_request: RunnerRequest
 
 
+def _all_required(schema: dict[str, Any]) -> dict[str, Any]:
+    """Serialized pydantic models always contain every field, defaults included."""
+    for d in [schema, *schema.get("$defs", {}).values()]:
+        if d.get("type") == "object" and "properties" in d:
+            d["required"] = list(d["properties"])
+    return schema
+
+
 def _dump(obj: Any) -> str:
     return json.dumps(obj, indent=2, sort_keys=False, ensure_ascii=False) + "\n"
 
@@ -332,7 +340,7 @@ def outputs() -> dict[Path, str]:
     root = settings().root
     problems = {pid: parse_problem_yaml((root / "problems" / f"{pid}.yaml").read_text())
                 for pid in FIXTURE_PROBLEMS}
-    records = _Records.model_json_schema(mode="serialization")
+    records = _all_required(_Records.model_json_schema(mode="serialization"))
     inputs = _Inputs.model_json_schema(mode="validation")
     problem_data = {pid: p.model_dump(mode="json") for pid, p in problems.items()}
     return {

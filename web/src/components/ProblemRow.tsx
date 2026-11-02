@@ -1,6 +1,6 @@
 import { Box, CircleCheck, CircleDashed, Cpu, Zap } from "lucide-react";
 import type { ProblemSummary } from "../lib/api";
-import { navigate } from "../lib/router";
+import { href as appHref, navigate } from "../lib/router";
 import { Chip, cx, DIFFICULTY_TONE } from "./ui";
 
 export function filterProblems(problems: ProblemSummary[], query: string): ProblemSummary[] {
@@ -33,15 +33,15 @@ export function ProblemRow({
   onOpen?: () => void;
 }) {
   const hw = hardware(p);
-  const href = `/p/${p.id}`;
+  const path = `/p/${p.id}`;
   return (
     <a
-      href={href}
+      href={appHref(path)}
       className={cx("problem-row", compact && "compact", current && "current")}
       onClick={(e) => {
         e.preventDefault();
         onOpen?.();
-        navigate(href);
+        navigate(path);
       }}
     >
       <StatusIcon status={p.status} />

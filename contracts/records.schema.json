@@ -92,6 +92,11 @@
       },
       "required": [
         "id",
+        "file",
+        "start_line",
+        "end_line",
+        "start_col",
+        "end_col",
         "severity",
         "message",
         "author",
@@ -176,7 +181,14 @@
         }
       },
       "title": "CustomTest",
-      "type": "object"
+      "type": "object",
+      "required": [
+        "name",
+        "description",
+        "section",
+        "input",
+        "expected"
+      ]
     },
     "CustomTestsChangedEvent": {
       "properties": {
@@ -267,7 +279,9 @@
       },
       "required": [
         "name",
-        "value"
+        "value",
+        "unit",
+        "reference"
       ],
       "title": "Metric",
       "type": "object"
@@ -365,6 +379,7 @@
         "id",
         "file",
         "content",
+        "rationale",
         "author",
         "source",
         "created_at"
@@ -399,7 +414,8 @@
       "required": [
         "type",
         "problem_id",
-        "proposals"
+        "proposals",
+        "added"
       ],
       "title": "ProposalsChangedEvent",
       "type": "object"
@@ -554,10 +570,20 @@
       "required": [
         "run_id",
         "problem_id",
+        "mode",
         "status",
         "executor",
+        "device",
         "started_at",
-        "duration_ms"
+        "duration_ms",
+        "passed",
+        "total",
+        "tests",
+        "metrics",
+        "compile_output",
+        "error",
+        "stdout",
+        "stderr"
       ],
       "title": "RunResult",
       "type": "object"
@@ -752,7 +778,17 @@
       },
       "required": [
         "name",
-        "status"
+        "status",
+        "visible",
+        "custom",
+        "description",
+        "section",
+        "input",
+        "expected",
+        "actual",
+        "message",
+        "stdout",
+        "duration_ms"
       ],
       "title": "TestResult",
       "type": "object"
