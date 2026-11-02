@@ -1,4 +1,4 @@
-"""leetclaude CLI: start | dev | stop | serve | validate | run | schema | list."""
+"""leetclaude CLI: start | dev | stop | serve | validate | run | schema | list | browser."""
 
 from __future__ import annotations
 
@@ -133,6 +133,19 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0 if result.status == "passed" else 1
 
 
+def _cmd_browser_build(args: argparse.Namespace) -> int:
+    from leetclaude.browser_edition.build import build
+
+    build(args.app_origin, args.runner_origin, Path(args.out), skip_vite=args.skip_vite)
+    return 0
+
+
+def _cmd_browser_serve(args: argparse.Namespace) -> int:
+    from leetclaude.browser_edition.serve import serve
+
+    return serve(Path(args.out), args.app_port, args.runner_port)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="leetclaude", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -183,6 +196,21 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--executor")
     s.add_argument("--json", action="store_true")
     s.set_defaults(fn=_cmd_run)
+
+    s = sub.add_parser("browser", help="build or serve the browser edition (static sites)")
+    bsub = s.add_subparsers(dest="browser_cmd", required=True)
+    default_out = str(cfg.root / "web" / "dist-browser")
+    b = bsub.add_parser("build", help="build the app and runner sites")
+    b.add_argument("--app-origin", default="http://localhost:13380")
+    b.add_argument("--runner-origin", default="http://127.0.0.1:13381")
+    b.add_argument("--out", default=default_out)
+    b.add_argument("--skip-vite", action="store_true", help="reuse the app's last Vite build")
+    b.set_defaults(fn=_cmd_browser_build)
+    b = bsub.add_parser("serve", help="serve a build locally with its production headers")
+    b.add_argument("--out", default=default_out)
+    b.add_argument("--app-port", type=int, default=13380)
+    b.add_argument("--runner-port", type=int, default=13381)
+    b.set_defaults(fn=_cmd_browser_serve)
 
     args = parser.parse_args(argv)
     return args.fn(args)

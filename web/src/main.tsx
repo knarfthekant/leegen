@@ -15,11 +15,26 @@ async function chooseBackend(): Promise<Backend> {
   return createServerBackend();
 }
 
-chooseBackend().then((backend) => {
-  setBackend(backend);
-  createRoot(document.getElementById("root")!).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  );
-});
+const root = createRoot(document.getElementById("root")!);
+chooseBackend().then(
+  (backend) => {
+    setBackend(backend);
+    root.render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+  },
+  (e) => {
+    root.render(
+      <main className="list-main">
+        <div className="soft-alert tone-fail">
+          <div className="soft-alert-body">
+            <strong>leetclaude could not start</strong>
+            <pre>{String(e?.message ?? e)}</pre>
+          </div>
+        </div>
+      </main>,
+    );
+  },
+);

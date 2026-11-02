@@ -1,6 +1,8 @@
 import { CircleAlert, Inbox, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Brand, ConnectionDot, ThemeToggle } from "../components/Chrome";
+import { ImportReport, TransferButtons } from "../components/Transfer";
+import type { ImportSummary } from "../backend/types";
 import { filterProblems, ProblemRow } from "../components/ProblemRow";
 import { Chip, DIFFICULTY_TONE, IconButton, Skeleton } from "../components/ui";
 import { getBackend, useBackendEvents } from "../backend";
@@ -17,6 +19,7 @@ export function ProblemList() {
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [track, setTrack] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [imported, setImported] = useState<ImportSummary | null>(null);
 
   const load = () =>
     getBackend().listProblems().then((r) => {
@@ -47,6 +50,7 @@ export function ProblemList() {
       <header className="topbar">
         <Brand />
         <div className="spacer" />
+        <TransferButtons onImported={setImported} />
         <ConnectionDot />
         <ThemeToggle />
       </header>
@@ -62,6 +66,8 @@ export function ProblemList() {
           </div>
           <Progress problems={problems} loading={loading} />
         </div>
+
+        {imported && <ImportReport summary={imported} onClose={() => setImported(null)} />}
 
         {errors.length > 0 && !errorsHidden && (
           <div className="soft-alert tone-fail">

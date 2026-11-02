@@ -51,8 +51,9 @@ def static_issues(problem: Problem) -> list[str]:
     return issues
 
 
-async def validate(problem: Problem, *, env: Environment | None, known_envs: list[str],
-                   runnable: bool, requires: list[str], run: RunFn) -> ValidationReport:
+def precheck(problem: Problem, *, env: Environment | None, known_envs: list[str],
+             runnable: bool, requires: list[str]) -> ValidationReport | None:
+    """A final report when the problem can't be run at all, else None (go run the reference)."""
     if env is None:
         return ValidationReport(False, issues=[f"unknown environment {problem.environment!r} "
                                                f"(known: {', '.join(sorted(known_envs))})"])
@@ -63,21 +64,26 @@ async def validate(problem: Problem, *, env: Environment | None, known_envs: lis
         return ValidationReport(False, skipped=True,
                                 summary=f"no executor provides {requires}; not run",
                                 issues=[f"configure an executor with {requires} to validate"])
+    return None
+
+
+def after_reference(problem: Problem, ref: RunResult) -> ValidationReport | None:
+    """A failure report if the reference doesn't pass, else None (go run the starter)."""
+    if ref.status == "passed":
+        return None
     issues = static_issues(problem)
+    issues.insert(0, f"reference solution does not pass: {ref.status} ({ref.passed}/{ref.total})")
+    for t in ref.tests:
+        if t.status != "pass":
+            issues.append(f"{t.name}: {t.status}: {(t.message or '').strip()[:500]}")
+    if ref.error:
+        issues.append(ref.error.strip()[:2000])
+    return ValidationReport(False, summary=f"reference {ref.passed}/{ref.total}",
+                            issues=issues, reference_run=ref)
 
-    ref = await run("reference")
-    if ref.status != "passed":
-        issues.insert(0, f"reference solution does not pass: {ref.status} "
-                         f"({ref.passed}/{ref.total})")
-        for t in ref.tests:
-            if t.status != "pass":
-                issues.append(f"{t.name}: {t.status}: {(t.message or '').strip()[:500]}")
-        if ref.error:
-            issues.append(ref.error.strip()[:2000])
-        return ValidationReport(False, summary=f"reference {ref.passed}/{ref.total}",
-                                issues=issues, reference_run=ref)
 
-    starter = await run("user")
+def after_starter(problem: Problem, ref: RunResult, starter: RunResult) -> ValidationReport:
+    issues = static_issues(problem)
     if starter.status == "passed":
         issues.append("starter code already passes every test; the problem is trivial or the "
                       "tests are too weak")
@@ -86,3 +92,18 @@ async def validate(problem: Problem, *, env: Environment | None, known_envs: lis
     return ValidationReport(True, summary=f"reference {ref.passed}/{ref.total}, starter "
                                           f"{starter.passed}/{starter.total}",
                             issues=issues, reference_run=ref, starter_run=starter)
+
+
+async def validate(problem: Problem, *, env: Environment | None, known_envs: list[str],
+                   runnable: bool, requires: list[str], run: RunFn) -> ValidationReport:
+    """precheck -> reference run -> starter run. The browser runner drives the same three
+    steps itself, so each run gets its own deadline."""
+    report = precheck(problem, env=env, known_envs=known_envs, runnable=runnable,
+                      requires=requires)
+    if report is not None:
+        return report
+    ref = await run("reference")
+    report = after_reference(problem, ref)
+    if report is not None:
+        return report
+    return after_starter(problem, ref, await run("user"))

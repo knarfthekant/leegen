@@ -46,6 +46,13 @@ export interface BackendStatus {
   title: string;
 }
 
+export interface ImportSummary {
+  problems: string[];
+  unchanged: string[];
+  workspaces: string[];
+  errors: { path: string; error: string }[];
+}
+
 export interface Backend {
   readonly edition: "server" | "browser";
 
@@ -74,5 +81,11 @@ export interface Backend {
   status: {
     get(): BackendStatus;
     subscribe(listener: () => void): () => void;
+  };
+
+  /** Browser edition: move problems and work to and from a repo-layout zip. */
+  transfer?: {
+    exportZip(): Promise<Blob>;
+    importZip(file: Blob): Promise<ImportSummary>;
   };
 }

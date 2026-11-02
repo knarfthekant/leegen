@@ -27,7 +27,7 @@ tags: [arrays, two-pointers]
 track: algorithms-basics       # optional curriculum id
 order: 3                       # optional position inside the track
 environment: python            # id of environments/<id>.yaml
-requires: [cpu]                # cpu | gpu (cuda or mps) | cuda (NVIDIA only)
+requires: [cpu]                # cpu | gpu (cuda or mps) | cuda (NVIDIA only) | webgpu
 description: |                 # Markdown, see section 5
   ...
 hints:                         # revealed one at a time, most general first
@@ -43,17 +43,23 @@ benchmark: {...}               # optional, section 3.4
 
 Environments right now:
 
-| id | Use for | requires |
-|---|---|---|
-| `python` | Python 3.13 + pytest, CPU problems | `[cpu]` |
-| `pytorch` | PyTorch (+ numpy) on CUDA or Apple MPS | `[gpu]` |
-| `triton` | Triton kernels + PyTorch, Linux/NVIDIA | `[cuda]` |
-| `cuda` | CUDA C++ with nvcc 13 (from PyPI wheels); `script` judge | `[cuda]` |
-| `cpp` | C++17 with the system compiler; `script` judge | `[cpu]` |
+| id | Use for | requires | Browser edition |
+|---|---|---|---|
+| `python` | Python 3.13 + pytest, CPU problems | `[cpu]` | yes (Pyodide, Python 3.14) |
+| `pytorch` | PyTorch (+ numpy) on CUDA or Apple MPS | `[gpu]` | no |
+| `triton` | Triton kernels + PyTorch, Linux/NVIDIA | `[cuda]` | no |
+| `cuda` | CUDA C++ with nvcc 13 (from PyPI wheels); `script` judge | `[cuda]` | no |
+| `cpp` | C++17 with the system compiler; `script` judge | `[cpu]` | no |
 
 `list_environments` returns the live list and the executors that can run each environment. If
 no executor can run a problem, validation is skipped and the problem is saved unvalidated, so
 prefer environments the user can run.
+
+**Browser edition.** In the hosted browser edition ([browser.md](browser.md)) code runs in
+Pyodide, so only environments with a `browser:` block run there, and only the `function` and
+`pytest` judges work (no `script` judge, no subprocesses, no threads). Keep `python` problems
+standard-library only, or use packages Pyodide ships. Problems in other environments can still be
+created there: they are saved unvalidated and marked as running on the local/remote edition.
 
 ## 2. Files and the reference
 

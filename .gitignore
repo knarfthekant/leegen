@@ -12,3 +12,4 @@ config/executors.yaml
 .DS_Store
 # wrangler local state
 .wrangler/
+web/dist-browser/
