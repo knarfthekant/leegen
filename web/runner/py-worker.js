@@ -1,11 +1,11 @@
-// Pyodide module worker for the leetclaude runner. One interpreter, reused across runs; the
-// Python side (leetclaude.browser_runner) purges run modules before and after each run.
+// Pyodide module worker for the leegen runner. One interpreter, reused across runs; the
+// Python side (leegen.browser_runner) purges run modules before and after each run.
 //
 // Messages in:  {id, method, params}
 // Messages out: {id, result} | {id, error} | {type: "line", line} (harness events, streamed)
 
 let py = null;
-let br = null;           // the leetclaude.browser_runner module
+let br = null;           // the leegen.browser_runner module
 let output = [];         // interpreter-level stdout/stderr of the current run
 const loaded = new Set();
 
@@ -43,7 +43,7 @@ const handlers = {
       py.FS.writeFile(path, content);
     }
     await loadPackages(preload || []);
-    py.runPython("import sys\nsys.path.insert(0, '/lc')\nimport leetclaude.browser_runner as _lc_br");
+    py.runPython("import sys\nsys.path.insert(0, '/lc')\nimport leegen.browser_runner as _lc_br");
     br = true;
     py.globals.set("_lc_sink", (line) => self.postMessage({ type: "line", line }));
     return { loadMs: performance.now() - t0, python: py.runPython("import sys; sys.version.split()[0]") };

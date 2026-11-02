@@ -1,11 +1,11 @@
 # Setting up a remote cluster backend
 
-Use this guide when connecting leetclaude to a remote machine or Slurm cluster. It is intended
+Use this guide when connecting leegen to a remote machine or Slurm cluster. It is intended
 for both people and coding agents. Probe the target system before choosing paths, packages,
 or scheduler options: login and compute nodes can have different software and mount settings.
 
-Executor configuration lives on the computer running leetclaude, in
-`~/.config/leetclaude/executors.yaml` (or the path set by `LEETCLAUDE_EXECUTORS`). See
+Executor configuration lives on the computer running leegen, in
+`~/.config/leegen/executors.yaml` (or the path set by `LEEGEN_EXECUTORS`). See
 [Executors](../executors.md) for how remote runs work.
 
 ## 1. Establish SSH access and the execution target
@@ -70,7 +70,7 @@ curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh
 
 Set `uv:` to its explicit path if non-interactive shells cannot find it. Check HTTPS access
 to the package index from the nodes that provision environments. If the cluster uses a
-mirror, set `LEETCLAUDE_PACKAGE_INDEX` in the local leetclaude server's environment.
+mirror, set `LEEGEN_PACKAGE_INDEX` in the local leegen server's environment.
 
 Resolve the unpinned environment specifications in `environments/` on the target system.
 Avoid reusing another cluster's prebuilt virtual environments or package pins. For CUDA,
@@ -90,7 +90,7 @@ executors:
     kind: slurm
     description: My remote GPU cluster
     host: my-cluster-login             # existing SSH alias
-    workdir: ~/.leetclaude             # must be executable on compute nodes
+    workdir: ~/.leegen             # must be executable on compute nodes
     uv: ~/.local/bin/uv
     provision_on_node: true
     srun_args:
@@ -108,26 +108,26 @@ Declare only capabilities supported by the host. Authentication uses SSH; keep c
 out of this YAML. To select one identity explicitly, add `ssh_options` with `-i` and an
 absolute key path, `-o IdentitiesOnly=yes`, and, if appropriate, `-o IdentityAgent=none`.
 
-Restart the leetclaude server after changing executor configuration. Check `list_executors`
+Restart the leegen server after changing executor configuration. Check `list_executors`
 and `list_environments` through MCP, or the browser's executor selector, to confirm that the
 backend is available for compatible problems.
 
-## 5. Verify through leetclaude
+## 5. Verify through leegen
 
 From `server/`, test the complete upload, provisioning, build, and result path. For an NVIDIA
 GPU backend, run the CUDA and PyTorch references:
 
 ```bash
-uv run leetclaude run cuda-vector-add --reference --executor my-cluster
-uv run leetclaude run kv-cache-basics --reference --executor my-cluster
-uv run leetclaude run triton-vector-add --reference --executor my-cluster
+uv run leegen run cuda-vector-add --reference --executor my-cluster
+uv run leegen run kv-cache-basics --reference --executor my-cluster
+uv run leegen run triton-vector-add --reference --executor my-cluster
 ```
 
 Use a CPU exercise such as `merge-ranges` for a CPU-only host. To validate both reference
 and starter behavior for an exercise on this backend:
 
 ```bash
-uv run leetclaude validate <problem-id> --executor my-cluster
+uv run leegen validate <problem-id> --executor my-cluster
 ```
 
 Confirm that test results report the intended executor and device. Distinguish queue delays

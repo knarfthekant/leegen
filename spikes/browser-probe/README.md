@@ -1,7 +1,7 @@
 # Browser edition: Phase 0 probe
 
 This is a throwaway spike. It answers the questions the browser-edition plan needs settled before
-Phase 1: can a hosted static page use WebMCP site tools, run the **unmodified** leetclaude harness
+Phase 1: can a hosted static page use WebMCP site tools, run the **unmodified** leegen harness
 in Pyodide inside a **separate-origin runner**, stop runaway code, and reach WebGPU?
 
 ## Layout
@@ -61,8 +61,8 @@ Sizes: app 0.3 MB; runner 18.3 MB. The largest file is `pyodide.asm.wasm` at 9.6
 
 ## Deployed: Cloudflare Workers static assets, 2026-11-01
 
-- App: https://leetclaude-probe.frankshan.workers.dev (Worker `leetclaude-probe`)
-- Runner: https://leetclaude-probe-runner.frankshan.workers.dev (Worker `leetclaude-probe-runner`)
+- App: https://leegen-probe.frankshan.workers.dev (Worker `leegen-probe`)
+- Runner: https://leegen-probe-runner.frankshan.workers.dev (Worker `leegen-probe-runner`)
 - Deployed with `npx wrangler deploy --name <worker> --assets <folder> --compatibility-date 2026-11-01`.
 - `_headers` is honoured. COOP/COEP/CORP/CSP are served on HTML, JS and wasm, and the wasm is
   served as `application/wasm`. The 9.6 MB file is accepted.

@@ -2,8 +2,8 @@ import shutil
 
 import pytest
 
-from leetclaude.runner import Orchestrator, RunRequest
-from leetclaude.store.problems import ProblemStore, parse_problem_yaml
+from leegen.runner import Orchestrator, RunRequest
+from leegen.store.problems import ProblemStore, parse_problem_yaml
 
 from .conftest import FIXTURES
 
@@ -115,7 +115,7 @@ async def test_script_judge_cpp():
 
 
 async def test_cuda_problem_has_no_local_executor_on_cpu_only_machines():
-    from leetclaude.executors.local import detect_local_capabilities
+    from leegen.executors.local import detect_local_capabilities
 
     if "cuda" in detect_local_capabilities():
         pytest.skip("machine has CUDA")
@@ -124,7 +124,7 @@ async def test_cuda_problem_has_no_local_executor_on_cpu_only_machines():
 
 
 async def test_gpu_problem_on_local_accelerator():
-    from leetclaude.executors.local import detect_local_capabilities
+    from leegen.executors.local import detect_local_capabilities
 
     if not {"mps", "cuda"} & detect_local_capabilities():
         pytest.skip("no local GPU")
@@ -153,7 +153,7 @@ async def test_custom_tests_are_named_test_n_without_collisions():
 
 
 def test_unique_test_name():
-    from leetclaude.runner.orchestrator import unique_test_name
+    from leegen.runner.orchestrator import unique_test_name
     assert unique_test_name(None, set()) == "Test 1"
     assert unique_test_name(None, {"Test 1", "Test 2"}) == "Test 3"
     assert unique_test_name("Mine", {"Mine"}) == "Mine (2)"

@@ -2,10 +2,10 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from leetclaude.schema.export import problem_json_schema
-from leetclaude.schema.models import Problem
-from leetclaude.schema.views import public_problem
-from leetclaude.store.problems import ProblemStore, dump_problem_yaml, parse_problem_yaml
+from leegen.schema.export import problem_json_schema
+from leegen.schema.models import Problem
+from leegen.schema.views import public_problem
+from leegen.store.problems import ProblemStore, dump_problem_yaml, parse_problem_yaml
 
 
 def test_seed_problems_load():

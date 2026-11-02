@@ -4,7 +4,7 @@
 // The build replaces the two placeholders below.
 const VERSION = "__VERSION__";
 const PRECACHE = __PRECACHE__;
-const CACHE = `leetclaude-runner-${VERSION}`;
+const CACHE = `leegen-runner-${VERSION}`;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
@@ -13,7 +13,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     for (const key of await caches.keys()) {
-      if (key.startsWith("leetclaude-runner-") && key !== CACHE) await caches.delete(key);
+      if (key.startsWith("leegen-runner-") && key !== CACHE) await caches.delete(key);
     }
     await self.clients.claim();
   })());

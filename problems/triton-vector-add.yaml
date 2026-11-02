@@ -69,7 +69,7 @@ files:
     content: |
       import torch
 
-      from leetclaude_harness import device
+      from leegen_harness import device
 
 
       def pair(seed: int, n: int):

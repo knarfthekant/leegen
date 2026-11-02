@@ -6,7 +6,7 @@ import type { BackendEvent } from "../types";
 export class EventHub {
   private listeners = new Set<(e: BackendEvent) => void>();
   private channel: BroadcastChannel | null =
-    typeof BroadcastChannel === "function" ? new BroadcastChannel("leetclaude-events") : null;
+    typeof BroadcastChannel === "function" ? new BroadcastChannel("leegen-events") : null;
 
   constructor() {
     if (this.channel) this.channel.onmessage = (m) => this.deliver(m.data as BackendEvent);

@@ -61,7 +61,7 @@ export class RunnerClient {
     this.port = new Promise<MessagePort>((resolve, reject) => {
       const frame = document.createElement("iframe");
       frame.src = `${this.origin}/`;
-      frame.title = "leetclaude runner";
+      frame.title = "leegen runner";
       frame.allow = "cross-origin-isolated";
       frame.setAttribute("aria-hidden", "true");
       frame.tabIndex = -1;

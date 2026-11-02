@@ -326,7 +326,7 @@
     {
       "name": "get_authoring_guide",
       "title": "Authoring guide",
-      "description": "How to write leetclaude problems: schema walkthrough, judge kinds, test design, markup,\nand worked examples. Read this before creating problems.",
+      "description": "How to write leegen problems: schema walkthrough, judge kinds, test design, markup,\nand worked examples. Read this before creating problems.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -403,7 +403,7 @@
     {
       "name": "get_tutoring_guide",
       "title": "Tutoring guide",
-      "description": "How to tutor the user in leetclaude: call get_session first, hint in small steps,\nannotate exact ranges, change code only through propose_edit. Read this before helping\nwith a problem.",
+      "description": "How to tutor the user in leegen: call get_session first, hint in small steps,\nannotate exact ranges, change code only through propose_edit. Read this before helping\nwith a problem.",
       "inputSchema": {
         "type": "object",
         "properties": {},

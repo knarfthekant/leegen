@@ -1,4 +1,4 @@
-// leetclaude runner origin: a stateless execution host embedded by the app as a hidden iframe.
+// leegen runner origin: a stateless execution host embedded by the app as a hidden iframe.
 //
 // - It talks only to allow-listed parent origins, over a MessageChannel the parent hands over.
 // - It never sees the app's storage: every request carries what the run needs (problem YAML,
@@ -13,7 +13,7 @@
 //                  {type: "status", run_id, phase, detail}  loading / running
 
 const statusEl = document.getElementById("status");
-const setStatus = (s) => { statusEl.textContent = `leetclaude runner: ${s}`; };
+const setStatus = (s) => { statusEl.textContent = `leegen runner: ${s}`; };
 
 const config = await (await fetch("./config.json", { cache: "no-cache" })).json();
 const allowed = new Set(config.allowed_parents);
@@ -235,7 +235,7 @@ const methods = {
     return JSON.parse(await w.py("parse", problem_yaml));
   },
 
-  // The server's validation rules (leetclaude.core.validation), one deadline per run.
+  // The server's validation rules (leegen.core.validation), one deadline per run.
   validate({ problem_yaml, environments, capabilities, packages, run_id }, notify) {
     return serial(async () => {
       const w = await worker();

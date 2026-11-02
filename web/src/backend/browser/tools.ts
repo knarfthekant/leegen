@@ -169,17 +169,17 @@ declare global {
     modelContext?: ModelContext;
   }
   // eslint-disable-next-line no-var
-  var leetclaudeTools: { list(): ManifestTool[]; call(name: string, input?: unknown): Promise<ToolResult> } | undefined;
+  var leegenTools: { list(): ManifestTool[]; call(name: string, input?: unknown): Promise<ToolResult> } | undefined;
 }
 
 const BROWSER_NOTE =
-  " (leetclaude browser edition: problems and the user's work live in this browser; code runs in Pyodide.)";
+  " (leegen browser edition: problems and the user's work live in this browser; code runs in Pyodide.)";
 
 /** Register every manifest tool with WebMCP. Returns how many were registered (0 when the page
- * has no modelContext). Tools are also reachable as `leetclaudeTools.call(name, input)`. */
+ * has no modelContext). Tools are also reachable as `leegenTools.call(name, input)`. */
 export async function registerAgentTools(svc: BrowserToolService, manifest: ManifestTool[]): Promise<number> {
   const tools = manifest.filter((t) => HANDLERS[t.name]);
-  globalThis.leetclaudeTools = {
+  globalThis.leegenTools = {
     list: () => tools,
     call: (name, input) => {
       const tool = tools.find((t) => t.name === name);

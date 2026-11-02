@@ -8,7 +8,7 @@ import "./styles.css";
 
 // The edition is chosen at build time: `vite build` (server) or `vite build --mode browser`.
 async function chooseBackend(): Promise<Backend> {
-  if (import.meta.env.VITE_LEETCLAUDE_EDITION === "browser") {
+  if (import.meta.env.VITE_LEEGEN_EDITION === "browser") {
     const { createBrowserBackend } = await import("./backend/browser");
     return createBrowserBackend();
   }
@@ -30,7 +30,7 @@ chooseBackend().then(
       <main className="list-main">
         <div className="soft-alert tone-fail">
           <div className="soft-alert-body">
-            <strong>leetclaude could not start</strong>
+            <strong>leegen could not start</strong>
             <pre>{String(e?.message ?? e)}</pre>
           </div>
         </div>

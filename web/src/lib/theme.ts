@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 
 export type ThemeMode = "system" | "light" | "dark";
-const KEY = "leetclaude.theme";
+const KEY = "leegen.theme";
 const query = "(prefers-color-scheme: dark)";
 const listeners = new Set<() => void>();
 

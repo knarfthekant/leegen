@@ -1,28 +1,49 @@
-# leetclaude
+# leegen
 
-A local, LeetCode-style programming trainer where **your coding agent writes the problems,
-and you solve them**. Ask for an exercise on a topic you want to learn, work through it in the
-browser, and ask the same agent for hints or feedback. Run your solution on a local CPU or GPU,
-or send it to a remote GPU over SSH or Slurm.
+A LeetCode-style programming trainer where **your coding agent writes the problems, and you
+solve them**. Ask for an exercise on a topic you want to learn, work through it in the browser,
+and ask the same agent for hints or feedback. Use the hosted browser edition to run Python and
+WebGPU exercises in your browser, or run the server edition locally for native and remote
+CPU and GPU execution.
 
 There is no fixed problem bank: the repo includes examples, and your agent can create new
 problems or adapt existing ones to your level. Exercises can cover algorithms, async Python,
-multi-file services, PyTorch, Triton, or CUDA kernels.
+multi-file services, WebGPU, PyTorch, Triton, or CUDA kernels.
+
+## Choose an edition
+
+Both editions use the same problem format, editor, test harness, and core validation rules.
+Each lets an agent create problems, inspect your work, run tests, annotate code, and suggest
+edits. They differ in where code runs, where work is stored, and how the agent connects:
+
+| | Browser edition | Server edition |
+| --- | --- | --- |
+| Get started | [Open the hosted app](https://leegen.frankshan.workers.dev); no server installation | Run `make start` from a local checkout |
+| Execution | Python in Pyodide; WGSL kernels through WebGPU | Native local CPU, Apple MPS, or CUDA; remote SSH and Slurm executors |
+| Problems | Python and WebGPU; `function` and `pytest` judges | Python, C++, PyTorch, Triton, and CUDA; `function`, `pytest`, and `script` judges |
+| Agent connection | WebMCP tools on the page in a supported browser, such as Codex's built-in browser | MCP server over HTTP, usable by Codex, Claude Code, and other MCP clients |
+| Storage | Browser IndexedDB, scoped to the site and browser | YAML files in `problems/` and work in `workspace/` |
+| Offline | Works offline after the required app and runtime files have been cached | Runs locally; remote execution needs a connection to the host |
+
+The problem list marks exercises that need the other edition. Browser data is separate from
+the server's files and from data at other site origins. Use the browser edition's export/import
+or manual folder sync to transfer problems and work; see [browser edition storage](docs/browser.md#storage-export-and-import).
 
 ## How it works with your coding agent
 
-leetclaude provides the browser editor, test runner, and an **MCP (Model Context Protocol)
-server**. Your coding agent—such as Codex or Claude Code—connects to that server to author
-exercises and act as your tutor. You use your existing agent and chat; leetclaude itself does
-not require a model API key.
+leegen provides the browser editor and test runner. The server edition exposes an **MCP
+(Model Context Protocol) server**; the browser edition exposes corresponding **WebMCP** site
+tools to a supported browser. Your coding agent can use these tools to author exercises and
+act as your tutor. You use your existing agent and chat; leegen itself does not require a
+model API key.
 
-The browser reports your open problem, current code (including unsaved edits), cursor, and
-test results to the server. Through MCP, your agent can read that context, run tests, leave
-comments on exact code ranges, and propose edits that you accept or reject in the editor.
+The app makes your open problem, current code (including unsaved edits), cursor, and test
+results available to the agent. The agent can read that context, run tests, leave comments on
+exact code ranges, and propose edits that you accept or reject in the editor.
 You can ask for help without copying your code and error messages into chat.
 
-The four screenshots below follow one PyTorch learning session in Codex. Click any image to
-open the full-size screenshot stored in this repo.
+The four screenshots below follow one **server edition** PyTorch learning session in Codex.
+Click any image to open the full-size screenshot stored in this repo.
 
 ### 1. Generate a problem through MCP
 
@@ -33,7 +54,7 @@ reference solution. The MCP authoring tools validate the exercise by checking th
 reference passes every test and the starter fails at least one, when a compatible executor
 is available. The saved exercise appears in the problem list.
 
-[![Codex using the leetclaude MCP integration to generate and validate a PyTorch GPU tutorial beside the problem list](docs/images/problem-generation.png)](docs/images/problem-generation.png)
+[![Codex using the leegen MCP integration to generate and validate a PyTorch GPU tutorial beside the problem list](docs/images/problem-generation.png)](docs/images/problem-generation.png)
 
 [Full-size screenshot: problem generation](docs/images/problem-generation.png)
 
@@ -77,7 +98,7 @@ and a cancel control. Once allocated, the remote executor runs the tests and ret
 results to the same UI.
 
 The local executor detects CPU, Apple MPS, and NVIDIA CUDA capabilities. Remote `ssh` and
-`slurm` executors are configured in `~/.config/leetclaude/executors.yaml` and use your existing
+`slurm` executors are configured in `~/.config/leegen/executors.yaml` and use your existing
 SSH authentication. Environments are provisioned with uv on first use and cached for later
 runs. The toolbar offers executors compatible with the exercise’s hardware requirements;
 PyTorch exercises can target either MPS or CUDA, while CUDA and Triton kernels require NVIDIA
@@ -90,7 +111,17 @@ hardware.
 See [executor configuration](docs/executors.md) for SSH and Slurm setup, and
 [the cluster setup guide](docs/clusters/README.md) for onboarding a remote backend.
 
-## Quick start
+## Quick start: browser edition
+
+Open [leegen](https://leegen.frankshan.workers.dev) in a browser. Python exercises run in
+Pyodide; WebGPU exercises also require a browser and device with WebGPU support. Open the
+site in Codex's built-in browser to use its WebMCP tools with an agent. Your problems and work
+are stored in that browser; export them or sync to a folder when you want to share them with
+another browser or the server edition.
+
+To build and serve the browser edition locally, see the [browser edition guide](docs/browser.md).
+
+## Quick start: server edition
 
 Requirements: [uv](https://docs.astral.sh/uv/) and Node.js with npm. From the repo root:
 
@@ -107,15 +138,15 @@ using the app or its MCP tools. Use `make stop` from another terminal to stop it
 For **Codex**, register the local MCP server:
 
 ```bash
-codex mcp add leetclaude --url http://127.0.0.1:13370/mcp
-codex mcp get leetclaude
+codex mcp add leegen --url http://127.0.0.1:13370/mcp
+codex mcp get leegen
 ```
 
 For **Claude Code**, the repo’s [`.mcp.json`](.mcp.json) already declares the server. To add
 it manually from another project:
 
 ```bash
-claude mcp add --transport http leetclaude http://127.0.0.1:13370/mcp
+claude mcp add --transport http leegen http://127.0.0.1:13370/mcp
 ```
 
 Other clients that support MCP over streamable HTTP can use the same URL. If your agent does
@@ -129,32 +160,36 @@ Then ask your agent to create a problem, or open one and ask for a hint. The rep
 
 Each problem is a self-contained YAML file in `problems/`. It declares the exercise content,
 editable and supporting files, tests, reference solution, environment, and hardware needs.
-Your saved solution and review state live in the gitignored `workspace/<id>/` directory.
+In the server edition, your saved solution and review state live in the gitignored
+`workspace/<id>/` directory. The browser edition stores its copies in IndexedDB.
 
-When you run a solution, the backend builds a temporary job bundle. The judge defines how it
-is tested, the language adapter defines how it is built and launched, the environment supplies
-the runtime and dependencies, and the executor determines where it runs. Every executor
-returns the same result format to the UI and MCP tools.
+Both editions plan a job bundle and run the shared harness. The server writes the bundle to a
+temporary directory and sends it to an executor; the browser runner builds it in Pyodide's
+in-memory filesystem. The judge defines how the solution is tested, while the environment and
+executor determine the available runtime and hardware. Both return the same result format to
+the UI and agent tools.
 
 | Layer | Supported options |
 | --- | --- |
-| Judges | `function` for input/output and method-call tests; `pytest` for async, stateful, and multi-file exercises; `script` for custom harnesses and compiled programs |
-| Environments | Python, C++, PyTorch, Triton, and CUDA; dependencies are managed by uv where applicable |
-| Executors | Local CPU/MPS/CUDA, remote SSH hosts, and Slurm clusters |
+| Judges | `function` for input/output and method-call tests; `pytest` for async, stateful, and multi-file exercises; server-only `script` for custom harnesses and compiled programs |
+| Environments | Python and WebGPU in the browser; Python, C++, PyTorch, Triton, and CUDA on the server |
+| Execution | Pyodide and WebGPU in the browser; local CPU/MPS/CUDA, remote SSH hosts, and Slurm clusters on the server |
 | Browser UI | Monaco editor, Markdown and math descriptions, hints, test cases and results, review comments, and proposed edits; light and dark themes |
 
 ## Development and documentation
 
 `make dev` runs the backend with auto-reload and the Vite UI with hot reload at
-[http://127.0.0.1:13371](http://127.0.0.1:13371). Ctrl-C stops both. Set `LEETCLAUDE_PORT`
-(default `13370`) or `LEETCLAUDE_WEB_PORT` (default `13371`) to override the ports; update
+[http://127.0.0.1:13371](http://127.0.0.1:13371). Ctrl-C stops both. Set `LEEGEN_PORT`
+(default `13370`) or `LEEGEN_WEB_PORT` (default `13371`) to override the ports; update
 your MCP URL if the backend port changes.
 
-`make check` runs backend tests, problem validation, and the frontend build. `make smoke`
-runs the browser smoke test against a running server using an installed Chrome.
+`make check` runs backend tests, problem validation, frontend conformance tests, and the frontend
+build. `make smoke` checks a running server edition in Chrome. For the browser edition, run
+`make browser`, `make browser-serve`, and then `make browser-smoke` in another terminal.
 
 - [Agent manual and architecture](AGENTS.md)
 - [Problem authoring guide](docs/authoring.md)
+- [Browser edition: architecture, storage, and deployment](docs/browser.md)
 - [Problem JSON Schema](schema/problem.schema.json)
 - [Executor configuration](docs/executors.md)
 - [Cluster setup guide](docs/clusters/README.md)

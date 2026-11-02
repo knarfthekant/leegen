@@ -3,7 +3,7 @@
 //   problems/<id>.yaml
 //   problems/<id>/assets/...
 //   workspace/<id>/<editable files>
-//   workspace/<id>/.leetclaude/<state>.json      (custom_tests, last_run, annotations, ...)
+//   workspace/<id>/.leegen/<state>.json      (custom_tests, last_run, annotations, ...)
 //
 // Unzip an export at the repo root and the local server sees the same problems and work; zip a
 // checkout's problems/ and workspace/ folders and import them here.
@@ -22,7 +22,7 @@ export interface ImportSummary {
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
-const STATE_DIR = ".leetclaude";
+const STATE_DIR = ".leegen";
 const SAFE_SEGMENT = /^(?!\.\.?$)[^/\\\0]+$/;
 
 /** Everything in the repo layout: problems, assets, the user's files and state. */

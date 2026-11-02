@@ -15,7 +15,7 @@ files:
     content: |
       #include <string>
       #include <vector>
-      #include <leetclaude/judge.h>
+      #include <leegen/judge.h>
       long long sum(const std::vector<int>& xs);
       int main() {
         struct Case { std::string name; std::vector<int> xs; long long want; };

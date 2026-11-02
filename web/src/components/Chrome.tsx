@@ -15,7 +15,7 @@ export function Brand() {
       }}
     >
       <Logo />
-      <span className="wordmark">leetclaude</span>
+      <span className="wordmark">leegen</span>
     </a>
   );
 }

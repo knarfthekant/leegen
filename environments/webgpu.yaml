@@ -1,7 +1,7 @@
 id: webgpu
 description: >-
   WGSL compute kernels on the browser's WebGPU device. A hidden Python host (Pyodide) dispatches
-  the user's kernel with leetclaude_harness.webgpu. Browser edition only.
+  the user's kernel with leegen_harness.webgpu. Browser edition only.
 language: python
 requires: [webgpu]
 native: false

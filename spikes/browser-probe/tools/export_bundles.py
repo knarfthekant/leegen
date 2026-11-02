@@ -5,7 +5,7 @@ Run from the repo root:
         --out spikes/browser-probe/build/runner/bundles merge-ranges py-async-generators
 
 Each bundle is a JSON file {problem_id, mode, expect, files: {relpath: content}} holding exactly
-what the orchestrator would write to its temp dir: user/, ref/ (if needed), _lc/leetclaude_harness
+what the orchestrator would write to its temp dir: user/, ref/ (if needed), _lc/leegen_harness
 and run.json. Nothing is executed.
 """
 
@@ -16,16 +16,16 @@ import json
 import sys
 from pathlib import Path
 
-from leetclaude.core.plan import plan_run
-from leetclaude.runner.orchestrator import HARNESS_DIR
-from leetclaude.store.problems import parse_problem_yaml
+from leegen.core.plan import plan_run
+from leegen.runner.orchestrator import HARNESS_DIR
+from leegen.store.problems import parse_problem_yaml
 
 
 def bundle_files(problem, mode: str) -> dict[str, str]:
     plan = plan_run(problem, mode=mode, device="cpu")
     files = dict(plan.files)
     for path in sorted(HARNESS_DIR.rglob("*.py")):
-        files[f"_lc/leetclaude_harness/{path.relative_to(HARNESS_DIR)}"] = path.read_text()
+        files[f"_lc/leegen_harness/{path.relative_to(HARNESS_DIR)}"] = path.read_text()
     files["run.json"] = json.dumps(plan.run_config, indent=2)
     return files
 

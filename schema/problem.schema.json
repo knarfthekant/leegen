@@ -612,5 +612,5 @@
   "title": "Problem",
   "type": "object",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://leetclaude.local/schema/problem.schema.json"
+  "$id": "https://leegen.local/schema/problem.schema.json"
 }

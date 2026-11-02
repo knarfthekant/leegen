@@ -95,8 +95,8 @@ files:
     content: |
       from pathlib import Path
 
-      from leetclaude_harness import webgpu as wg
-      from leetclaude_harness.protocol import emit
+      from leegen_harness import webgpu as wg
+      from leegen_harness.protocol import emit
 
       def matmul(a, b):
           m, k, n = len(a), len(b), len(b[0])

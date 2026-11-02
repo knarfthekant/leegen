@@ -7,19 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from leetclaude import config
-from leetclaude.devserver import LaunchError, deps_missing, ensure_port, port_free, ui_is_stale
+from leegen import config
+from leegen.devserver import LaunchError, deps_missing, ensure_port, port_free, ui_is_stale
 
 
 def test_port_defaults_and_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
-    for var in ("LEETCLAUDE_PORT", "LEETCLAUDE_WEB_PORT", "LEETCLAUDE_HOST"):
+    for var in ("LEEGEN_PORT", "LEEGEN_WEB_PORT", "LEEGEN_HOST"):
         monkeypatch.delenv(var, raising=False)
     config.settings.cache_clear()
     try:
         s = config.settings()
         assert (s.host, s.port, s.web_port) == ("127.0.0.1", 13370, 13371)
-        monkeypatch.setenv("LEETCLAUDE_PORT", "14000")
-        monkeypatch.setenv("LEETCLAUDE_WEB_PORT", "14001")
+        monkeypatch.setenv("LEEGEN_PORT", "14000")
+        monkeypatch.setenv("LEEGEN_WEB_PORT", "14001")
         config.settings.cache_clear()
         s = config.settings()
         assert (s.port, s.web_port) == (14000, 14001)
@@ -62,8 +62,8 @@ def test_port_in_use_is_reported() -> None:
         s.listen()
         port = s.getsockname()[1]
         assert not port_free("127.0.0.1", port)
-        with pytest.raises(LaunchError, match="LEETCLAUDE_PORT"):
-            ensure_port("127.0.0.1", port, "LEETCLAUDE_PORT")
+        with pytest.raises(LaunchError, match="LEEGEN_PORT"):
+            ensure_port("127.0.0.1", port, "LEEGEN_PORT")
 
 
 # ---------------------------------------------------------------- stop
@@ -72,10 +72,10 @@ import json  # noqa: E402
 import subprocess  # noqa: E402
 import sys  # noqa: E402
 
-from leetclaude import devserver  # noqa: E402
+from leegen import devserver  # noqa: E402
 
-# A stand-in "server": argv[0] of the script is a file named `leetclaude`, so `ps` shows
-# ".../leetclaude serve" just like the real console script. It listens on the given port.
+# A stand-in "server": argv[0] of the script is a file named `leegen`, so `ps` shows
+# ".../leegen serve" just like the real console script. It listens on the given port.
 _FAKE_SERVER = """
 import socket, sys, time
 s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -86,7 +86,7 @@ time.sleep(60)
 
 @pytest.fixture
 def run_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("LEETCLAUDE_CACHE", str(tmp_path / "cache"))
+    monkeypatch.setenv("LEEGEN_CACHE", str(tmp_path / "cache"))
     config.settings.cache_clear()
     yield tmp_path
     monkeypatch.undo()
@@ -113,9 +113,9 @@ def _spawn(tmp_path: Path, name: str, port: int) -> subprocess.Popen[bytes]:
 
 def test_entry_point_match() -> None:
     m = devserver._ENTRY.search
-    assert m("/repo/server/.venv/bin/python /repo/server/.venv/bin/leetclaude start")
-    assert m("python -m leetclaude.cli serve --reload --port 13370")
-    assert not m("node /Users/x/leetclaude/web/node_modules/.bin/vite --host 127.0.0.1")
+    assert m("/repo/server/.venv/bin/python /repo/server/.venv/bin/leegen start")
+    assert m("python -m leegen.cli serve --reload --port 13370")
+    assert not m("node /Users/x/leegen/web/node_modules/.bin/vite --host 127.0.0.1")
     assert not m("python -c from multiprocessing.spawn import spawn_main")
 
 
@@ -128,7 +128,7 @@ def test_registered_writes_and_removes_pidfile(run_dir: Path) -> None:
 
 def test_stop_uses_pidfile(run_dir: Path) -> None:
     port = _free_port()
-    proc = _spawn(run_dir, "leetclaude", port)
+    proc = _spawn(run_dir, "leegen", port)
     try:
         path = devserver.pidfile(port)
         path.parent.mkdir(parents=True)
@@ -140,9 +140,9 @@ def test_stop_uses_pidfile(run_dir: Path) -> None:
         proc.kill()
 
 
-def test_stop_falls_back_to_leetclaude_listener(run_dir: Path) -> None:
+def test_stop_falls_back_to_leegen_listener(run_dir: Path) -> None:
     port = _free_port()
-    proc = _spawn(run_dir, "leetclaude", port)
+    proc = _spawn(run_dir, "leegen", port)
     try:
         assert devserver.stop(port, timeout=5) == 0  # no pidfile
         assert proc.wait(timeout=5) is not None
@@ -154,7 +154,7 @@ def test_stop_leaves_other_programs_alone(run_dir: Path) -> None:
     port = _free_port()
     proc = _spawn(run_dir, "someone_elses_server", port)
     try:
-        # a stale pidfile pointing at a non-leetclaude PID must not get it killed either
+        # a stale pidfile pointing at a non-leegen PID must not get it killed either
         path = devserver.pidfile(port)
         path.parent.mkdir(parents=True)
         path.write_text(json.dumps({"pid": proc.pid, "mode": "start"}))

@@ -1,5 +1,5 @@
 // Folder sync through the File System Access API (Chromium): save everything to a folder in the
-// repo layout, or load problems and work from one. Point it at a leetclaude checkout and the
+// repo layout, or load problems and work from one. Point it at a leegen checkout and the
 // local server and the browser edition see the same problems/ and workspace/.
 
 import type { Db } from "./db.ts";
@@ -37,7 +37,7 @@ async function folder(db: Db, mode: "read" | "readwrite", pickNew: boolean): Pro
     if (state === "granted") return saved;
   }
   const picker = (window as unknown as { showDirectoryPicker: Picker }).showDirectoryPicker;
-  const dir = await picker({ id: "leetclaude", mode });
+  const dir = await picker({ id: "leegen", mode });
   await db.put("meta", dir, "folder_handle");
   return dir;
 }

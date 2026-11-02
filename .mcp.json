@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "leetclaude": {
+    "leegen": {
       "type": "http",
       "url": "http://127.0.0.1:13370/mcp"
     }

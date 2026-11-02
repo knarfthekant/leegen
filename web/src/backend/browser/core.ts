@@ -1,4 +1,4 @@
-// TypeScript port of leetclaude.core.views and leetclaude.core.review: the parts of the core the
+// TypeScript port of leegen.core.views and leegen.core.review: the parts of the core the
 // browser edition needs without waiting for Pyodide (listing, tutoring tools, the review flow).
 // Run planning, result assembly and validation are NOT ported; the runner runs the real Python.
 //

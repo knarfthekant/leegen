@@ -24,11 +24,11 @@ export interface WorkspaceRecord {
   id: string;
   /** The user's editable files. Missing paths fall back to the starter code. */
   files: Record<string, string>;
-  /** Same names as the server's workspace/<id>/.leetclaude/<name>.json. */
+  /** Same names as the server's workspace/<id>/.leegen/<name>.json. */
   state: Record<string, unknown>;
 }
 
-const DB_NAME = "leetclaude";
+const DB_NAME = "leegen";
 const DB_VERSION = 1;
 type StoreName = "problems" | "assets" | "workspace" | "meta";
 
@@ -56,7 +56,7 @@ export class Db {
       };
       r.onsuccess = () => resolve(new Db(r.result));
       r.onerror = () => reject(r.error);
-      r.onblocked = () => reject(new Error("the leetclaude database is blocked by another tab; close it and reload"));
+      r.onblocked = () => reject(new Error("the leegen database is blocked by another tab; close it and reload"));
     });
   }
 

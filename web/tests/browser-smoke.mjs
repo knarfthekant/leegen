@@ -1,12 +1,12 @@
 // Browser-edition smoke test: the static build on two local origins with production headers.
 //
-//   uv run leetclaude browser build && uv run leetclaude browser serve    (from server/)
+//   uv run leegen browser build && uv run leegen browser serve    (from server/)
 //   node tests/browser-smoke.mjs                                          (from web/)
 //
 // Fresh Chrome profile (empty IndexedDB). Uses the installed Chrome via playwright-core.
 import { chromium } from "playwright-core";
 
-const APP = process.env.LEETCLAUDE_APP ?? "http://localhost:13380";
+const APP = process.env.LEEGEN_APP ?? "http://localhost:13380";
 const SHOTS = process.env.SHOTS ?? "/tmp";
 const PID = "merge-ranges";
 const PYTHON_SEEDS = ["merge-ranges", "iterators-and-await", "py-async-generators", "rate-limiter-service"];
@@ -65,7 +65,7 @@ page.on("console", (m) => {
 });
 
 const tool = async (name, input = {}) => {
-  const r = await page.evaluate(([n, i]) => window.leetclaudeTools.call(n, i), [name, input]);
+  const r = await page.evaluate(([n, i]) => window.leegenTools.call(n, i), [name, input]);
   const text = r.content[0].text;
   if (r.isError) throw new Error(`${name}: ${text}`);
   try {
@@ -75,7 +75,7 @@ const tool = async (name, input = {}) => {
   }
 };
 const toolError = async (name, input) => {
-  const r = await page.evaluate(([n, i]) => window.leetclaudeTools.call(n, i), [name, input]);
+  const r = await page.evaluate(([n, i]) => window.leegenTools.call(n, i), [name, input]);
   if (!r.isError) throw new Error(`${name} should have failed`);
   return r.content[0].text;
 };
@@ -101,7 +101,7 @@ try {
   const registered = await page.evaluate(async () => {
     const mc = document.modelContext ?? navigator.modelContext;
     const tools = mc?.getTools ? await mc.getTools() : null;
-    return { has: !!mc, names: tools ? tools.map((t) => t.name) : null, listed: window.leetclaudeTools.list().length };
+    return { has: !!mc, names: tools ? tools.map((t) => t.name) : null, listed: window.leegenTools.list().length };
   });
   console.log(`  modelContext: ${registered.has}; registered: ${registered.names?.length ?? "?"}; manifest tools: ${registered.listed}`);
   if (registered.has && registered.names && registered.names.length !== registered.listed) {
@@ -259,7 +259,7 @@ try {
   await page.locator(".monaco-editor").first().waitFor();
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
   const runnerFrame = () => page.frames().find((f) => f !== page.mainFrame() && new URL(f.url()).origin !== new URL(APP).origin);
-  await page.waitForFunction(() => document.querySelector("iframe[title='leetclaude runner']"));
+  await page.waitForFunction(() => document.querySelector("iframe[title='leegen runner']"));
   for (let i = 0; i < 100 && !runnerFrame(); i++) await page.waitForTimeout(100);
   const precached = await runnerFrame().evaluate(async () => {
     const reg = await navigator.serviceWorker.ready;

@@ -18,7 +18,7 @@ test("zip round trip keeps paths and bytes", async () => {
   const entries = [
     { path: "problems/a.yaml", data: enc.encode("id: a\n") },
     { path: "workspace/a/solution.py", data: enc.encode("print('é')\n") },
-    { path: "workspace/a/.leetclaude/hints.json", data: enc.encode('{"revealed": 1}') },
+    { path: "workspace/a/.leegen/hints.json", data: enc.encode('{"revealed": 1}') },
   ];
   const back = await readZip(writeZip(entries));
   assert.deepEqual(back.map((e) => [e.path, dec.decode(e.data)]), entries.map((e) => [e.path, dec.decode(e.data)]));

@@ -2,7 +2,7 @@
 // Uses the locally installed Chrome via playwright-core (no browser download).
 import { chromium } from "playwright-core";
 
-const BASE = process.env.LEETCLAUDE_URL ?? "http://127.0.0.1:13370";
+const BASE = process.env.LEEGEN_URL ?? "http://127.0.0.1:13370";
 const SHOTS = process.env.SHOTS ?? "/tmp";
 const PID = "merge-ranges";
 const SOLUTION = `def merge_ranges(bookings):

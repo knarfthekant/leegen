@@ -51,7 +51,7 @@ description: |
 
   :::warning
   This problem needs an NVIDIA GPU. Run it on a CUDA executor: a local Linux machine, or a remote
-  SSH or SLURM machine configured in `~/.config/leetclaude/executors.yaml`.
+  SSH or SLURM machine configured in `~/.config/leegen/executors.yaml`.
   :::
 hints:
   - "Inside the kernel: `int i = blockIdx.x * blockDim.x + threadIdx.x; if (i < n) c[i] = a[i] + b[i];`"
@@ -87,7 +87,7 @@ files:
       #include <string>
       #include <vector>
 
-      #include <leetclaude/judge.h>
+      #include <leegen/judge.h>
       #include "kernel.h"
 
       static bool run_case(const std::string& name, int n, bool visible) {

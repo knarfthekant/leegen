@@ -86,7 +86,7 @@ def main() -> None:
         shutil.copy(REPO / "problems" / f"{pid}.yaml", app / "problems" / f"{pid}.yaml")
     (app / "problems" / "index.json").write_text(json.dumps(ids))
     (app / "core").mkdir()
-    shutil.copy(REPO / "server/src/leetclaude/schema/models.py", app / "core" / "models.py")
+    shutil.copy(REPO / "server/src/leegen/core/models.py", app / "core" / "models.py")
 
     # job bundles exported by the server's own planning code
     subprocess.run(

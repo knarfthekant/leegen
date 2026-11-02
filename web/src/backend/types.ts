@@ -1,6 +1,6 @@
 // The seam between the UI and wherever problems live and code runs.
 //
-// - ServerBackend (./server.ts): the local leetclaude server over REST + WebSocket.
+// - ServerBackend (./server.ts): the local leegen server over REST + WebSocket.
 // - BrowserBackend (./browser/): IndexedDB + a separate-origin Pyodide runner + WebMCP tools.
 //
 // Components only talk to `getBackend()` (./index.ts); nothing else knows which edition runs.

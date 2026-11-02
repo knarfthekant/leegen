@@ -1,5 +1,5 @@
 [project]
-name = "leetclaude"
+name = "leegen"
 version = "1.2.0"
 description = "AI-native programming training app"
 authors = [
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-leetclaude = "leetclaude.cli:main"
+leegen = "leegen.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.15,<0.13.0"]

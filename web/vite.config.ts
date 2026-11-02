@@ -1,10 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Ports: 13370 = backend (UI + API + MCP), 13371 = this dev server. `leetclaude dev` sets both.
-const apiPort = process.env.LEETCLAUDE_PORT ?? "13370";
-const api = process.env.LEETCLAUDE_API ?? `http://127.0.0.1:${apiPort}`;
-const webPort = Number(process.env.LEETCLAUDE_WEB_PORT ?? 13371);
+// Ports: 13370 = backend (UI + API + MCP), 13371 = this dev server. `leegen dev` sets both.
+const apiPort = process.env.LEEGEN_PORT ?? "13370";
+const api = process.env.LEEGEN_API ?? `http://127.0.0.1:${apiPort}`;
+const webPort = Number(process.env.LEEGEN_WEB_PORT ?? 13371);
 
 export default defineConfig({
   plugins: [react()],

@@ -43,7 +43,7 @@ export function ReviewPanel({ annotations, proposals, selectedId, onSelect, onDi
         <MessageSquare size={20} strokeWidth={1.6} />
         <span>
           No review comments yet. Ask your AI assistant for a hint or a code review. It can comment on lines here and
-          suggest edits through the leetclaude MCP server.
+          suggest edits through the leegen MCP server.
         </span>
       </div>
     );

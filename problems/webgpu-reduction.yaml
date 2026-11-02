@@ -81,7 +81,7 @@ files:
   - path: _host.py
     role: hidden
     content: |
-      from leetclaude_harness import webgpu as wg
+      from leegen_harness import webgpu as wg
 
       def total(values):
           n = len(values)

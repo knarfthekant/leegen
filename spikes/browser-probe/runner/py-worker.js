@@ -1,4 +1,4 @@
-// Pyodide module worker. Runs leetclaude job bundles with the unmodified harness, patched only
+// Pyodide module worker. Runs leegen job bundles with the unmodified harness, patched only
 // where the browser can't do what native Python does (signal-based per-test alarms).
 
 import { loadPyodide } from "./pyodide/pyodide.mjs";
@@ -24,7 +24,7 @@ facts["event_loop_policy"] = type(asyncio.get_event_loop_policy()).__name__
 json.dumps(facts)
 `;
 
-// Runs the harness exactly like `python -m leetclaude_harness run.json`, from a per-run MEMFS dir.
+// Runs the harness exactly like `python -m leegen_harness run.json`, from a per-run MEMFS dir.
 const RUN_PY = `
 import contextlib, os, sys
 
@@ -32,19 +32,19 @@ def _purge_run_modules():
     # user/ref/harness modules from earlier runs share names (solution, test_visible, ...)
     for name, mod in list(sys.modules.items()):
         f = getattr(mod, "__file__", None) or ""
-        if f.startswith("/run/") or name == "leetclaude_harness" or name.startswith("leetclaude_harness."):
+        if f.startswith("/run/") or name == "leegen_harness" or name.startswith("leegen_harness."):
             del sys.modules[name]
 
 base = LC_BASE
-os.environ["LEETCLAUDE_RESULTS"] = base + "/results.jsonl"
-os.environ["LEETCLAUDE_DEVICE"] = "cpu"
+os.environ["LEEGEN_RESULTS"] = base + "/results.jsonl"
+os.environ["LEEGEN_DEVICE"] = "cpu"
 sys.dont_write_bytecode = True
 _purge_run_modules()
 lc_path = base + "/_lc"
 sys.path.insert(0, lc_path)
 cwd = os.getcwd()
 try:
-    from leetclaude_harness import _common
+    from leegen_harness import _common
 
     @contextlib.contextmanager
     def _browser_alarm(seconds):
@@ -55,8 +55,8 @@ try:
 
     if LC_PATCH_ALARM:
         _common.alarm = _browser_alarm
-    sys.argv = ["leetclaude_harness", base + "/run.json"]
-    from leetclaude_harness.__main__ import main
+    sys.argv = ["leegen_harness", base + "/run.json"]
+    from leegen_harness.__main__ import main
     main()
 finally:
     os.chdir(cwd)

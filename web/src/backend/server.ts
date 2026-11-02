@@ -36,7 +36,7 @@ export function createServerBackend(base = ""): Backend {
     if (live === v) return;
     live = v;
     status = v
-      ? { ok: true, label: "Live", title: "Connected to the leetclaude server" }
+      ? { ok: true, label: "Live", title: "Connected to the leegen server" }
       : { ok: false, label: "Offline", title: "Reconnecting…" };
     statusListeners.forEach((l) => l());
   };

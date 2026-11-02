@@ -21,7 +21,7 @@ type DirectiveNode = {
   data?: Record<string, unknown>;
 };
 
-function remarkLeetclaudeDirectives() {
+function remarkLeegenDirectives() {
   return (tree: unknown) => {
     visit(tree as never, (node: DirectiveNode) => {
       if (node.type !== "containerDirective" && node.type !== "leafDirective") return;
@@ -138,7 +138,7 @@ export const Markdown = memo(function Markdown({
   return (
     <div className="markdown">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath, remarkDirective, remarkLeetclaudeDirectives]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkDirective, remarkLeegenDirectives]}
         rehypePlugins={[
           rehypeRaw,
           [rehypeSanitize, schema],

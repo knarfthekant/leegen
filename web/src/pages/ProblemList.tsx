@@ -150,7 +150,7 @@ export function ProblemList() {
                 </span>
               ) : (
                 <span>
-                  No problems yet. Ask an agent to create one through the leetclaude MCP server, or add a YAML file to{" "}
+                  No problems yet. Ask an agent to create one through the leegen MCP server, or add a YAML file to{" "}
                   <code>problems/</code>.
                 </span>
               )}

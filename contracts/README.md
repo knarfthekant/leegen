@@ -1,8 +1,8 @@
 # contracts/
 
 Shared between the server edition and the browser edition. Everything here except this README
-is **generated** by `cd server && uv run leetclaude schema` from `server/src/leetclaude/core/`;
-`uv run leetclaude schema --check` (and a backend test) fail when it is stale.
+is **generated** by `cd server && uv run leegen schema` from `server/src/leegen/core/`;
+`uv run leegen schema --check` (and a backend test) fail when it is stale.
 
 | File | What |
 |---|---|
@@ -15,9 +15,9 @@ The TypeScript types for the same records live in `web/src/contracts/generated.t
 
 ## Run protocol
 
-Both editions run the same harness (`server/src/leetclaude/harness/`) on a bundle planned by
-`core.plan.plan_run()`: `user/`, optional `ref/`, `_lc/leetclaude_harness/`, `run.json`. The
+Both editions run the same harness (`server/src/leegen/harness/`) on a bundle planned by
+`core.plan.plan_run()`: `user/`, optional `ref/`, `_lc/leegen_harness/`, `run.json`. The
 harness appends JSON lines (`test`, `metric`, `error`, `compile_error`, `log`) to
-`$LEETCLAUDE_RESULTS`, and `core.assemble.assemble()` turns them into a `RunResult`. The server
+`$LEEGEN_RESULTS`, and `core.assemble.assemble()` turns them into a `RunResult`. The server
 writes the bundle to a temp dir and runs it on an executor; the browser runner writes it to
 Pyodide's in-memory filesystem and runs it in a worker, streaming lines as `RunnerEvent`s.

@@ -72,7 +72,7 @@ files:
   content: |
     import torch
 
-    from leetclaude_harness import device
+    from leegen_harness import device
 
 
     def make_inputs(seed, x, weight, bias):

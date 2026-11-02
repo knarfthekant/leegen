@@ -1,13 +1,13 @@
-"""leetclaude.browser_runner (what the Pyodide worker calls), exercised natively."""
+"""leegen.browser_runner (what the Pyodide worker calls), exercised natively."""
 
 import json
 
-from leetclaude.browser_runner import (execute, finish, parse, prepare, read_results,
+from leegen.browser_runner import (execute, finish, parse, prepare, read_results,
                                        validate_after_reference, validate_after_starter,
                                        validate_precheck)
-from leetclaude.envs.registry import EnvironmentRegistry
-from leetclaude.runner.orchestrator import HARNESS_ROOT
-from leetclaude.store.problems import ProblemStore
+from leegen.envs.registry import EnvironmentRegistry
+from leegen.runner.orchestrator import HARNESS_ROOT
+from leegen.store.problems import ProblemStore
 
 
 def _yaml(pid: str) -> str:
@@ -70,7 +70,7 @@ def test_webgpu_helper_data_and_native_refusal(monkeypatch):
     monkeypatch.syspath_prepend(str(HARNESS_ROOT))
     import pytest
 
-    from leetclaude_harness import webgpu as wg
+    from leegen_harness import webgpu as wg
 
     assert wg.to_f32(wg.f32([1.5, -2.0])) == [1.5, -2.0]
     assert wg.to_u32(wg.u32([7, 0])) == [7, 0] and wg.to_i32(wg.i32([-3])) == [-3]

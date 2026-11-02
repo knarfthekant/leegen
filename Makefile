@@ -1,17 +1,17 @@
-# Run from the repo root. Ports: LEETCLAUDE_PORT (default 13370), LEETCLAUDE_WEB_PORT (13371).
+# Run from the repo root. Ports: LEEGEN_PORT (default 13370), LEEGEN_WEB_PORT (13371).
 .PHONY: start dev stop restart build check test smoke browser browser-serve browser-smoke
 
 ## UI + API + MCP on one port; installs deps and rebuilds the UI when needed
 start:
-	cd server && uv sync -q && uv run leetclaude start
+	cd server && uv sync -q && uv run leegen start
 
 ## backend --reload + Vite hot reload; Ctrl-C stops both
 dev:
-	cd server && uv sync -q && uv run leetclaude dev
+	cd server && uv sync -q && uv run leegen dev
 
 ## stop the server started by `make start` / `make dev` (from any terminal)
 stop:
-	cd server && uv run leetclaude stop
+	cd server && uv run leegen stop
 
 restart: stop start
 
@@ -22,7 +22,7 @@ test:
 	cd server && uv run pytest
 
 check: test
-	cd server && uv run leetclaude validate --all
+	cd server && uv run leegen validate --all
 	cd web && npm test && npm run typecheck && npm run build
 
 ## browser smoke test against a running server (make start)
@@ -31,10 +31,10 @@ smoke:
 
 ## browser edition: build both static sites (app + runner) for local origins, then serve them
 browser:
-	cd server && uv run leetclaude browser build
+	cd server && uv run leegen browser build
 
 browser-serve:
-	cd server && uv run leetclaude browser serve
+	cd server && uv run leegen browser serve
 
 ## browser smoke test against `make browser-serve`
 browser-smoke:

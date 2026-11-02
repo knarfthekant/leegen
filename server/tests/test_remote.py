@@ -5,10 +5,10 @@ import stat
 
 import pytest
 
-from leetclaude.executors.remote import SlurmExecutor, SshExecutor
-from leetclaude.runner import Orchestrator, RunRequest
-from leetclaude.schema.models import ExecutorConfig
-from leetclaude.store.problems import ProblemStore
+from leegen.executors.remote import SlurmExecutor, SshExecutor
+from leegen.runner import Orchestrator, RunRequest
+from leegen.schema.models import ExecutorConfig
+from leegen.store.problems import ProblemStore
 
 
 class _Manager:
@@ -90,7 +90,7 @@ def test_ssh_executor_requires_host():
 
 
 def test_tilde_paths_become_home():
-    ex = SshExecutor(ExecutorConfig(id="x", kind="ssh", host="h", workdir="~/.leetclaude/",
+    ex = SshExecutor(ExecutorConfig(id="x", kind="ssh", host="h", workdir="~/.leegen/",
                                     uv="~/.local/bin/uv"))
-    assert ex._base() == "$HOME/.leetclaude"  # until resolved to an absolute path on first use
+    assert ex._base() == "$HOME/.leegen"  # until resolved to an absolute path on first use
     assert ex.uv == "$HOME/.local/bin/uv"

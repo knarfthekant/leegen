@@ -9,26 +9,26 @@ whose **capabilities** cover the problem's and environment's `requires`:
 | `gpu` | `cuda` or `mps` |
 | `cuda` | `cuda` only |
 
-The toolbar lists only compatible executors. Validation and `leetclaude run` use the first
+The toolbar lists only compatible executors. Validation and `leegen run` use the first
 compatible one, unless `--executor <id>` is given.
 
 ## Configuration
 
-`~/.config/leetclaude/executors.yaml` (override the location with `LEETCLAUDE_EXECUTORS`):
+`~/.config/leegen/executors.yaml` (override the location with `LEEGEN_EXECUTORS`):
 
 ```yaml
 executors:
   - id: devbox                         # plain SSH host
     kind: ssh
     host: me@devbox.example.com        # or an alias from ~/.ssh/config
-    workdir: ~/.leetclaude             # scratch dir on the remote: envs/ and runs/
+    workdir: ~/.leegen             # scratch dir on the remote: envs/ and runs/
     capabilities: [cpu, cuda]
 
   - id: cluster                        # SLURM through a login node
     kind: slurm
     host: me@login.cluster.example.edu
     ssh_options: [-i, ~/.ssh/id_ed25519, -o, IdentitiesOnly=yes]
-    workdir: ~/.leetclaude
+    workdir: ~/.leegen
     uv: ~/.local/bin/uv                # uv on the compute nodes
     srun_args: [--partition=GPU, --gres=gpu:1, --time=00:15:00, --cpus-per-task=4, --mem=16G]
     setup: "module load gcc"           # optional shell lines run before every job
@@ -43,7 +43,7 @@ The `local` executor (this machine) always exists and detects its own capabiliti
 ## How the kinds work
 
 **local** runs the job as a subprocess in a uv venv cached at
-`~/.cache/leetclaude/envs/<env>-<hash>`. It applies wall-clock and CPU-time limits, uses its own
+`~/.cache/leegen/envs/<env>-<hash>`. It applies wall-clock and CPU-time limits, uses its own
 process group, and cancel kills that group.
 
 **ssh**
@@ -54,7 +54,7 @@ process group, and cancel kills that group.
 4. Fetches the results and deletes the run directory.
 
 It uses the system `ssh` with `BatchMode=yes` and a ControlMaster socket, so repeated runs reuse
-one connection. Authentication is whatever `ssh <host>` does; leetclaude never stores
+one connection. Authentication is whatever `ssh <host>` does; leegen never stores
 credentials.
 
 **slurm** is the same, except the job script runs as `srun --job-name=lc-<run-id> <srun_args>
@@ -80,7 +80,7 @@ toolkit is a minor version newer than the driver.
   for `slurm`. Install it with `curl -LsSf https://astral.sh/uv/install.sh | sh`; set `uv:` if
   it isn't on the non-interactive `PATH`.
 - Outbound HTTPS to PyPI on first use of each environment (or a reachable mirror set with
-  `LEETCLAUDE_PACKAGE_INDEX`).
+  `LEEGEN_PACKAGE_INDEX`).
 
 ## Setting up a cluster
 
@@ -94,7 +94,7 @@ local notes are gitignored. Only the shared setup guide is tracked in this direc
 
 ## Adding an executor kind
 
-Subclass `leetclaude.executors.base.Executor` and implement:
+Subclass `leegen.executors.base.Executor` and implement:
 - `capabilities()`
 - `prepare(env, extra_deps)`: returns template values such as `{python}`, `{venv}` and
   `{site_packages}`

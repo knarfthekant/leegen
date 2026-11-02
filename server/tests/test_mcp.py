@@ -2,9 +2,9 @@
 
 from mcp import Client
 
-from leetclaude.mcp_server import build_mcp
-from leetclaude.state import app_state
-from leetclaude.store.problems import ProblemStore, dump_problem_yaml
+from leegen.mcp_server import build_mcp
+from leegen.state import app_state
+from leegen.store.problems import ProblemStore, dump_problem_yaml
 
 
 def connect() -> Client:
@@ -130,7 +130,7 @@ async def test_add_test_case_sections_and_names():
 
 
 async def test_resolve_proposal_accept_writes_file():
-    from leetclaude import tutor
+    from leegen import tutor
 
     p = ProblemStore().get("merge-ranges")
     st = app_state()

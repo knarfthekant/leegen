@@ -1,4 +1,4 @@
-# Authoring leetclaude problems
+# Authoring leegen problems
 
 A problem is one YAML file, `problems/<id>.yaml`, validated against
 `schema/problem.schema.json`. It contains everything needed to show and grade the problem:
@@ -10,11 +10,11 @@ A problem is one YAML file, `problems/<id>.yaml`, validated against
 The loop:
 
 1. Draft the YAML.
-2. `validate_problem_yaml` (MCP) or `uv run leetclaude validate --file draft.yaml`
+2. `validate_problem_yaml` (MCP) or `uv run leegen validate --file draft.yaml`
    (CLI) checks the schema, runs the **reference** (it must pass every test) and runs the
    **starter** (it must fail at least one test).
 3. Fix the issues, then `create_problem` (MCP), or save to `problems/` and run
-   `leetclaude validate <id>`.
+   `leegen validate <id>`.
 
 ## 1. Top-level fields
 
@@ -93,7 +93,7 @@ Rules:
 - Every file is available to the code at run time. Hidden files are never sent to the browser,
   but a failing hidden test's message may show code from them.
 - Name hidden helpers with a leading underscore (`_setup.py`, `_gen.py`).
-- In GPU problems, get the device with `from leetclaude_harness import device` (returns `"cuda"`,
+- In GPU problems, get the device with `from leegen_harness import device` (returns `"cuda"`,
   `"mps"` or `"cpu"`) in hidden setup code. User-facing code should take the device from its
   inputs (`x.device`).
 
@@ -205,7 +205,7 @@ judge:
   interpreter.
 - A failing build step shows as **Compile Error**, with its output.
 - The harness writes result events (one JSON object per line) to the file named by the
-  `LEETCLAUDE_RESULTS` environment variable:
+  `LEEGEN_RESULTS` environment variable:
 
   ```json
   {"type": "test", "name": "n=1024", "status": "pass", "visible": true, "expected": "...", "actual": "...", "message": null}
@@ -322,13 +322,13 @@ A good description has:
   Example: `kv-cache-basics`.
 - **Low-level GPU (CUDA):** `requires: [cuda]`, `script` judge, hidden `main.cu` harness that
   checks results against a CPU computation and prints result events with
-  `#include <leetclaude/judge.h>` (`lc::test`, `lc::error`, `lc::metric`; compile with
+  `#include <leegen/judge.h>` (`lc::test`, `lc::error`, `lc::metric`; compile with
   `-I{bundle}/_lc/include`). These only run on NVIDIA executors (local Linux box, SSH host,
   SLURM cluster). Examples: `cuda-vector-add` (script), `triton-vector-add` (function judge with
   Triton).
 - **GPU in the browser (WebGPU):** `webgpu` environment, `requires: [webgpu]`, browser edition
   only. The editable file is a `kernel.wgsl`. A hidden `_host.py` is the `function` judge's entry:
-  it packs the inputs, calls `leetclaude_harness.webgpu.dispatch(wg.source("kernel.wgsl",
+  it packs the inputs, calls `leegen_harness.webgpu.dispatch(wg.source("kernel.wgsl",
   __file__), [wg.storage(...), wg.uniform(...)], workgroups=(...))` and returns plain lists, which
   are compared with `float` tolerances. Bindings are `@group(0) @binding(i)` in list order.
   Writable storage buffers are read back, and compile errors reach the user as

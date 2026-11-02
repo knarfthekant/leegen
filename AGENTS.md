@@ -1,6 +1,6 @@
 # AGENTS.md
 
-leetclaude is a local, LeetCode-style programming trainer with **no fixed problem bank**. Agents
+leegen is a local, LeetCode-style programming trainer with **no fixed problem bank**. Agents
 write problems as YAML files. The user solves them in a browser (description on the left, editor
 and tests on the right) and runs tests on CPU or GPU executors. Agents also act as the user's
 tutor through MCP: reading their code, running it, commenting on lines, and proposing edits.
@@ -27,33 +27,33 @@ make stop     # stop the server started by start/dev, from any terminal (make re
 
 | Port | What | Override |
 |---|---|---|
-| 13370 | UI, REST API, WebSocket and MCP (`/mcp`), all served by the backend | `LEETCLAUDE_PORT` (or `--port`) |
-| 13371 | Vite dev server (`make dev` only); proxies `/api` and `/mcp` to 13370 | `LEETCLAUDE_WEB_PORT` |
+| 13370 | UI, REST API, WebSocket and MCP (`/mcp`), all served by the backend | `LEEGEN_PORT` (or `--port`) |
+| 13371 | Vite dev server (`make dev` only); proxies `/api` and `/mcp` to 13370 | `LEEGEN_WEB_PORT` |
 
-Without make, from `server/`: `uv run leetclaude start` (`--no-build` skips the UI build),
-`uv run leetclaude dev` and `uv run leetclaude stop [--port N]`. `uv run leetclaude serve` serves
+Without make, from `server/`: `uv run leegen start` (`--no-build` skips the UI build),
+`uv run leegen dev` and `uv run leegen stop [--port N]`. `uv run leegen serve` serves
 without building. If a port is taken, startup fails with a message naming the variable to change;
 ports never drift silently.
 
-`stop` is PID-exact: launchers record their PID in `~/.cache/leetclaude/run/server-<port>.json`,
+`stop` is PID-exact: launchers record their PID in `~/.cache/leegen/run/server-<port>.json`,
 and `stop` signals only that process (SIGTERM, then SIGKILL after `--timeout`) after checking that
-its command line is a leetclaude entry point. Without a pidfile it falls back to the leetclaude
+its command line is a leegen entry point. Without a pidfile it falls back to the leegen
 process listening on the port. Any other program on the port is reported and never touched.
 
 Connect an agent: the repo's `.mcp.json` registers `http://127.0.0.1:13370/mcp` for Claude Code
-automatically. Elsewhere: `claude mcp add --transport http leetclaude http://127.0.0.1:13370/mcp`
+automatically. Elsewhere: `claude mcp add --transport http leegen http://127.0.0.1:13370/mcp`
 (Codex and other clients use the same URL).
 
 CLI, for agents without MCP. Run from `server/`:
 
 | Command | What it does |
 |---|---|
-| `uv run leetclaude start` / `dev` / `stop` / `serve` | Launch or stop the server (see [Running](#running)) |
-| `uv run leetclaude list` | List problems; invalid YAML files are reported |
-| `uv run leetclaude validate --all` / `<id>` / `--file x.yaml` | Schema check + reference must pass every test + starter must fail |
-| `uv run leetclaude run <id> [--reference] [--json]` | Run the user's workspace code (or the reference) |
-| `uv run leetclaude schema` | Regenerate `schema/problem.schema.json` from the Pydantic models |
-| `uv run leetclaude browser build` / `serve` | Build the browser edition's two static sites / serve them locally with their headers |
+| `uv run leegen start` / `dev` / `stop` / `serve` | Launch or stop the server (see [Running](#running)) |
+| `uv run leegen list` | List problems; invalid YAML files are reported |
+| `uv run leegen validate --all` / `<id>` / `--file x.yaml` | Schema check + reference must pass every test + starter must fail |
+| `uv run leegen run <id> [--reference] [--json]` | Run the user's workspace code (or the reference) |
+| `uv run leegen schema` | Regenerate `schema/problem.schema.json` from the Pydantic models |
+| `uv run leegen browser build` / `serve` | Build the browser edition's two static sites / serve them locally with their headers |
 
 ## Repo map
 
@@ -61,7 +61,7 @@ CLI, for agents without MCP. Run from `server/`:
 problems/<id>.yaml          problem bank (one self-contained file per problem)
 problems/<id>/assets/       optional images referenced from the description
 environments/<id>.yaml      runtimes: language, python version, dependencies, hardware needs
-workspace/<id>/             the user's code (real files) + .leetclaude/*.json state (gitignored)
+workspace/<id>/             the user's code (real files) + .leegen/*.json state (gitignored)
 docs/authoring.md           full authoring guide (also served by the get_authoring_guide tool)
 docs/browser.md             the browser edition: architecture, build, deploy, limits
 docs/executors.md           executor kinds and executors.yaml
@@ -69,13 +69,13 @@ docs/clusters/README.md     shared guide for setting up remote cluster backends
 docs/clusters/<name>.md     local per-cluster notes (gitignored)
 schema/problem.schema.json  generated JSON Schema for problem YAML
 contracts/                  generated: records/events schemas, tool manifest, conformance fixtures
-server/src/leetclaude/      FastAPI backend, runner, MCP server (Python package `leetclaude`)
-server/src/leetclaude/core/ pure core shared with the browser runner (stdlib + pydantic only)
+server/src/leegen/      FastAPI backend, runner, MCP server (Python package `leegen`)
+server/src/leegen/core/ pure core shared with the browser runner (stdlib + pydantic only)
 web/src/                    React + Vite + Monaco frontend (primitives in components/ui.tsx)
 web/src/backend/            Backend interface: server.ts (REST/WS) and browser/ (IndexedDB, WebMCP)
 web/runner/                 browser edition's runner origin (Pyodide worker, deadlines, RPC)
-server/src/leetclaude/browser_runner.py   what the Pyodide worker calls (prepare/execute/finish)
-server/src/leetclaude/browser_edition/    browser build: Pyodide fetch, data bundle, _headers
+server/src/leegen/browser_runner.py   what the Pyodide worker calls (prepare/execute/finish)
+server/src/leegen/browser_edition/    browser build: Pyodide fetch, data bundle, _headers
 ```
 
 ## Authoring protocol
@@ -115,14 +115,14 @@ Short version:
 7. **Validate, then save:** `validate_problem_yaml` returns a report. Fix every issue, then call
    `create_problem` (or `update_problem`). It saves only if the reference passes every test and
    the starter fails at least one. Without MCP, write `problems/<id>.yaml` and run
-   `uv run leetclaude validate <id>`.
+   `uv run leegen validate <id>`.
 8. `id` is a lowercase slug and must equal the file name. Use `track` + `order` for multi-part
    curricula (for example `cuda-101`, orders 1..N).
 
 Good examples to copy from: `merge-ranges` (function + generator), `py-async-generators`
 (pytest, learning-style), `rate-limiter-service` (half-built multi-file app), `kv-cache-basics`
 (PyTorch on GPU, tensor generators, allclose), `triton-vector-add` (Triton, NVIDIA),
-`cuda-vector-add` (script judge with a hidden CUDA harness using `<leetclaude/judge.h>`).
+`cuda-vector-add` (script judge with a hidden CUDA harness using `<leegen/judge.h>`).
 
 ## Tutoring protocol
 
@@ -159,14 +159,14 @@ When the user asks for help with the problem they have open:
 ## Architecture
 
 The layers are decoupled. Each one is an interface plus a registry
-(`server/src/leetclaude/registry.py`).
+(`server/src/leegen/registry.py`).
 
 ```
 Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─► Executor
 (what)          (how tested)  (how built/run)     (deps/runtime) (where it runs)
 ```
 
-- **Core** (`server/src/leetclaude/core/`): the schema models, run planning (`plan.py`), result
+- **Core** (`server/src/leegen/core/`): the schema models, run planning (`plan.py`), result
   assembly (`assemble.py`), views, review logic (annotations, edits, proposals), validation rules
   and the tool spec. It is pure (stdlib + pydantic, pyyaml in `parse.py`) because the browser
   edition's runner imports the same modules inside Pyodide. Never add I/O or server imports here.
@@ -174,16 +174,16 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   temp dir containing:
   - `user/`: the user's files, readonly files and hidden files
   - `ref/`: the same, with the reference solution swapped in (only when needed)
-  - `_lc/leetclaude_harness/`: the harness library
+  - `_lc/leegen_harness/`: the harness library
   - `run.json`
-- **Results protocol:** the harness appends JSON lines to `$LEETCLAUDE_RESULTS`:
+- **Results protocol:** the harness appends JSON lines to `$LEEGEN_RESULTS`:
   - `{"type": "test", "name", "status": "pass|fail|error|timeout|skipped", "visible", "input", "expected", "actual", "message", "stdout", "duration_ms"}`
   - `{"type": "metric", "name", "value", "unit", "reference"}`
   - `{"type": "error"|"compile_error"|"log", "message"}`
 
   Every judge kind and language uses this format. Non-Python harnesses only need to print these
   lines.
-- **Harness** (`server/src/leetclaude/harness/leetclaude_harness/`): standard library only (plus
+- **Harness** (`server/src/leegen/harness/leegen_harness/`): standard library only (plus
   pytest for the pytest judge). It is copied into every bundle and runs inside the problem's
   environment, never in the server process. It also runs unmodified in Pyodide: `alarm()` falls
   back to deadline checks where `signal.setitimer` is missing, `run_coro()` handles Pyodide's
@@ -193,13 +193,13 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
     them.
   - `pytest_plugin.py`: turns pytest reports into result events and runs `async def` tests.
 - **Executors** (`executors/`):
-  - `local` runs a subprocess in a uv venv (`~/.cache/leetclaude/envs/<id>-<hash>`), with a
+  - `local` runs a subprocess in a uv venv (`~/.cache/leegen/envs/<id>-<hash>`), with a
     timeout, a process group and CPU rlimits.
   - Capabilities (`cpu`, `mps`, `cuda`) are detected automatically. Problems and environments
     declare `requires`, and only compatible executors are offered. Executors also have a
     `runtime` (`native` here, `pyodide` for the browser runner); environments list theirs
     (`native: true`, plus a `browser:` block if they run in the browser). See `core/compat.py`.
-  - Remote executors (`ssh`, `slurm`) are configured in `~/.config/leetclaude/executors.yaml`.
+  - Remote executors (`ssh`, `slurm`) are configured in `~/.config/leegen/executors.yaml`.
     See `docs/executors.md`. Never put credentials in that file; it relies on the user's own
     ssh setup.
   - **Setting up a new remote cluster:** don't copy another cluster's config or pin packages.
@@ -217,16 +217,16 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   session, event sink and orchestrator injected (wired in `state.py`). MCP (`mcp_server/server.py`)
   and REST (`api/routes.py`) are thin adapters over it: put new behaviour in the service, then
   expose it in both. `services.py`, `tutor.py` and `validate.py` are compatibility wrappers.
-- **Contracts** (`contracts/`, generated by `uv run leetclaude schema` from `core/`): record and
+- **Contracts** (`contracts/`, generated by `uv run leegen schema` from `core/`): record and
   event schemas, `tools.json` (MCP tool definitions + `core/toolspec.py` hints, which the browser
   edition registers as WebMCP tools), conformance fixtures, and `web/src/contracts/generated.ts`.
-  `uv run leetclaude schema --check` fails when they are stale; a test enforces it.
+  `uv run leegen schema --check` fails when they are stale; a test enforces it.
 
 ### Browser edition
 
 - **Same core, different shell.** The UI talks to a `Backend` (`web/src/backend/types.ts`). The
   build picks one: `vite build` gives `server.ts`, and `vite build --mode browser` (what
-  `leetclaude browser build` runs) gives `browser/`.
+  `leegen browser build` runs) gives `browser/`.
 - **App origin:** `browser/service.ts` is `BrowserToolService`, the TS twin of `ToolService`.
   `browser/core.ts` ports `core/views.py` and `core/review.py`, and `npm test` checks it against
   `contracts/fixtures`. `browser/tools.ts` registers every tool in `contracts/tools.json` with
@@ -240,10 +240,10 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   `core.validation` steps (`precheck`, `after_reference`, `after_starter`), with a deadline per
   run. Timeouts and cancels use the interrupt buffer first, then terminate the worker.
 - **Rules:**
-  - Behaviour that both editions need goes into `leetclaude.core` (Python, which Pyodide runs) or
+  - Behaviour that both editions need goes into `leegen.core` (Python, which Pyodide runs) or
     into the service on both sides.
   - Any change to `core/views.py` or `core/review.py` must be mirrored in `browser/core.ts`, then
-    run `uv run leetclaude schema` and `npm test`.
+    run `uv run leegen schema` and `npm test`.
   - An environment runs in the browser only if it has a `browser:` block (Pyodide packages).
 
 ## Extending
@@ -260,7 +260,7 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
 - **New executor:** subclass `Executor` (`capabilities`, `prepare`, `run`, `cancel`), register it
   with `@register("executor", "<kind>")`, and import it in `executors/__init__.py`. Executor
   config allows extra fields.
-- **Schema changes:** edit `core/models.py`, then run `uv run leetclaude schema`, and update
+- **Schema changes:** edit `core/models.py`, then run `uv run leegen schema`, and update
   `docs/authoring.md` and the seed problems.
 - **New agent tool:** add the operation to `ToolService`, an MCP tool in `mcp_server/server.py`
   (its docstring is the description), an entry in `core/toolspec.py`, then regenerate contracts and
@@ -269,7 +269,7 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
 ## Conventions and checks
 
 - Backend: `cd server && uv run pytest`. All seed problems must stay valid
-  (`uv run leetclaude validate --all`).
+  (`uv run leegen validate --all`).
 - Frontend: `cd web && npm test && npm run typecheck && npm run build`. Browser smoke test against
   a running server: `make smoke` / `node tests/smoke.mjs` (uses the installed Chrome through
   playwright-core). `make check` runs the backend tests, problem validation, the TS conformance

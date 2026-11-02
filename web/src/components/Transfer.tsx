@@ -24,7 +24,7 @@ export function TransferButtons({
       const blob = await transfer.exportZip();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `leetclaude-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.download = `leegen-${new Date().toISOString().slice(0, 10)}.zip`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
     } finally {
@@ -72,7 +72,7 @@ export function TransferButtons({
           />
           <IconButton
             icon={FolderInput}
-            label="Load from a folder (a leetclaude checkout; shift-click to choose another folder)"
+            label="Load from a folder (a leegen checkout; shift-click to choose another folder)"
             onClick={withFolder(async (pickNew) => onImported?.(await folder.load(pickNew)))}
             disabled={busy}
           />

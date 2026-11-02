@@ -123,7 +123,7 @@ const TOOLS = [
   {
     name: "probe_get_report",
     title: "Get probe report",
-    description: "Return the leetclaude browser-probe report: which capabilities this browser has " +
+    description: "Return the leegen browser-probe report: which capabilities this browser has " +
       "(cross-origin isolation, WebGPU, JSPI, storage), whether the separate-origin runner works, and " +
       "Python run results. Read-only.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },

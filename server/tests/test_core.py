@@ -1,4 +1,4 @@
-"""The pure core (leetclaude.core), the ToolService seam and the generated contracts."""
+"""The pure core (leegen.core), the ToolService seam and the generated contracts."""
 
 import asyncio
 import json
@@ -6,14 +6,14 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from leetclaude.config import settings
-from leetclaude.core import compat, review
-from leetclaude.core.models import Environment, Problem
-from leetclaude.core.plan import plan_run
-from leetclaude.schema.contracts import check_all, tool_manifest
-from leetclaude.core.toolspec import TOOLS
-from leetclaude.state import app_state
-from leetclaude.store.problems import ProblemStore
+from leegen.config import settings
+from leegen.core import compat, review
+from leegen.core.models import Environment, Problem
+from leegen.core.plan import plan_run
+from leegen.schema.contracts import check_all, tool_manifest
+from leegen.core.toolspec import TOOLS
+from leegen.state import app_state
+from leegen.store.problems import ProblemStore
 
 
 def _env(**kw) -> Environment:
@@ -88,7 +88,7 @@ def test_rest_and_service_parity():
 
 
 def app_state_app():
-    from leetclaude.app import create_app
+    from leegen.app import create_app
 
     return create_app(watch=False)
 
@@ -106,14 +106,14 @@ def test_tool_manifest_covers_toolspec():
 def test_generated_contracts_are_up_to_date():
     # tests run against copies of problems/, but contracts come from the repo's own files
     stale = [str(p.relative_to(settings().root)) for p in check_all()]
-    assert stale == [], f"run `uv run leetclaude schema`: {stale}"
+    assert stale == [], f"run `uv run leegen schema`: {stale}"
 
 
 def test_run_coro_outside_a_loop(monkeypatch):
-    from leetclaude.runner.orchestrator import HARNESS_ROOT
+    from leegen.runner.orchestrator import HARNESS_ROOT
 
     monkeypatch.syspath_prepend(str(HARNESS_ROOT))   # the bundle's _lc/ on PYTHONPATH
-    from leetclaude_harness._common import run_coro
+    from leegen_harness._common import run_coro
 
     async def three() -> int:
         await asyncio.sleep(0)

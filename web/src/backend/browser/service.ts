@@ -1,5 +1,5 @@
 // BrowserToolService: the browser edition's counterpart of the server's ToolService
-// (server/src/leetclaude/service.py). Same operations, same result shapes and error messages,
+// (server/src/leegen/service.py). Same operations, same result shapes and error messages,
 // so the WebMCP tools (tools.ts) and the UI backend (index.ts) behave like MCP and REST do.
 //
 // Storage is IndexedDB (db.ts), events go through the EventHub (this tab + BroadcastChannel),
@@ -560,7 +560,7 @@ export class BrowserToolService {
     if (!canRun(caps, "pyodide", requires, env)) {
       const why = !runtimes(env).has("pyodide")
         ? `the ${pyRepr(env.id)} environment runs only on the local/remote edition (native executors). ` +
-          "Export this problem and run it with the leetclaude server."
+          "Export this problem and run it with the leegen server."
         : `this browser does not provide ${requires.filter((r) => !caps.includes(r)).join(", ")}` +
           (requires.includes("webgpu") ? " (WebGPU is unavailable here; try a current Chrome, Edge or Safari)" : "");
       return errorResult(p.id, runId, why, this.clock.now());
@@ -587,7 +587,7 @@ export class BrowserToolService {
   }
 
   private withRunLock<T>(problemId: string, fn: () => Promise<T>): Promise<T> {
-    const name = `leetclaude-run:${problemId}`;
+    const name = `leegen-run:${problemId}`;
     const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
     if (locks) return locks.request(name, fn) as Promise<T>;
     const prev = this.localLocks.get(name) ?? Promise.resolve();
