@@ -110,8 +110,9 @@ def build_mcp() -> MCPServer:
 
     @tool()
     def get_authoring_guide() -> str:
-        """How to write leegen problems: schema walkthrough, judge kinds, test design, markup,
-        and worked examples. Read this before creating problems."""
+        """How to write leegen problems: schema walkthrough, judge kinds, test design (including
+        pytest class grouping and one-line case descriptions), markup, and worked examples. Read
+        this before creating problems."""
         return _svc().authoring_guide()
 
     @tool()

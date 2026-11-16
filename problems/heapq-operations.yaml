@@ -1,0 +1,233 @@
+schema_version: 1
+id: heapq-operations
+title: 'heapq: Priority Queues and Top-K'
+difficulty: easy
+tags:
+- python
+- heapq
+- priority-queue
+- top-k
+track: python-data-structures
+order: 7
+environment: python
+description: |
+  A heap answers "what is the smallest (or largest) thing right now?" in O(log n)
+  and gives you the top-k of a large stream without sorting it. Python's `heapq`
+  module is a **min-heap**: `heap[0]` is always the smallest element. Coding
+  questions use it for schedulers, Dijkstra, k-way merges and every "k closest /
+  k largest" problem.
+
+  ## Your task
+
+  Implement four functions in `solution.py`.
+
+  | Function | What it does |
+  |---|---|
+  | `top_k(scores, k)` | The `k` largest scores, largest first. `k <= 0` is `[]`. |
+  | `cheapest_k(prices, k)` | The `k` smallest prices, smallest first. `k <= 0` is `[]`. |
+  | `merge_streams(streams)` | Merge pre-sorted lists into one sorted list (k-way merge). `merge_streams([])` is `[]`. |
+  | `combine_ropes(lengths)` | Repeatedly join the two shortest ropes; each join costs the sum of the two lengths. Return the **minimum total cost**. Fewer than two ropes costs 0. |
+
+  ## Worked example
+
+  ```text
+  top_k([72, 95, 88, 61], 2)         ->  [95, 88]
+  cheapest_k([7, 10, 4, 3, 20], 3)   ->  [3, 4, 7]
+  merge_streams([[1, 4], [1, 3], [2, 6]])
+                                     ->  [1, 1, 2, 3, 4, 6]
+  combine_ropes([4, 3, 2, 6])        ->  29
+      # 2+3=5 (cost 5), 5+4=9 (cost 9), 9+6=15 (cost 15); total 5+9+15 = 29
+  ```
+
+  ## Concepts these exercise
+
+  - `heapq.nlargest(k, xs)` / `heapq.nsmallest(k, xs)` - top-k without
+    writing a heap; both return sorted results.
+  - `heapq.merge(*streams)` lazily merges any number of sorted inputs.
+  - The manual pattern every scheduler uses: `heapify` once, then loop
+    `heappop` (the work), `heappush` (the follow-up).
+
+  :::warning
+  `heapq` is a min-heap. To get "largest first" out of it, push negated
+  values, or use `nlargest`. Also note `nlargest`/`nsmallest` **return a
+  new sorted list**, while `heappush`/`heappop` mutate the heap in place -
+  and `heapify` turns an existing list into a heap in place.
+  :::
+
+  **Constraints:** at most 10**5 elements; rope lengths are positive ints
+  fitting in 64 bits. `top_k`/`cheapest_k` are O(n log k); `combine_ropes` is
+  O(n log n).
+hints:
+- 'Top-k one-liners: `heapq.nlargest(k, scores)` and `heapq.nsmallest(k, prices)` - both already return
+  sorted lists.'
+- '`heapq.merge(*streams)` takes each list as a separate argument - unpack with the star.'
+- '`combine_ropes`: `heapify`, then while more than one rope remains, pop two, add their sum to the total,
+  and push the sum back.'
+files:
+- path: solution.py
+  content: |
+    """heapq: priority queues and the top-k family."""
+
+    import heapq
+
+
+    def top_k(scores: list, k: int) -> list:
+        """The k largest scores, largest first.
+
+        >>> top_k([72, 95, 88, 61], 2)
+        [95, 88]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def cheapest_k(prices: list, k: int) -> list:
+        """The k smallest prices, smallest first.
+
+        >>> cheapest_k([7, 10, 4, 3, 20], 3)
+        [3, 4, 7]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def merge_streams(streams: list) -> list:
+        """Merge pre-sorted lists into one sorted list.
+
+        >>> merge_streams([[1, 4], [1, 3], [2, 6]])
+        [1, 1, 2, 3, 4, 6]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def combine_ropes(lengths: list) -> int:
+        """Minimum total cost of joining all ropes, two at a time.
+
+        >>> combine_ropes([4, 3, 2, 6])
+        29
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+- path: test_visible.py
+  role: readonly
+  content: |
+    from solution import cheapest_k, combine_ropes, merge_streams, top_k
+
+
+    class TestTopK:
+        def test_top_k_largest_first(self):
+            """The k largest values, highest first."""
+            assert top_k([72, 95, 88, 61], 2) == [95, 88]
+
+
+    class TestCheapestK:
+        def test_cheapest_k_smallest_first(self):
+            """The k smallest values, smallest first."""
+            assert cheapest_k([7, 10, 4, 3, 20], 3) == [3, 4, 7]
+
+
+    class TestMergeStreams:
+        def test_merge_streams_k_way_merge_of_sorted_lists(self):
+            """Merge sorted streams into one sorted stream."""
+            assert merge_streams([[1, 4], [1, 3], [2, 6]]) == [1, 1, 2, 3, 4, 6]
+
+
+    class TestCombineRopes:
+        def test_combine_ropes_greedy_smallest_first(self):
+            """Always combine the two cheapest ropes; sum every cost."""
+            assert combine_ropes([4, 3, 2, 6]) == 29
+- path: test_hidden.py
+  role: hidden
+  content: |
+    from solution import cheapest_k, combine_ropes, merge_streams, top_k
+
+
+    class TestTopK:
+        def test_top_k_zero_or_negative_k(self):
+            """k <= 0 asks for nothing."""
+            assert top_k([1, 2], 0) == []
+
+        def test_top_k_empty(self):
+            """No numbers, no top-k."""
+            assert top_k([], 3) == []
+
+        def test_top_k_duplicates(self):
+            """Duplicates each count: two 5s are both returned."""
+            assert top_k([5, 5, 4], 2) == [5, 5]
+
+
+    class TestCheapestK:
+        def test_cheapest_k_zero_or_negative_k(self):
+            """k <= 0 asks for nothing."""
+            assert cheapest_k([1, 2], 0) == []
+
+        def test_cheapest_k_duplicates(self):
+            """Duplicates each count: both 1s survive."""
+            assert cheapest_k([3, 3, 1, 1], 3) == [1, 1, 3]
+
+
+    class TestMergeStreams:
+        def test_merge_streams_empty_outer_list(self):
+            """No streams, nothing to merge."""
+            assert merge_streams([]) == []
+
+        def test_merge_streams_with_empty_sublists(self):
+            """Empty streams contribute nothing."""
+            assert merge_streams([[], [1, 2], []]) == [1, 2]
+
+        def test_merge_streams_single_stream_is_returned_in_given_order(self):
+            """A single stream is returned as given, not re-sorted."""
+            assert merge_streams([[3, 1, 2]]) == [3, 1, 2]
+
+
+    class TestCombineRopes:
+        def test_combine_ropes_fewer_than_two_ropes(self):
+            """Fewer than two ropes cost nothing."""
+            assert combine_ropes([]) == 0
+            assert combine_ropes([7]) == 0
+
+        def test_combine_ropes_two_ropes_cost_their_sum(self):
+            """Two ropes cost their sum, in one combine."""
+            assert combine_ropes([3, 5]) == 8
+
+        def test_combine_ropes_greedy_beats_left_to_right(self):
+            """Greedy smallest-first beats combining left to right."""
+            assert combine_ropes([1, 2, 3, 4, 5]) == 33
+reference:
+  files:
+  - path: solution.py
+    content: |
+      """heapq: priority queues and the top-k family."""
+
+      import heapq
+
+
+      def top_k(scores: list, k: int) -> list:
+          return heapq.nlargest(max(k, 0), scores)
+
+
+      def cheapest_k(prices: list, k: int) -> list:
+          return heapq.nsmallest(max(k, 0), prices)
+
+
+      def merge_streams(streams: list) -> list:
+          if not streams:
+              return []
+          return list(heapq.merge(*streams))
+
+
+      def combine_ropes(lengths: list) -> int:
+          if len(lengths) < 2:
+              return 0
+          heap = list(lengths)
+          heapq.heapify(heap)
+          total = 0
+          while len(heap) > 1:
+              a = heapq.heappop(heap)
+              b = heapq.heappop(heap)
+              total += a + b
+              heapq.heappush(heap, a + b)
+          return total
+judge:
+  kind: pytest

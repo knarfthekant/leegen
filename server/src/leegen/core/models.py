@@ -367,3 +367,23 @@ class RunResult(BaseModel):
     error: str | None = None
     stdout: str = ""
     stderr: str = ""
+
+
+ConsoleStatus = Literal["ok", "error", "timeout", "cancelled"]
+
+
+class ConsoleResult(BaseModel):
+    """One quick-execution run: a snippet or a selection, never a graded test run."""
+
+    run_id: str
+    problem_id: str
+    status: ConsoleStatus
+    executor: str
+    device: str | None = None
+    file: str | None = None
+    started_at: float
+    duration_ms: float
+    stdout: str = ""
+    stderr: str = ""
+    result: str | None = None       # repr of the last expression, when it has a value
+    error: str | None = None

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import yaml
 from pydantic import ValidationError
@@ -13,7 +15,10 @@ def test_seed_problems_load():
     assert store.errors() == []
     ids = {p.id for p in store.list()}
     assert ids == {"merge-ranges", "iterators-and-await", "kv-cache-basics",
-                   "cuda-vector-add", "webgpu-tiled-matmul"}
+                   "cuda-vector-add", "webgpu-tiled-matmul",
+                   "list-operations", "dict-operations", "set-operations",
+                   "tuples-and-unpacking", "counter-and-defaultdict",
+                   "deque-operations", "heapq-operations", "lru-cache-design"}
 
 
 def test_yaml_round_trip():
@@ -98,3 +103,33 @@ def test_invalid_sections_rejected(over, needle):
 def test_seed_problem_without_sections_still_loads():
     p = ProblemStore().get("kv-cache-basics")
     assert p is not None and p.sections == [] and all(t.section is None for t in p.tests)
+
+
+def test_pytest_validation_warns_about_grouping_and_docstrings():
+    from leegen.core.validation import static_issues
+
+    def problem(test_source: str):
+        return parse_problem_yaml(f"""
+schema_version: 1
+id: x-pytest
+title: X
+environment: python
+description: d
+files:
+- {{path: solution.py, content: "def f():\\n    pass\\n"}}
+- {{path: test_visible.py, role: readonly, content: {json.dumps(test_source)}}}
+reference:
+  files:
+  - {{path: solution.py, content: "def f():\\n    return 1\\n"}}
+judge: {{kind: pytest}}
+""")
+
+    loose = static_issues(problem(
+        "def test_a():\n    assert True\n\ndef test_b():\n    assert True\n"))
+    assert any("grouped into classes" in i for i in loose)
+    assert any("docstring" in i for i in loose)
+
+    tidy = static_issues(problem(
+        'class TestF:\n    def test_a(self):\n        """A."""\n        assert True\n'))
+    assert not any("grouped into classes" in i for i in tidy)
+    assert not any("docstring" in i for i in tidy)

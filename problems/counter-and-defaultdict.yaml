@@ -1,0 +1,234 @@
+schema_version: 1
+id: counter-and-defaultdict
+title: 'Counter and defaultdict: Counting and Grouping Without Boilerplate'
+difficulty: easy
+tags:
+- python
+- collections
+- counter
+- defaultdict
+- grouping
+track: python-data-structures
+order: 5
+environment: python
+description: |
+  Two `collections` types replace the most common dict boilerplate in coding
+  questions. `Counter` counts things and answers "what are the top n?";
+  `defaultdict(list)` groups things without the "is the key there yet?" dance.
+  Together they are half of every frequency-based solution.
+
+  ## Your task
+
+  Implement four functions in `solution.py`.
+
+  | Function | What it does |
+  |---|---|
+  | `top_words(words, n)` | The `n` most common words as `(word, count)` tuples. Ties come out in **first-occurrence order** (Counter preserves insertion order). |
+  | `group_by_first_letter(words)` | Dict mapping first character -> list of words, in the order they appear. Case-sensitive: `"A"` and `"a"` are different keys. |
+  | `group_anagrams(words)` | Group anagrams together; return the groups as a list of lists, each group in first-appearance order, groups in order of first appearance. |
+  | `net_counts(upvotes, downvotes)` | For each element, margin = upvotes - downvotes. Return a plain dict of the elements with a **positive** margin, `{item: margin}`. |
+
+  ## Worked example
+
+  ```text
+  top_words(["b", "a", "b", "a", "c"], 2)
+      ->  [("b", 2), ("a", 2)]
+  group_by_first_letter(["apple", "avocado", "banana"])
+      ->  {"a": ["apple", "avocado"], "b": ["banana"]}
+  group_anagrams(["eat", "tea", "tan", "ate", "nat"])
+      ->  [["eat", "tea", "ate"], ["tan", "nat"]]
+  net_counts(["x", "x", "x", "y"], ["x", "y"])
+      ->  {"x": 2}        # "y" nets to zero and drops out
+  ```
+
+  ## Concepts these exercise
+
+  - `Counter(words).most_common(n)` - the top-n idiom, no manual sort.
+  - `defaultdict(list)` + `groups[key].append(item)` - grouping in two lines.
+  - The anagram key: `tuple(sorted(word))` makes a hashable canonical form of
+    any word, so anagrams collide into the same bucket.
+  - `Counter(a) - Counter(b)` is multiset subtraction: counts that reach zero
+    or go negative **disappear** from the result.
+
+  :::details{summary="Why the anagram key works"}
+  Anagrams are the same word rearranged, so sorting their characters gives the
+  same sequence for all of them: `sorted("eat")`, `sorted("tea")` and
+  `sorted("ate")` are all `['a', 'e', 't']`. A list can't be a dict key, so
+  convert to `tuple` - the standard trick for making any derived value
+  hashable.
+  :::
+
+  **Constraints:** at most 10**5 words; words are lowercase or uppercase
+  ASCII. All functions run in O(n) (O(n k log k) for anagrams of length k).
+hints:
+- '`Counter(words).most_common(n)` returns exactly the `(word, count)` tuples asked for.'
+- 'Grouping: `groups = defaultdict(list)` then `groups[fn(word)].append(word)`; `dict(groups)` converts
+  back.'
+- For anagrams the group key is `tuple(sorted(word))`. For net_counts, try `Counter(up) - Counter(down)`.
+files:
+- path: solution.py
+  content: |
+    """Counter and defaultdict: counting and grouping without boilerplate."""
+
+
+    def top_words(words: list, n: int) -> list:
+        """The n most common words as (word, count) tuples, first-occurrence order on ties.
+
+        >>> top_words(["b", "a", "b", "a", "c"], 2)
+        [('b', 2), ('a', 2)]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def group_by_first_letter(words: list) -> dict:
+        """Map first character -> list of words, in order of appearance.
+
+        >>> group_by_first_letter(["apple", "avocado", "banana"])
+        {'a': ['apple', 'avocado'], 'b': ['banana']}
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def group_anagrams(words: list) -> list:
+        """Group anagrams; groups (and words within them) keep first-appearance order.
+
+        >>> group_anagrams(["eat", "tea", "tan", "ate", "nat"])
+        [['eat', 'tea', 'ate'], ['tan', 'nat']]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def net_counts(upvotes: list, downvotes: list) -> dict:
+        """{item: margin} for items whose upvotes exceed their downvotes.
+
+        >>> net_counts(["x", "x", "x", "y"], ["x", "y"])
+        {'x': 2}
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+- path: test_visible.py
+  role: readonly
+  content: |
+    from solution import group_anagrams, group_by_first_letter, net_counts, top_words
+
+
+    class TestTopWords:
+        def test_top_words_most_common_with_ties_by_first_occurrence(self):
+            """The n most common words; ties keep first-appearance order."""
+            assert top_words(["b", "a", "b", "a", "c"], 2) == [("b", 2), ("a", 2)]
+
+
+    class TestGroupByFirstLetter:
+        def test_group_by_first_letter(self):
+            """Group words under their first character."""
+            assert group_by_first_letter(["apple", "avocado", "banana"]) == {
+                "a": ["apple", "avocado"], "b": ["banana"]
+            }
+
+
+    class TestGroupAnagrams:
+        def test_group_anagrams_classic(self):
+            """Anagrams share a group; first-seen order is preserved."""
+            assert group_anagrams(["eat", "tea", "tan", "ate", "nat"]) == [
+                ["eat", "tea", "ate"], ["tan", "nat"]
+            ]
+
+
+    class TestNetCounts:
+        def test_net_counts_positive_margins_only(self):
+            """Only positive nets: seen count minus blocked count."""
+            assert net_counts(["x", "x", "x", "y"], ["x", "y"]) == {"x": 2}
+- path: test_hidden.py
+  role: hidden
+  content: |
+    from solution import group_anagrams, group_by_first_letter, net_counts, top_words
+
+
+    class TestTopWords:
+        def test_top_words_n_exceeds_distinct_words(self):
+            """n larger than the vocabulary: every word, most common first."""
+            assert top_words(["a", "b"], 10) == [("a", 1), ("b", 1)]
+
+        def test_top_words_empty(self):
+            """No words, no ranking."""
+            assert top_words([], 3) == []
+
+        def test_top_words_n_zero(self):
+            """n = 0 asks for nothing."""
+            assert top_words(["a"], 0) == []
+
+
+    class TestGroupByFirstLetter:
+        def test_group_by_first_letter_case_sensitive(self):
+            """First letters are case-sensitive: A and a are different keys."""
+            assert group_by_first_letter(["A", "a"]) == {"A": ["A"], "a": ["a"]}
+
+        def test_group_by_first_letter_empty(self):
+            """No words means no groups."""
+            assert group_by_first_letter([]) == {}
+
+
+    class TestGroupAnagrams:
+        def test_group_anagrams_empty(self):
+            """No words, no groups."""
+            assert group_anagrams([]) == []
+
+        def test_group_anagrams_no_anagrams_makes_singletons(self):
+            """No anagram pairs: every word is a singleton group."""
+            assert group_anagrams(["ab", "cd", "ef"]) == [["ab"], ["cd"], ["ef"]]
+
+        def test_group_anagrams_identical_words_share_a_group(self):
+            """Identical words share one group."""
+            assert group_anagrams(["aa", "aa"]) == [["aa", "aa"]]
+
+
+    class TestNetCounts:
+        def test_net_counts_nothing_positive(self):
+            """The blocked count cancels the seen count: {}."""
+            assert net_counts(["x"], ["x", "x"]) == {}
+
+        def test_net_counts_empty_inputs(self):
+            """No input, no counts."""
+            assert net_counts([], []) == {}
+
+        def test_net_counts_margin_is_difference(self):
+            """The value is the difference between seen and blocked."""
+            assert net_counts(["x", "x", "x"], ["x"]) == {"x": 2}
+
+        def test_net_counts_untouched_items_count_too(self):
+            """Words only in the seen list still count."""
+            assert net_counts(["y"], []) == {"y": 1}
+reference:
+  files:
+  - path: solution.py
+    content: |
+      """Counter and defaultdict: counting and grouping without boilerplate."""
+
+      from collections import Counter, defaultdict
+
+
+      def top_words(words: list, n: int) -> list:
+          return Counter(words).most_common(max(n, 0))
+
+
+      def group_by_first_letter(words: list) -> dict:
+          groups = defaultdict(list)
+          for word in words:
+              groups[word[0]].append(word)
+          return dict(groups)
+
+
+      def group_anagrams(words: list) -> list:
+          groups = defaultdict(list)
+          for word in words:
+              groups[tuple(sorted(word))].append(word)
+          return list(groups.values())
+
+
+      def net_counts(upvotes: list, downvotes: list) -> dict:
+          return dict(Counter(upvotes) - Counter(downvotes))
+judge:
+  kind: pytest

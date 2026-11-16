@@ -133,6 +133,26 @@ async def cancel(run_id: str) -> dict[str, Any]:
     return await _svc().cancel(run_id)
 
 
+class ConsoleBody(BaseModel):
+    problem_id: str
+    files: dict[str, str] | None = None
+    file: str | None = None
+    code: str
+    stdin: str = ""
+    executor: str | None = None
+    run_id: str | None = None
+
+
+@router.post("/console")
+async def console(body: ConsoleBody) -> dict[str, Any]:
+    """Run one quick-execution snippet; never graded and never recorded as last_run."""
+    p = _call(lambda: _svc().problem(body.problem_id))
+    result = await _acall(_svc().run_console(
+        p, files=body.files, file=body.file, code=body.code, stdin=body.stdin,
+        executor=body.executor, run_id=body.run_id, source="ui"))
+    return result.model_dump(mode="json")
+
+
 @router.get("/executors")
 def executors(problem_id: str | None = None) -> dict[str, Any]:
     return _call(lambda: _svc().executors_for(problem_id))

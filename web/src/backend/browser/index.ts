@@ -138,6 +138,13 @@ export async function createBrowserBackend(): Promise<BrowserBackend> {
       const p = await service.problem(problemId);
       return service.run(p, { files, executor, runId, source: "ui" });
     },
+    async runConsole(problemId, req) {
+      const p = await service.problem(problemId);
+      return service.runConsole(p, {
+        files: req.files, file: req.file, code: req.code, stdin: req.stdin,
+        executor: req.executor, runId: req.runId, source: "ui",
+      });
+    },
     cancel: (runId) => service.cancel(runId),
     async executors(problemId) {
       runner.warm().catch(() => undefined);   // start Python while the user reads the problem

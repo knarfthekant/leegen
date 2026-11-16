@@ -1,0 +1,242 @@
+schema_version: 1
+id: deque-operations
+title: 'deque: Queues, Streams, and Rotation'
+difficulty: easy
+tags:
+- python
+- collections
+- deque
+- queue
+- sliding-window
+track: python-data-structures
+order: 6
+environment: python
+description: |
+  `list.pop(0)` is O(n) - the wrong tool for a queue. `collections.deque`
+  (double-ended queue) does both ends in O(1): `popleft()` for FIFO queues,
+  `pop()` for stacks, `maxlen` for sliding windows, `rotate()` for circular
+  shifts. It is the structure behind BFS, rate limiters and "last N events".
+
+  ## Your task
+
+  Implement four functions in `solution.py`.
+
+  | Function | What it does |
+  |---|---|
+  | `rotate_roster(names, k)` | Rotate `names` **right** by `k` positions (like `deque.rotate(k)`); return a list. |
+  | `last_n(stream, n)` | The last `n` elements of `stream`, in order. `n <= 0` is `[]`; `n` beyond the length returns everything. |
+  | `serve(tasks, blocked)` | Process `tasks` FIFO: `popleft()` each task, skip the ones in `blocked`, and return the served tasks in order. |
+  | `interleave(a, b)` | Alternate one element from `a`, then one from `b`, until both are exhausted (the longer queue's tail follows). |
+
+  ## Worked example
+
+  ```text
+  rotate_roster([1, 2, 3, 4], 1)    ->  [4, 1, 2, 3]
+  last_n([1, 2, 3, 4, 5], 2)        ->  [4, 5]
+  serve(["t1", "t2", "t3"], {"t2"}) ->  ["t1", "t3"]
+  interleave([1, 2, 3], ["a"])      ->  [1, "a", 2, 3]
+  ```
+
+  ## Concepts these exercise
+
+  - `deque.rotate(k)` shifts right by `k` in O(k); negative `k` shifts left.
+  - `deque(stream, maxlen=n)` keeps only the last `n` items as new ones
+    arrive - the sliding-window idiom.
+  - `popleft()` is the O(1) queue operation that makes BFS O(n) instead of
+    O(n^2) (which is what `list.pop(0)` would cost).
+  - Two deques drain independently: the `while qa or qb` loop with two
+    guards handles unequal lengths.
+
+  :::note
+  Stack or queue? `append` + `pop` is a stack, `append` + `popleft` is a
+  queue - same type, opposite ends.
+  :::
+
+  **Constraints:** at most 10**5 elements. Every function runs in O(n).
+hints:
+- '`deque.rotate(k)` does the rotation; just wrap the result in `list(...)`.'
+- '`deque(stream, maxlen=n)` discards from the opposite end as items arrive, leaving the last n.'
+- '`serve` is `while q: task = q.popleft()`; `interleave` is a loop over `while qa or qb:` with a guard
+  per queue.'
+files:
+- path: solution.py
+  content: |
+    """deque: queues, streams and rotation at both ends."""
+
+    from collections import deque
+
+
+    def rotate_roster(names: list, k: int) -> list:
+        """Return names rotated right by k positions.
+
+        >>> rotate_roster([1, 2, 3, 4], 1)
+        [4, 1, 2, 3]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def last_n(stream: list, n: int) -> list:
+        """Return the last n elements of stream, in order.
+
+        >>> last_n([1, 2, 3, 4, 5], 2)
+        [4, 5]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def serve(tasks: list, blocked: set) -> list:
+        """FIFO-serve tasks, skipping blocked ones, in order.
+
+        >>> serve(["t1", "t2", "t3"], {"t2"})
+        ['t1', 't3']
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def interleave(a: list, b: list) -> list:
+        """Alternate elements of a and b until both are exhausted.
+
+        >>> interleave([1, 2, 3], ["a"])
+        [1, 'a', 2, 3]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+- path: test_visible.py
+  role: readonly
+  content: |
+    from solution import interleave, last_n, rotate_roster, serve
+
+
+    class TestRotateRoster:
+        def test_rotate_roster_moves_the_tail_to_the_front(self):
+            """Rotate right by 1: the last item moves to the front."""
+            assert rotate_roster([1, 2, 3, 4], 1) == [4, 1, 2, 3]
+
+
+    class TestLastN:
+        def test_last_n_keeps_a_window_on_the_tail(self):
+            """The last n items, in their original order."""
+            assert last_n([1, 2, 3, 4, 5], 2) == [4, 5]
+
+
+    class TestServe:
+        def test_serve_skips_blocked_tasks_in_fifo_order(self):
+            """Blocked tasks are skipped; the rest leave in FIFO order."""
+            assert serve(["t1", "t2", "t3"], {"t2"}) == ["t1", "t3"]
+
+
+    class TestInterleave:
+        def test_interleave_alternates_until_one_runs_out(self):
+            """Alternate items until one side runs out."""
+            assert interleave([1, 2, 3], ["a"]) == [1, "a", 2, 3]
+- path: test_hidden.py
+  role: hidden
+  content: |
+    from solution import interleave, last_n, rotate_roster, serve
+
+
+    class TestRotateRoster:
+        def test_rotate_roster_zero_is_a_copy(self):
+            """k = 0 returns a new list in the same order, not the input object."""
+            src = [1, 2]
+            out = rotate_roster(src, 0)
+            assert out == [1, 2]
+            assert out is not src
+
+        def test_rotate_roster_empty(self):
+            """An empty roster stays empty."""
+            assert rotate_roster([], 3) == []
+
+        def test_rotate_roster_negative_k_rotates_left(self):
+            """A negative k rotates left: -1 moves the first item to the end."""
+            assert rotate_roster([1, 2, 3, 4], -1) == [2, 3, 4, 1]
+
+        def test_rotate_roster_k_beyond_length_wraps(self):
+            """k larger than the roster wraps around."""
+            assert rotate_roster([1, 2, 3], 4) == [3, 1, 2]
+
+
+    class TestLastN:
+        def test_last_n_zero_is_empty(self):
+            """n = 0 asks for nothing."""
+            assert last_n([1, 2, 3], 0) == []
+
+        def test_last_n_negative_is_empty(self):
+            """A negative n asks for nothing."""
+            assert last_n([1, 2, 3], -2) == []
+
+        def test_last_n_beyond_length_returns_everything(self):
+            """n larger than the list returns everything."""
+            assert last_n([1, 2], 10) == [1, 2]
+
+
+    class TestServe:
+        def test_serve_all_blocked(self):
+            """All tasks blocked: nothing is served."""
+            assert serve(["t1", "t2"], {"t1", "t2"}) == []
+
+        def test_serve_empty_blocked_set(self):
+            """Nothing blocked: everything is served in order."""
+            assert serve(["t1"], set()) == ["t1"]
+
+        def test_serve_empty_tasks(self):
+            """No tasks, nothing to serve."""
+            assert serve([], {"t1"}) == []
+
+
+    class TestInterleave:
+        def test_interleave_empty_first(self):
+            """An empty first side leaves the second side untouched."""
+            assert interleave([], [1, 2]) == [1, 2]
+
+        def test_interleave_empty_second(self):
+            """An empty second side leaves the first side untouched."""
+            assert interleave([1, 2], []) == [1, 2]
+
+        def test_interleave_both_empty(self):
+            """Two empty sides stay empty."""
+            assert interleave([], []) == []
+reference:
+  files:
+  - path: solution.py
+    content: |
+      """deque: queues, streams and rotation at both ends."""
+
+      from collections import deque
+
+
+      def rotate_roster(names: list, k: int) -> list:
+          q = deque(names)
+          q.rotate(k)
+          return list(q)
+
+
+      def last_n(stream: list, n: int) -> list:
+          return list(deque(stream, maxlen=max(n, 0)))
+
+
+      def serve(tasks: list, blocked: set) -> list:
+          q = deque(tasks)
+          served = []
+          while q:
+              task = q.popleft()
+              if task in blocked:
+                  continue
+              served.append(task)
+          return served
+
+
+      def interleave(a: list, b: list) -> list:
+          qa, qb = deque(a), deque(b)
+          out = []
+          while qa or qb:
+              if qa:
+                  out.append(qa.popleft())
+              if qb:
+                  out.append(qb.popleft())
+          return out
+judge:
+  kind: pytest

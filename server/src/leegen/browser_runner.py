@@ -24,11 +24,11 @@ from collections.abc import Callable
 from typing import Any
 
 from leegen.core import compat, validation
-from leegen.core.assemble import ExecOutcome, assemble, redact
+from leegen.core.assemble import ExecOutcome, assemble, assemble_console, redact
 from leegen.core.events import RunnerRequest
-from leegen.core.models import Environment, RunResult
+from leegen.core.models import ConsoleResult, Environment, RunResult
 from leegen.core.parse import format_error, parse_problem_yaml
-from leegen.core.plan import plan_run
+from leegen.core.plan import RunPlan, plan_run, plan_snippet
 from leegen.core.views import public_problem
 
 EXECUTOR_ID = "browser"
@@ -46,18 +46,31 @@ def _purge(base: str) -> None:
 # ------------------------------------------------------------------ runs
 
 
-def prepare(request_json: str, base: str) -> str:
-    req = RunnerRequest.model_validate_json(request_json)
-    problem = parse_problem_yaml(req.problem_yaml)
-    custom = [ct.model_dump(exclude_unset=True) for ct in req.custom_tests]
-    plan = plan_run(problem, req.files, mode=req.mode, custom_tests=custom,
-                    only_visible=req.only_visible, device=req.device)
+def _write_plan(base: str, plan: RunPlan) -> None:
     shutil.rmtree(base, ignore_errors=True)
     for rel, content in {**plan.files, "run.json": json.dumps(plan.run_config)}.items():
         path = os.path.join(base, rel)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(content)
+
+
+def prepare(request_json: str, base: str) -> str:
+    req = RunnerRequest.model_validate_json(request_json)
+    problem = parse_problem_yaml(req.problem_yaml)
+    if req.mode == "snippet":
+        spec = req.snippet
+        if spec is None:
+            raise ValueError("a snippet run needs a snippet")
+        plan = plan_snippet(problem, req.files, file=spec.file, code=spec.code,
+                            stdin=spec.stdin, device=req.device)
+        _write_plan(base, plan)
+        return json.dumps({"tests": [], "timeout_s": plan.run_config["timeout_s"],
+                           "judge": "snippet", "started": time.time()})
+    custom = [ct.model_dump(exclude_unset=True) for ct in req.custom_tests]
+    plan = plan_run(problem, req.files, mode=req.mode, custom_tests=custom,
+                    only_visible=req.only_visible, device=req.device)
+    _write_plan(base, plan)
     return json.dumps({"tests": plan.tests, "timeout_s": problem.limits.timeout_s,
                        "judge": problem.judge.kind, "started": time.time()})
 
@@ -114,7 +127,7 @@ def cleanup(base: str) -> None:
 
 
 def finish(request_json: str, prepared_json: str, results: str, outcome_json: str) -> str:
-    """Assemble the RunResult. `outcome_json`: stdout, stderr, timed_out, cancelled,
+    """Assemble the result. `outcome_json`: stdout, stderr, timed_out, cancelled,
     duration_ms, exit_code (what the JavaScript side observed)."""
     req = RunnerRequest.model_validate_json(request_json)
     problem = parse_problem_yaml(req.problem_yaml)
@@ -124,6 +137,11 @@ def finish(request_json: str, prepared_json: str, results: str, outcome_json: st
                           stderr=o.get("stderr", ""), results=results,
                           timed_out=bool(o.get("timed_out")), cancelled=bool(o.get("cancelled")),
                           duration_ms=float(o.get("duration_ms", 0.0)))
+    if req.mode == "snippet":
+        spec = req.snippet
+        console = assemble_console(req.run_id, problem, outcome, EXECUTOR_ID, req.device,
+                                   prepared["started"], file=spec.file if spec else None)
+        return console.model_dump_json()
     result = assemble(req.run_id, problem, req.mode, prepared["tests"], outcome, EXECUTOR_ID,
                       req.device, prepared["started"])
     return redact(result).model_dump_json()
@@ -135,6 +153,13 @@ def error_result(request_json: str, message: str, duration_ms: str | float = 0.0
         problem_id = parse_problem_yaml(req.problem_yaml).id
     except Exception:  # noqa: BLE001
         problem_id = "?"
+    if req.mode == "snippet":
+        spec = req.snippet
+        return ConsoleResult(run_id=req.run_id, problem_id=problem_id, status="error",
+                             executor=EXECUTOR_ID, device=req.device,
+                             file=spec.file if spec else None, started_at=time.time(),
+                             duration_ms=float(duration_ms),
+                             error=message).model_dump_json()
     return RunResult(run_id=req.run_id, problem_id=problem_id, mode=req.mode, status="error",
                      executor=EXECUTOR_ID, device=req.device, started_at=time.time(),
                      duration_ms=float(duration_ms), error=message).model_dump_json()

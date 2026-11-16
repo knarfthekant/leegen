@@ -7,7 +7,7 @@
 // the real Python core in Pyodide.
 
 import type { BackendEvent } from "../types";
-import type { AgentStatus, RunResult } from "../../contracts/generated";
+import type { AgentStatus, ConsoleResult, RunResult } from "../../contracts/generated";
 import {
   type AnnotationRecord,
   type AnnotationRequest,
@@ -21,6 +21,7 @@ import {
   briefRun,
   canRun,
   compareSummaries,
+  consoleAvailable,
   defaultClock,
   deviceFor,
   editableFiles,
@@ -521,10 +522,12 @@ export class BrowserToolService {
     const caps = await this.capabilities();
     let requires: string[] = [];
     let env: Environment | null = null;
+    let console = false;
     if (problemId) {
       const p = await this.problem(problemId);
       env = this.environment(p);
       requires = requirements(p, env);
+      console = consoleAvailable(p, env);
     }
     return {
       executors: [
@@ -536,6 +539,7 @@ export class BrowserToolService {
       ],
       requires,
       runtimes: [...runtimes(env)].sort(),
+      console,
     };
   }
 
@@ -577,12 +581,7 @@ export class BrowserToolService {
     const caps = await this.capabilities();
     if (!env) return errorResult(p.id, runId, `unknown environment ${pyRepr(p.environment)}`, this.clock.now());
     if (!canRun(caps, "pyodide", requires, env)) {
-      const why = !runtimes(env).has("pyodide")
-        ? `the ${pyRepr(env.id)} environment runs only on the local/remote edition (native executors). ` +
-          "Export this problem and run it with the leegen server."
-        : `this browser does not provide ${requires.filter((r) => !caps.includes(r)).join(", ")}` +
-          (requires.includes("webgpu") ? " (WebGPU is unavailable here; try a current Chrome, Edge or Safari)" : "");
-      return errorResult(p.id, runId, why, this.clock.now());
+      return errorResult(p.id, runId, this.cannotRunReason(env, requires, caps), this.clock.now());
     }
     const rec = await this.record(p.id);
     return this.runner.run({
@@ -594,6 +593,89 @@ export class BrowserToolService {
       only_visible: false,
       packages: env.browser?.packages ?? [],
       device: deviceFor(caps, requires),
+    });
+  }
+
+  private cannotRunReason(env: Environment, requires: string[], caps: string[]): string {
+    if (!runtimes(env).has("pyodide")) {
+      return `the ${pyRepr(env.id)} environment runs only on the local/remote edition (native executors). ` +
+        "Export this problem and run it with the leegen server.";
+    }
+    return `this browser does not provide ${requires.filter((r) => !caps.includes(r)).join(", ")}` +
+      (requires.includes("webgpu") ? " (WebGPU is unavailable here; try a current Chrome, Edge or Safari)" : "");
+  }
+
+  /** Run one console snippet; live buffers are used but never saved, and last_run is untouched. */
+  async runConsole(
+    p: FullProblem,
+    opts: {
+      files?: Record<string, string> | null;
+      file?: string | null;
+      code: string;
+      stdin?: string;
+      executor?: string | null;
+      runId?: string | null;
+      source?: string;
+    },
+  ): Promise<ConsoleResult> {
+    const runId = opts.runId || this.clock.newId() + this.clock.newId().slice(0, 2);
+    const source = opts.source ?? "ui";
+    const env = this.environment(p);
+    const requires = requirements(p, env);
+    const caps = await this.capabilities();
+    const started = this.clock.now();
+    return this.withRunLock(p.id, async () => {
+      this.broadcast({ type: "console_started", problem_id: p.id, run_id: runId,
+                       source, file: opts.file ?? null });
+      const files = { ...(await this.workspaceFiles(p)), ...(opts.files ?? {}) };
+      const off = this.runner.onNotice((n) => {
+        if (n.run_id !== runId) return;
+        if (n.type === "status") {
+          this.broadcast({ type: "console_status", problem_id: p.id, run_id: runId,
+                           phase: n.phase, detail: n.detail });
+          return;
+        }
+        try {
+          const ev = JSON.parse(n.line) as { type?: string; stream?: string; text?: string };
+          if (ev.type === "output") {
+            this.broadcast({ type: "console_output", problem_id: p.id, run_id: runId,
+                             stream: ev.stream === "stderr" ? "stderr" : "stdout",
+                             text: ev.text ?? "" });
+          }
+        } catch {
+          /* not a JSON event line */
+        }
+      });
+      let result: ConsoleResult;
+      try {
+        if (!env) {
+          result = consoleError(p.id, runId, `unknown environment ${pyRepr(p.environment)}`, started);
+        } else if (!consoleAvailable(p, env)) {
+          result = consoleError(p.id, runId, "this problem's environment does not support the console", started);
+        } else if (!canRun(caps, "pyodide", requires, env)) {
+          result = consoleError(p.id, runId, this.cannotRunReason(env, requires, caps), started);
+        } else {
+          const rec = await this.record(p.id);
+          result = await this.runner.runSnippet({
+            run_id: runId,
+            problem_yaml: rec.yaml,
+            files,
+            mode: "snippet",
+            snippet: { file: opts.file ?? null, code: opts.code, stdin: opts.stdin ?? "" },
+            custom_tests: [],
+            only_visible: false,
+            packages: env.browser?.packages ?? [],
+            device: deviceFor(caps, requires),
+          });
+        }
+      } catch (e) {
+        result = consoleError(p.id, runId, String((e as Error).message ?? e), started);
+      } finally {
+        off();
+      }
+      this.broadcast({ type: "console_finished", problem_id: p.id, run_id: runId,
+                       source, result });
+      return result;
     });
   }
 
@@ -650,6 +732,24 @@ export function errorResult(problemId: string, runId: string, error: string, sta
     stdout: "",
     stderr: "",
   } as RunResult;
+}
+
+export function consoleError(problemId: string, runId: string, error: string,
+                             started: number, file: string | null = null): ConsoleResult {
+  return {
+    run_id: runId,
+    problem_id: problemId,
+    status: "error",
+    executor: EXECUTOR_ID,
+    device: null,
+    file,
+    started_at: started,
+    duration_ms: 0,
+    stdout: "",
+    stderr: "",
+    result: null,
+    error,
+  };
 }
 
 function waitFor(cond: () => boolean, timeoutMs = 25_000): Promise<void> {

@@ -146,8 +146,9 @@ async function runOnce(req, notify) {
   } catch (e) {
     return JSON.parse(await w.py("error_result", reqJson, cleanError(e), String(performance.now() - t0)));
   }
-  const { timeout_s } = JSON.parse(prepared);
-  status("running", "Running tests");
+  const prep = JSON.parse(prepared);
+  const { timeout_s } = prep;
+  status("running", prep.judge === "snippet" ? "Running snippet" : "Running tests");
 
   const lines = [];
   w.onLine = (line) => {

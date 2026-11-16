@@ -116,3 +116,35 @@ def plan_run(problem: Problem, files: dict[str, str] | None = None, *, mode: Mod
                   "ref_dir": "ref" if needs_ref else None,
                   "timeout_s": problem.limits.timeout_s, "device": device}
     return RunPlan(tests=tests, run_config=run_config, files=bundle, needs_ref_dir=needs_ref)
+
+
+SNIPPET_TIMEOUT_S = 30.0
+MAX_SNIPPET_CODE = 200_000
+MAX_SNIPPET_STDIN = 64_000
+
+
+def plan_snippet(problem: Problem, files: dict[str, str] | None = None, *, file: str | None,
+                 code: str, stdin: str = "", device: str = "cpu",
+                 timeout_s: float = SNIPPET_TIMEOUT_S) -> RunPlan:
+    """A console run: the problem's files with the user's edits, plus one code snippet.
+
+    `file` names the module the snippet runs inside (Jupyter-style); None means a bare namespace.
+    There are no tests, so the run never goes through `assemble()`.
+    """
+    if len(code) > MAX_SNIPPET_CODE:
+        raise ValueError(f"snippet is too long (max {MAX_SNIPPET_CODE} characters)")
+    if len(stdin) > MAX_SNIPPET_STDIN:
+        raise ValueError(f"stdin is too long (max {MAX_SNIPPET_STDIN} characters)")
+    user = materialize(problem, files or {})
+    if file is not None and file not in user:
+        raise ValueError(f"unknown file {file!r}")
+    run_config = {
+        "mode": "snippet",
+        "snippet": {"file": file, "code": code, "stdin": stdin},
+        "user_dir": "user",
+        "ref_dir": None,
+        "timeout_s": timeout_s,
+        "device": device,
+    }
+    return RunPlan(tests=[], run_config=run_config,
+                   files={f"user/{k}": v for k, v in user.items()})

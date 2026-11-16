@@ -188,6 +188,268 @@
       "title": "AnnotationsChangedEvent",
       "type": "object"
     },
+    "ConsoleFinishedEvent": {
+      "properties": {
+        "type": {
+          "const": "console_finished",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/ConsoleResult"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "run_id",
+        "source",
+        "result"
+      ],
+      "title": "ConsoleFinishedEvent",
+      "type": "object"
+    },
+    "ConsoleOutputEvent": {
+      "properties": {
+        "type": {
+          "const": "console_output",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "stream": {
+          "enum": [
+            "stdout",
+            "stderr"
+          ],
+          "title": "Stream",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "run_id",
+        "stream",
+        "text"
+      ],
+      "title": "ConsoleOutputEvent",
+      "type": "object"
+    },
+    "ConsoleResult": {
+      "description": "One quick-execution run: a snippet or a selection, never a graded test run.",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "error",
+            "timeout",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "executor": {
+          "title": "Executor",
+          "type": "string"
+        },
+        "device": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "number"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "number"
+        },
+        "stdout": {
+          "default": "",
+          "title": "Stdout",
+          "type": "string"
+        },
+        "stderr": {
+          "default": "",
+          "title": "Stderr",
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Result"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        }
+      },
+      "required": [
+        "run_id",
+        "problem_id",
+        "status",
+        "executor",
+        "device",
+        "file",
+        "started_at",
+        "duration_ms",
+        "stdout",
+        "stderr",
+        "result",
+        "error"
+      ],
+      "title": "ConsoleResult",
+      "type": "object"
+    },
+    "ConsoleStartedEvent": {
+      "properties": {
+        "type": {
+          "const": "console_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "run_id",
+        "source",
+        "file"
+      ],
+      "title": "ConsoleStartedEvent",
+      "type": "object"
+    },
+    "ConsoleStatusEvent": {
+      "properties": {
+        "type": {
+          "const": "console_status",
+          "title": "Type",
+          "type": "string"
+        },
+        "problem_id": {
+          "title": "Problem Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "preparing",
+            "queued",
+            "running",
+            "loading"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "problem_id",
+        "run_id",
+        "phase",
+        "detail"
+      ],
+      "title": "ConsoleStatusEvent",
+      "type": "object"
+    },
     "CustomTest": {
       "properties": {
         "name": {
@@ -857,6 +1119,9 @@
     "run_result": {
       "$ref": "#/$defs/RunResult"
     },
+    "console_result": {
+      "$ref": "#/$defs/ConsoleResult"
+    },
     "test_result": {
       "$ref": "#/$defs/TestResult"
     },
@@ -877,6 +1142,10 @@
         "mapping": {
           "agent_status_changed": "#/$defs/AgentStatusChangedEvent",
           "annotations_changed": "#/$defs/AnnotationsChangedEvent",
+          "console_finished": "#/$defs/ConsoleFinishedEvent",
+          "console_output": "#/$defs/ConsoleOutputEvent",
+          "console_started": "#/$defs/ConsoleStartedEvent",
+          "console_status": "#/$defs/ConsoleStatusEvent",
           "custom_tests_changed": "#/$defs/CustomTestsChangedEvent",
           "files_changed": "#/$defs/FilesChangedEvent",
           "navigate": "#/$defs/NavigateEvent",
@@ -922,6 +1191,18 @@
         },
         {
           "$ref": "#/$defs/AgentStatusChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/ConsoleStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/ConsoleStatusEvent"
+        },
+        {
+          "$ref": "#/$defs/ConsoleOutputEvent"
+        },
+        {
+          "$ref": "#/$defs/ConsoleFinishedEvent"
         }
       ],
       "title": "Backend Event"
@@ -933,6 +1214,7 @@
   "required": [
     "agent_status",
     "run_result",
+    "console_result",
     "test_result",
     "metric",
     "annotation",

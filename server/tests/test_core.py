@@ -8,8 +8,10 @@ from fastapi.testclient import TestClient
 
 from leegen.config import settings
 from leegen.core import compat, review
+from leegen.core.assemble import ExecOutcome, assemble_console
 from leegen.core.models import Environment, Problem
-from leegen.core.plan import plan_run
+from leegen.core.plan import MAX_SNIPPET_CODE, plan_run, plan_snippet
+from leegen.envs.registry import EnvironmentRegistry
 from leegen.schema.contracts import check_all, tool_manifest
 from leegen.core.toolspec import TOOLS
 from leegen.state import app_state
@@ -48,6 +50,51 @@ def test_plan_run_matches_bundle_layout():
     assert ref.files["user/solution.py"] == p.reference.files[0].content
     with pytest.raises(ValueError):
         plan_run(p.model_copy(update={"reference": None}), mode="reference")
+
+
+def test_console_available_is_python_only():
+    envs = EnvironmentRegistry().all()
+    store = ProblemStore()
+    assert compat.console_available(store.get("merge-ranges"), envs["python"])
+    assert compat.console_available(store.get("kv-cache-basics"), envs["pytorch"])
+    assert not compat.console_available(store.get("cuda-vector-add"), envs["cuda"])
+    assert not compat.console_available(store.get("webgpu-tiled-matmul"), envs["webgpu"])
+
+
+def test_plan_snippet_bundle_and_limits():
+    p = ProblemStore().get("merge-ranges")
+    plan = plan_snippet(p, {"solution.py": "x = 1\n"}, file="solution.py",
+                        code="print(x)", stdin="Ada\n", device="cpu", timeout_s=5.0)
+    assert plan.tests == [] and not plan.needs_ref_dir
+    assert plan.files["user/solution.py"] == "x = 1\n"
+    assert plan.run_config == {
+        "mode": "snippet",
+        "snippet": {"file": "solution.py", "code": "print(x)", "stdin": "Ada\n"},
+        "user_dir": "user", "ref_dir": None, "timeout_s": 5.0, "device": "cpu",
+    }
+    with pytest.raises(ValueError):
+        plan_snippet(p, file="nope.py", code="print(1)")
+    with pytest.raises(ValueError):
+        plan_snippet(p, file=None, code="x" * (MAX_SNIPPET_CODE + 1))
+
+
+def test_assemble_console_precedence_and_streams():
+    p = ProblemStore().get("merge-ranges")
+    raw = "\n".join([
+        json.dumps({"type": "output", "stream": "stdout", "text": "hi\n"}),
+        json.dumps({"type": "output", "stream": "stderr", "text": "warn\n"}),
+        json.dumps({"type": "console_done", "status": "ok", "result": "2", "error": None}),
+    ]) + "\n"
+    r = assemble_console("r", p, ExecOutcome(exit_code=0, results=raw), "local", "cpu", 0.0,
+                         file="solution.py")
+    assert (r.status, r.stdout, r.stderr, r.result, r.file) == (
+        "ok", "hi\n", "warn\n", "2", "solution.py")
+    assert assemble_console("r", p, ExecOutcome(exit_code=None, cancelled=True),
+                            "local", "cpu", 0.0).status == "cancelled"
+    assert assemble_console("r", p, ExecOutcome(exit_code=None, timed_out=True),
+                            "local", "cpu", 0.0).status == "timeout"
+    assert assemble_console("r", p, ExecOutcome(exit_code=2, stderr="boom"),
+                            "local", "cpu", 0.0).status == "error"
 
 
 def test_review_core_is_deterministic_with_injected_ids():

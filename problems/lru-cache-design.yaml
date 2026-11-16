@@ -1,0 +1,404 @@
+schema_version: 1
+id: lru-cache-design
+title: Design an LRU Cache
+tags:
+- python
+- design
+- dict
+- ordereddict
+- lru
+track: python-data-structures
+order: 8
+environment: python
+description: |
+  The capstone: combine what the track built up into a real design question.
+  The LRU (least-recently-used) cache is *the* interview question about data
+  structures - it asks which structure makes both operations O(1), and the
+  answer is "a hash map glued to a doubly linked list" - or Python's
+  `collections.OrderedDict`, which already is exactly that.
+
+  ## Your task
+
+  Implement an `LRUCache` class in `solution.py`:
+
+  - `LRUCache(capacity)` - construct with a positive capacity.
+  - `get(key)` - return the value for `key`, or `-1` if absent. A successful
+    get counts as a **use** of the key.
+  - `put(key, value)` - insert or update `key`. Insertion and update both
+    count as a **use**. When the cache exceeds `capacity`, evict the
+    **least recently used** key. Returns `None`.
+
+  Both operations must be **O(1)** average time.
+
+  ## Worked example
+
+  ```text
+  cache = LRUCache(2)
+  cache.put(1, 10)     # {1: 10}
+  cache.put(2, 20)     # {1: 10, 2: 20}
+  cache.get(1)  -> 10  # 1 is now most recently used
+  cache.put(3, 30)     # evicts 2  ->  {3: 30, 1: 10}
+  cache.get(2)  -> -1  # evicted
+  cache.get(3)  -> 30
+  ```
+
+  ## The data-structure reasoning
+
+  You need O(1) lookup (a hash map) **and** an O(1) record of usage order
+  (a linked list). Options:
+
+  1. `collections.OrderedDict` - a dict that remembers insertion order and
+     offers `move_to_end(key)` and `popitem(last=False)`. Both operations
+     become a few lines.
+  2. A plain `dict` + a list of keys - the list makes eviction O(n). Wrong
+     tool; feel the difference.
+  3. Hand-rolled hash map + doubly linked list - what OrderedDict does
+     internally, and what you'd build in a language without it.
+
+  :::tip
+  Python dicts preserve insertion order too, so a plain dict can work: on a
+  get, `del d[key]` then re-insert to move the key to the end, and evict with
+  `next(iter(d))`. OrderedDict's `move_to_end` is just the O(1) spelling of
+  the same idea.
+  :::
+
+  **Constraints:** `1 <= capacity <= 3000`; at most 10^4 calls total; keys
+  and values are ints.
+hints:
+- 'OrderedDict gives you the whole machine: `move_to_end(key)` marks a use; `popitem(last=False)` evicts
+  the LRU end.'
+- On `put` of an existing key, refresh its position (move_to_end) *before* overwriting - update counts
+  as a use.
+- Evict only when the size exceeds capacity, and check it after the insertion, not before.
+files:
+- path: solution.py
+  content: |
+    """Design an LRU cache with O(1) get and put."""
+
+
+    class LRUCache:
+        """A least-recently-used cache with O(1) get and put."""
+
+        def __init__(self, capacity: int):
+            self.capacity = capacity
+            # TODO: pick the structure(s) that make both operations O(1).
+            raise NotImplementedError
+
+        def get(self, key: int) -> int:
+            """Return the value for key, or -1 if absent. Counts as a use."""
+            raise NotImplementedError
+
+        def put(self, key: int, value: int) -> None:
+            """Insert or update key; evict the LRU entry past capacity.
+
+            Insertion and update both count as a use.
+            """
+            raise NotImplementedError
+reference:
+  files:
+  - path: solution.py
+    content: |
+      """Design an LRU cache with O(1) get and put."""
+
+      from collections import OrderedDict
+
+
+      class LRUCache:
+          """A least-recently-used cache with O(1) get and put."""
+
+          def __init__(self, capacity: int):
+              self.capacity = capacity
+              self._entries: OrderedDict = OrderedDict()
+
+          def get(self, key: int) -> int:
+              if key not in self._entries:
+                  return -1
+              self._entries.move_to_end(key)
+              return self._entries[key]
+
+          def put(self, key: int, value: int) -> None:
+              if key in self._entries:
+                  self._entries.move_to_end(key)
+              self._entries[key] = value
+              if len(self._entries) > self.capacity:
+                  self._entries.popitem(last=False)
+judge:
+  kind: function
+  entry: solution.py:LRUCache
+sections:
+- id: examples
+  title: Worked examples
+  description: The three examples from the statement.
+- id: eviction
+  title: Eviction order
+  description: Which key leaves when the cache fills, and what counts as a use.
+- id: edge-cases
+  title: Edge cases
+tests:
+- name: Example - eviction follows usage order
+  description: get(1) makes 1 the most recent, so put(3) evicts 2.
+  section: examples
+  input:
+    args:
+    - 2
+    calls:
+    - method: put
+      args:
+      - 1
+      - 10
+    - method: put
+      args:
+      - 2
+      - 20
+    - method: get
+      args:
+      - 1
+    - method: put
+      args:
+      - 3
+      - 30
+    - method: get
+      args:
+      - 2
+    - method: get
+      args:
+      - 3
+  expected:
+  - null
+  - null
+  - 10
+  - null
+  - -1
+  - 30
+- name: Example - missing key returns -1
+  description: A get on an empty or missing key is -1.
+  section: examples
+  input:
+    args:
+    - 2
+    calls:
+    - method: get
+      args:
+      - 7
+    - method: put
+      args:
+      - 7
+      - 1
+    - method: get
+      args:
+      - 7
+  expected:
+  - -1
+  - null
+  - 1
+- name: Example - updating an existing key refreshes recency
+  description: put(1) again makes 1 newest, so put(3) evicts 2, not 1.
+  section: examples
+  input:
+    args:
+    - 2
+    calls:
+    - method: put
+      args:
+      - 1
+      - 10
+    - method: put
+      args:
+      - 2
+      - 20
+    - method: put
+      args:
+      - 1
+      - 11
+    - method: put
+      args:
+      - 3
+      - 30
+    - method: get
+      args:
+      - 1
+    - method: get
+      args:
+      - 2
+  expected:
+  - null
+  - null
+  - null
+  - null
+  - 11
+  - -1
+- name: Capacity 1 evicts on every new key
+  description: The smallest possible cache; each new key evicts the previous one.
+  section: eviction
+  input:
+    args:
+    - 1
+    calls:
+    - method: put
+      args:
+      - 1
+      - 10
+    - method: get
+      args:
+      - 1
+    - method: put
+      args:
+      - 2
+      - 20
+    - method: get
+      args:
+      - 1
+    - method: get
+      args:
+      - 2
+  expected:
+  - null
+  - 10
+  - null
+  - -1
+  - 20
+- name: get refreshes recency before eviction
+  description: get(1) between fills means 2 is the one evicted.
+  section: eviction
+  input:
+    args:
+    - 2
+    calls:
+    - method: put
+      args:
+      - 1
+      - 1
+    - method: put
+      args:
+      - 2
+      - 2
+    - method: get
+      args:
+      - 1
+    - method: put
+      args:
+      - 3
+      - 3
+    - method: get
+      args:
+      - 2
+    - method: get
+      args:
+      - 1
+    - method: get
+      args:
+      - 3
+  expected:
+  - null
+  - null
+  - 1
+  - null
+  - -1
+  - 1
+  - 3
+- name: Re-putting the same key does not evict
+  description: Updating key 1 at capacity 2 must not push anything out.
+  section: eviction
+  input:
+    args:
+    - 2
+    calls:
+    - method: put
+      args:
+      - 1
+      - 1
+    - method: put
+      args:
+      - 2
+      - 2
+    - method: put
+      args:
+      - 1
+      - 5
+    - method: get
+      args:
+      - 2
+    - method: get
+      args:
+      - 1
+  expected:
+  - null
+  - null
+  - null
+  - 2
+  - 5
+- name: Eviction chain under pressure
+  description: A long sequence where each new key evicts the current LRU.
+  section: eviction
+  input:
+    args:
+    - 2
+    calls:
+    - method: put
+      args:
+      - 1
+      - 1
+    - method: put
+      args:
+      - 2
+      - 2
+    - method: put
+      args:
+      - 3
+      - 3
+    - method: put
+      args:
+      - 4
+      - 4
+    - method: get
+      args:
+      - 3
+    - method: get
+      args:
+      - 4
+    - method: get
+      args:
+      - 1
+  expected:
+  - null
+  - null
+  - null
+  - null
+  - 3
+  - 4
+  - -1
+- name: Negative keys and values are ordinary ints
+  description: The cache is keyed by value equality, including negatives.
+  section: edge-cases
+  input:
+    args:
+    - 2
+    calls:
+    - method: put
+      args:
+      - -1
+      - -10
+    - method: get
+      args:
+      - -1
+    - method: put
+      args:
+      - 0
+      - 0
+    - method: put
+      args:
+      - 9
+      - 9
+    - method: get
+      args:
+      - -1
+    - method: get
+      args:
+      - 0
+  expected:
+  - null
+  - -10
+  - null
+  - null
+  - -1
+  - 0

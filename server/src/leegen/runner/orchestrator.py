@@ -11,14 +11,16 @@ import shutil
 import tempfile
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from leegen.core.assemble import ExecOutcome, assemble, parse_events, redact
-from leegen.core.compat import requirements
-from leegen.core.models import Problem, RunResult
-from leegen.core.plan import plan_run, unique_test_name
+from leegen.core.assemble import (ExecOutcome, assemble, assemble_console, parse_events,
+                                 redact)
+from leegen.core.compat import console_available, requirements
+from leegen.core.models import ConsoleResult, Problem, RunResult
+from leegen.core.plan import SNIPPET_TIMEOUT_S, plan_run, plan_snippet, unique_test_name
 from leegen.envs.provision import ProvisionError
 from leegen.envs.registry import EnvironmentRegistry
 from leegen.executors import ExecutorManager
@@ -26,11 +28,14 @@ from leegen.executors.base import JobSpec, StatusCallback, _no_status
 from leegen.judges import get_judge
 from leegen.languages import get_language
 
-__all__ = ["HARNESS_DIR", "HARNESS_ROOT", "Orchestrator", "RunRequest", "parse_events", "redact",
-           "unique_test_name"]
+__all__ = ["HARNESS_DIR", "HARNESS_ROOT", "Orchestrator", "RunRequest", "SnippetRequest",
+           "parse_events", "redact", "unique_test_name"]
 
 HARNESS_ROOT = Path(__file__).resolve().parent.parent / "harness"
 HARNESS_DIR = HARNESS_ROOT / "leegen_harness"
+
+# Console output callback: on_output(stream, text)
+OutputCallback = Callable[[str, str], Awaitable[None]]
 
 
 @dataclass
@@ -41,6 +46,17 @@ class RunRequest:
     executor: str | None = None
     custom_tests: list[dict[str, Any]] = field(default_factory=list)
     only_visible: bool = False
+
+
+@dataclass
+class SnippetRequest:
+    problem: Problem
+    files: dict[str, str] = field(default_factory=dict)   # editable file overrides
+    file: str | None = None                               # module the snippet runs inside
+    code: str = ""
+    stdin: str = ""
+    executor: str | None = None
+    timeout_s: float = SNIPPET_TIMEOUT_S
 
 
 def _write_files(target: Path, files: dict[str, str]) -> None:
@@ -120,6 +136,85 @@ class Orchestrator:
                                     device, started)
             result.duration_ms = (time.perf_counter() - t0) * 1000
             return redact(result)
+        finally:
+            self.active.pop(run_id, None)
+            shutil.rmtree(bundle, ignore_errors=True)
+
+    async def run_snippet(self, req: SnippetRequest, run_id: str | None = None,
+                          on_status: StatusCallback = _no_status,
+                          on_output: OutputCallback | None = None) -> ConsoleResult:
+        """Run one console snippet in the problem's environment; never a graded run."""
+        problem = req.problem
+        run_id = run_id or uuid.uuid4().hex[:12]
+        started = time.time()
+        t0 = time.perf_counter()
+
+        def fail(error: str, executor: str = "-", device: str | None = None) -> ConsoleResult:
+            return ConsoleResult(run_id=run_id, problem_id=problem.id, status="error",
+                                 executor=executor, device=device, file=req.file,
+                                 started_at=started,
+                                 duration_ms=(time.perf_counter() - t0) * 1000, error=error)
+
+        env = self.environments.get(problem.environment)
+        if env is None:
+            return fail(f"unknown environment {problem.environment!r}")
+        if not console_available(problem, env):
+            return fail("this problem's environment does not support the console")
+        requires = requirements(problem, env)
+        try:
+            executor = self.executors.choose(requires, req.executor, env=env)
+        except LookupError as exc:
+            return fail(str(exc))
+
+        lang = get_language(env.language)
+        device = executor.device_for(requires)
+        try:
+            plan = plan_snippet(problem, req.files, file=req.file, code=req.code,
+                                stdin=req.stdin, device=device, timeout_s=req.timeout_s)
+        except ValueError as exc:
+            return fail(str(exc), executor.id, device)
+
+        bundle = Path(tempfile.mkdtemp(prefix=f"leegen-console-{problem.id}-"))
+        try:
+            _write_files(bundle, plan.files)
+            shutil.copytree(HARNESS_DIR, bundle / "_lc" / "leegen_harness",
+                            ignore=shutil.ignore_patterns("__pycache__"))
+            shutil.copytree(HARNESS_ROOT / "include", bundle / "_lc" / "include")
+            (bundle / "run.json").write_text(json.dumps(plan.run_config, indent=2))
+
+            job_env = {**lang.harness_env(), **env.env, "LEEGEN_DEVICE": device}
+            if "cuda" not in executor.capabilities():
+                job_env.update(env.env_without_cuda)
+            if problem.limits.memory_mb:
+                job_env["LEEGEN_MEMORY_MB"] = str(problem.limits.memory_mb)
+
+            async def on_line(line: str) -> None:
+                if on_output is None:
+                    return
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    return
+                if event.get("type") == "output":
+                    await on_output(str(event.get("stream") or "stdout"),
+                                    str(event.get("text") or ""))
+
+            job = JobSpec(run_id=run_id, bundle=bundle, command=lang.harness_command(),
+                          env=job_env, timeout_s=float(plan.run_config["timeout_s"]),
+                          on_result_line=on_line if on_output is not None else None)
+
+            self.active[run_id] = executor.id
+            try:
+                await on_status("preparing", f"environment {env.id} on {executor.id}")
+                values = await executor.prepare(env, lang.dependencies(env, problem.judge.kind))
+            except ProvisionError as exc:
+                return fail(f"could not prepare environment {env.id!r}:\n{exc}",
+                            executor.id, device)
+            outcome = await executor.run(job, values, on_status)
+            result = assemble_console(run_id, problem, outcome, executor.id, device, started,
+                                      file=req.file)
+            result.duration_ms = (time.perf_counter() - t0) * 1000
+            return result
         finally:
             self.active.pop(run_id, None)
             shutil.rmtree(bundle, ignore_errors=True)

@@ -115,9 +115,12 @@ Short version:
    for edge cases (empty input, boundaries, duplicates, large or random inputs, error paths).
    Seed all randomness. For floats and tensors use `float` or `allclose` with explicit
    tolerances; GPU float32 needs `rtol≈1e-4`. The UI shows cases as `Test 1..N` with only their
-   `description`, so give every test a one-line `description`. Group related tests with
-   top-level `sections` (`id`, `title`, `description`) and `section: <id>` on each test (see the
-   authoring guide). pytest problems group by test class automatically.
+   `description`, so give every test a one-line `description` (for pytest: the first docstring
+   line). Group related tests with top-level `sections` (`id`, `title`, `description`) and
+   `section: <id>` on each test for `function`/`script` problems. For `pytest`, group instead
+   with **one `class Test<Thing>:` per function or theme**, using the same class names in
+   `test_visible.py` and `test_hidden.py` — the class becomes the UI section (see the authoring
+   guide).
 6. **Description:** Markdown with KaTeX math, `mermaid` code fences, inline `<svg>` figures and
    `:::note` / `:::warning` / `:::details{summary="..."}` / `:::figure{caption="..."}` blocks.
    No raw HTML other than SVG, and no scripts. State the exact function signature, input/output
@@ -233,6 +236,33 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   event schemas, `tools.json` (MCP tool definitions + `core/toolspec.py` hints, which the browser
   edition registers as WebMCP tools), conformance fixtures, and `web/src/contracts/generated.ts`.
   `uv run leegen schema --check` fails when they are stale; a test enforces it.
+
+### Console and editor intelligence
+
+- **Console** (the `Console` bottom tab): a quick-run scratchpad for Python-based environments
+  (`core.compat.console_available()`: `env.language == "python"` and an editable `.py` file). It
+  is a separate pipeline, not a judge kind. `core.plan.plan_snippet()` writes the usual bundle
+  without tests and with `mode: "snippet"`; the harness (`leegen_harness/snippet.py`) imports
+  the context file as a module, runs the snippet under `module_scope`/`alarm`, streams `output`
+  events and emits one `console_done`. `core.assemble.assemble_console()` builds a
+  `ConsoleResult`. The service broadcasts `console_started` / `console_status` /
+  `console_output` / `console_finished` and never writes `last_run` or emits `run_*`, so the
+  Test Result panel and the problem-list badge are untouched. Server: `POST /api/console`;
+  browser: the Pyodide runner's `prepare`/`finish` handle the same snippet mode.
+- **Console semantics:** stdin is pre-seeded (no echo; `input()` raises `EOFError` when empty).
+  The context file is imported once, so a `__main__` guard does not fire and repeating a
+  top-level statement runs it again. Selections are dedented, and the last expression is echoed
+  (`repr`) unless the code ends with `;`. Top-level `await` is not supported. Local and browser
+  runs stream output; remote executors return it after the run. Console runs share the
+  per-problem run lock with tests but not their result state.
+- **Editor intelligence** (`web/src/lib/`): `pythonSymbols.ts` is a dependency-free scanner
+  (multi-line defs, classes, docstrings, imports, `findCallContext`), `pythonCatalog.ts` holds
+  keywords, builtins and snippets, and `editorIntelligence.ts` registers Monaco completion,
+  signature-help and symbol-hover providers once at startup, for `python` only, in both
+  editions. The Editor publishes its visible files per problem so closed files still contribute
+  names; Monaco models override the snapshot, so unsaved edits are always fresh. The symbol
+  hover is registered after the annotation hover so comments render first. `Ctrl/Cmd+Shift+Enter`
+  in the editor runs the selection in the Console with the open file as context.
 
 ### Browser edition
 

@@ -59,7 +59,9 @@ export interface Problem extends Omit<ProblemSummary, "judge" | "status"> {
 }
 
 // Records shared with the server come from the generated contracts (uv run leegen schema).
-export type { Annotation, Metric, Proposal, RunResult, TestResult } from "../contracts/generated";
+export type {
+  Annotation, ConsoleResult, Metric, Proposal, RunResult, TestResult,
+} from "../contracts/generated";
 import type { Annotation, Proposal, RunResult } from "../contracts/generated";
 
 export type Severity = Annotation["severity"];

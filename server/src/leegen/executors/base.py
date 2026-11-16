@@ -23,10 +23,14 @@ class JobSpec:
     timeout_s: float = 10.0
     build_timeout_s: float = 120.0
     results_file: str = "results.jsonl"
+    # Executors that can follow the results file while the job runs call this per line.
+    on_result_line: ResultLineCallback | None = None
 
 
 # Progress callback: on_status("preparing" | "queued" | "running", detail)
 StatusCallback = Callable[[str, str], Awaitable[None]]
+# Result-line callback: each complete line from the harness results file, as it is written.
+ResultLineCallback = Callable[[str], Awaitable[None]]
 
 
 async def _no_status(phase: str, detail: str) -> None:

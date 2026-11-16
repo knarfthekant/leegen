@@ -2,7 +2,7 @@ import shutil
 
 import pytest
 
-from leegen.runner import Orchestrator, RunRequest
+from leegen.runner import Orchestrator, RunRequest, SnippetRequest
 from leegen.store.problems import ProblemStore, parse_problem_yaml
 
 from .conftest import FIXTURES
@@ -159,3 +159,48 @@ def test_unique_test_name():
     assert unique_test_name(None, {"Test 1", "Test 2"}) == "Test 3"
     assert unique_test_name("Mine", {"Mine"}) == "Mine (2)"
     assert unique_test_name("  ", {"Test 1"}) == "Test 2"
+
+
+# ------------------------------------------------------------------ console snippets
+
+
+async def snippet(pid: str, **kw):
+    return await orch.run_snippet(SnippetRequest(problem=problem(pid), **kw))
+
+
+async def test_console_prints_and_echoes_last_expression():
+    r = await snippet("merge-ranges", file="solution.py", code='print("hi")\n1 + 1')
+    assert r.status == "ok", r
+    assert r.stdout == "hi\n" and r.result == "2"
+    assert r.file == "solution.py" and r.executor == "local"
+
+
+async def test_console_file_context_and_stdin():
+    code = 'name = input()\nprint(name)\nmerge_ranges([[4, 5], [1, 2]])'
+    r = await snippet("merge-ranges", files={"solution.py": GOOD}, file="solution.py",
+                      code=code, stdin="Ada\n")
+    assert r.status == "ok", r
+    assert r.stdout == "Ada\n" and r.result == "[[1, 2], [4, 5]]"
+
+
+async def test_console_error_has_only_console_frames():
+    r = await snippet("merge-ranges", file="solution.py", code='raise ValueError("boom")')
+    assert r.status == "error"
+    assert "<console>" in r.error and "ValueError: boom" in r.error
+    assert "_lc" not in r.error and "leegen_harness" not in r.error
+
+
+async def test_console_indented_selection_is_dedented():
+    r = await snippet("merge-ranges", files={"solution.py": GOOD}, file="solution.py",
+                      code="    print(merge_ranges([[3, 4], [1, 2]]))")
+    assert r.status == "ok" and r.stdout == "[[1, 2], [3, 4]]\n" and r.result is None
+
+
+async def test_console_timeout():
+    r = await snippet("merge-ranges", file=None, code="while True:\n    pass", timeout_s=0.5)
+    assert r.status == "timeout" and "time limit" in r.error
+
+
+async def test_console_not_available_for_non_python_problems():
+    r = await snippet("cuda-vector-add", code="print(1)")
+    assert r.status == "error" and "console" in r.error

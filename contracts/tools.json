@@ -326,7 +326,7 @@
     {
       "name": "get_authoring_guide",
       "title": "Authoring guide",
-      "description": "How to write leegen problems: schema walkthrough, judge kinds, test design, markup,\nand worked examples. Read this before creating problems.",
+      "description": "How to write leegen problems: schema walkthrough, judge kinds, test design (including\npytest class grouping and one-line case descriptions), markup, and worked examples. Read\nthis before creating problems.",
       "inputSchema": {
         "type": "object",
         "properties": {},

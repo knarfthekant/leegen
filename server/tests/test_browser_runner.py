@@ -78,3 +78,23 @@ def test_webgpu_helper_data_and_native_refusal(monkeypatch):
     assert wg.storage(b"1234").read_only and not wg.storage(size=8).read_only
     with pytest.raises(wg.WebGPUUnavailable, match="browser edition"):
         wg.device()   # natively there is no WebGPU: a clear error, not an ImportError
+
+
+def test_snippet_run_streams_output_and_echoes(tmp_path):
+    solution = "def double(x):\n    return x * 2\n"
+    req = json.dumps({"run_id": "r-snippet", "problem_yaml": _yaml("merge-ranges"),
+                      "mode": "snippet", "files": {"solution.py": solution},
+                      "snippet": {"file": "solution.py", "stdin": "",
+                                  "code": "print('hi')\ndouble(21)"}})
+    base = str(tmp_path / "snippet")
+    prepared = prepare(req, base)
+    assert json.loads(prepared)["judge"] == "snippet"
+    lines: list[str] = []
+    crash = execute(base, str(HARNESS_ROOT), sink=lines.append)
+    results = read_results(base)
+    assert results.splitlines() == lines
+    assert any(json.loads(line)["type"] == "output" for line in lines)
+    out = json.loads(finish(req, prepared, results, json.dumps(
+        {"exit_code": 0 if not crash else 1, "stderr": crash})))
+    assert out["status"] == "ok" and out["stdout"] == "hi\n" and out["result"] == "42"
+    assert out["executor"] == "browser" and out["file"] == "solution.py"

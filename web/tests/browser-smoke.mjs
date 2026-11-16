@@ -84,6 +84,14 @@ const editor = (fn, arg) =>
     const m = window.monaco, ed = m.editor.getEditors().find((e) => !e.getOption(m.editor.EditorOption.readOnly));
     return (${fn.toString()})(m, ed, ${JSON.stringify(arg ?? null)});
   })()`);
+const trigger = (id) => editor((m, ed, action) => ed.trigger("smoke", action, {}), id);
+const setBuffer = (code) => editor((m, ed, value) => {
+  const model = ed.getModel();
+  model.setValue(value);
+  const line = model.getLineCount();
+  ed.setPosition({ lineNumber: line, column: model.getLineMaxColumn(line) });
+  ed.focus();
+}, code);
 const resultStatus = async () => {
   await page.locator(".result-status").waitFor({ timeout: 90_000 });
   await page.waitForFunction(() => !document.body.innerText.includes("Running…"), null, { timeout: 90_000 });
@@ -95,7 +103,7 @@ try {
   await page.goto(APP + "/");
   await page.getByText("Merge Booking Ranges").first().waitFor();
   const seeds = await page.locator(".problem-row").count();
-  if (seeds !== 5) throw new Error(`expected 5 signature seed problems, got ${seeds}`);
+  if (seeds !== 13) throw new Error(`expected 13 bundled problems, got ${seeds}`);
   await page.getByRole("button", { name: "Minimize Codex guide" }).click();
   const isolated = await page.evaluate(() => crossOriginIsolated);
   if (!isolated) throw new Error("the app page is not cross-origin isolated");
@@ -133,6 +141,63 @@ try {
   await page.locator(".monaco-editor").first().waitFor();
   await editor((m, ed, code) => { ed.getModel().setValue(code); ed.focus(); }, SOLUTION);
   await page.waitForTimeout(700);
+
+  step("editor intelligence works in the static build");
+  await setBuffer(SOLUTION + "\nmer");
+  await trigger("editor.action.triggerSuggest");
+  await page.locator(".suggest-widget").waitFor({ timeout: 10_000 });
+  const suggestions = await page.locator(".suggest-widget .monaco-list-row").allInnerTexts();
+  if (!suggestions.some((s) => s.includes("merge_ranges"))) throw new Error("no merge_ranges completion: " + JSON.stringify(suggestions.slice(0, 8)));
+  await page.keyboard.press("Escape");
+  await setBuffer(SOLUTION + "\nmerge_ranges(");
+  await trigger("editor.action.triggerParameterHints");
+  await page.locator(".parameter-hints-widget").waitFor({ timeout: 10_000 });
+  const hints = await page.locator(".parameter-hints-widget").innerText();
+  if (!hints.includes("bookings")) throw new Error("parameter hints missing bookings: " + hints);
+  await page.keyboard.press("Escape");
+  await setBuffer(SOLUTION);
+  await page.waitForTimeout(700);
+  const hoverPoint = await editor((m, ed) => {
+    const p = ed.getScrolledVisiblePosition({ lineNumber: 1, column: 6 });
+    const r = ed.getDomNode().getBoundingClientRect();
+    return { x: r.left + p.left + 2, y: r.top + p.top + p.height / 2 };
+  });
+  await page.mouse.move(hoverPoint.x, hoverPoint.y);
+  await page.locator(".monaco-hover", { hasText: "def merge_ranges(bookings" }).waitFor({ timeout: 10_000 });
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(200);
+
+  step("console: snippet with stdout and an echoed expression");
+  await page.getByRole("tab", { name: "Console" }).click();
+  await page.locator("textarea.console-input").first().fill('print("hi")\n2 + 3');
+  await page.getByRole("button", { name: "Run snippet" }).click();
+  await page.locator(".console-entry .chip", { hasText: "ok" }).first().waitFor({ timeout: 90_000 });
+  const consoleText = await page.locator(".console-entry").first().innerText();
+  if (!consoleText.includes("hi") || !consoleText.includes("5")) throw new Error("console output:\n" + consoleText);
+  console.log("  console ok:", consoleText.replace(/\s+/g, " ").slice(0, 80));
+
+  step("run the selected line in the Console");
+  await editor((m, ed) => {
+    const model = ed.getModel();
+    const last = model.getLineCount();
+    const end = model.getLineMaxColumn(last);
+    ed.executeEdits("smoke", [{ range: new m.Range(last, end, last, end), text: "\nmerge_ranges([[4, 5], [1, 2]])" }]);
+    const line = model.getLineCount();
+    ed.setSelection(new m.Range(line, 1, line, model.getLineMaxColumn(line)));
+    ed.focus();
+  });
+  await page.keyboard.press("ControlOrMeta+Shift+Enter");
+  await page.waitForFunction(() => {
+    const entries = document.querySelectorAll(".console-entry");
+    return entries.length >= 2 && entries[0].querySelector(".chip")?.textContent?.trim() === "ok";
+  }, null, { timeout: 90_000 });
+  const selectionText = await page.locator(".console-entry").first().innerText();
+  if (!selectionText.includes("[[1, 2], [4, 5]]")) throw new Error("selection output:\n" + selectionText);
+  console.log("  selection ok:", selectionText.replace(/\s+/g, " ").slice(0, 80));
+  await setBuffer(SOLUTION);
+  await page.waitForTimeout(700);
+
+  step("run with ⌘↵ and expect all tests to pass");
   await page.keyboard.press("ControlOrMeta+Enter");
   const status = await resultStatus();
   console.log("  result:", (await page.locator(".result-head").innerText()).replace(/\s+/g, " "));
@@ -228,6 +293,20 @@ try {
     await tool("open_problem", { problem_id: id });
     await page.locator(".title", { hasText: "Tiled Matrix" }).waitFor();
     await page.waitForFunction(() => window.monaco.editor.getEditors().some((e) => e.getModel()?.getLanguageId() === "wgsl"));
+    step("the WGSL editor gets no Python suggestions");
+    await editor((m, ed) => {
+      ed.getModel().setValue("pri\n");
+      ed.setPosition({ lineNumber: 1, column: 4 });
+      ed.focus();
+    });
+    await trigger("editor.action.triggerSuggest");
+    await page.waitForTimeout(800);
+    const wgslSuggestions = await page.locator(".suggest-widget.visible .monaco-list-row").allInnerTexts().catch(() => []);
+    if (wgslSuggestions.some((s) => /merge_ranges|\bprint\b|sorted\b/.test(s))) {
+      throw new Error("Python suggestions leaked into WGSL: " + JSON.stringify(wgslSuggestions.slice(0, 8)));
+    }
+    await page.keyboard.press("Escape");
+    step("WebGPU: compile errors with locations, a passing kernel, GPU timing");
     await editor((m, ed) => ed.getModel().setValue("@compute @workgroup_size(64)\nfn main() {\n    let x: f32 = 1u;\n}\n"));
     await page.waitForTimeout(700);
     const broken = await tool("run_tests", {});

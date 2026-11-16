@@ -6,7 +6,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from leegen.core.models import Metric, Problem, RunResult, TestResult
+from leegen.core.models import (ConsoleResult, ConsoleStatus, Metric, Problem, RunResult,
+                                TestResult)
 
 
 @dataclass
@@ -41,6 +42,62 @@ def redact(result: RunResult) -> RunResult:
         if not t.visible and t.status == "pass":
             t.input = t.expected = t.actual = None
     return result
+
+
+MAX_CONSOLE_OUTPUT = 200_000
+
+
+def _cap(text: str, limit: int = MAX_CONSOLE_OUTPUT) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"\n... (output truncated at {limit} characters)"
+
+
+def assemble_console(run_id: str, problem: Problem, outcome: ExecOutcome, executor_id: str,
+                     device: str, started: float, *, file: str | None = None) -> ConsoleResult:
+    """Console results come from `output` and `console_done` events, never from `assemble()`."""
+    stdout: list[str] = []
+    stderr: list[str] = []
+    done: dict[str, Any] | None = None
+    for ev in parse_events(outcome.results):
+        kind = ev.get("type")
+        if kind == "output":
+            text = str(ev.get("text") or "")
+            (stderr if ev.get("stream") == "stderr" else stdout).append(text)
+        elif kind == "console_done":
+            done = ev
+
+    status: ConsoleStatus = "ok"
+    error: str | None = None
+    value: str | None = None
+    if outcome.cancelled:
+        status = "cancelled"
+    elif done is not None:
+        status = done.get("status") or "error"  # type: ignore[assignment]
+        error = done.get("error")
+        value = done.get("result")
+    elif outcome.timed_out:
+        status = "timeout"
+    elif outcome.exit_code not in (0, None):
+        status = "error"
+        error = (outcome.stderr.strip()[-4000:] or
+                 f"process exited with code {outcome.exit_code}")
+    else:
+        status = "error"
+        error = outcome.stderr.strip()[-4000:] or "the console produced no result"
+
+    if outcome.stderr.strip() and done is not None and status == "ok":
+        # harness-level noise (imports, warnings) alongside a successful run
+        stderr.append(outcome.stderr)
+    elif outcome.stderr.strip() and status != "ok" and not stderr:
+        stderr.append(outcome.stderr)
+
+    return ConsoleResult(
+        run_id=run_id, problem_id=problem.id, status=status, executor=executor_id,
+        device=device, file=file, started_at=started,
+        duration_ms=outcome.duration_ms, stdout=_cap("".join(stdout)),
+        stderr=_cap("".join(stderr)), result=value, error=error,
+    )
 
 
 def assemble(run_id: str, problem: Problem, mode: str, tests: list[dict[str, Any]],

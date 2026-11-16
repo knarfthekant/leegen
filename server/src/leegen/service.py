@@ -17,14 +17,14 @@ from pathlib import Path
 from typing import Any, Literal, Protocol
 
 from leegen.core import review
-from leegen.core.compat import requirements
+from leegen.core.compat import console_available, requirements
 from leegen.core.events import AgentActivity, AgentStatus
-from leegen.core.models import Environment, Problem, RunResult
+from leegen.core.models import ConsoleResult, Environment, Problem, RunResult
 from leegen.core.parse import dump_problem_yaml, format_error, parse_problem_yaml
 from leegen.core.toolspec import TUTORING_GUIDE
 from leegen.core.validation import ValidationReport, validate
 from leegen.core.views import brief_run, problem_summary, public_problem, run_status, sort_key
-from leegen.runner import Orchestrator, RunRequest
+from leegen.runner import Orchestrator, RunRequest, SnippetRequest
 from leegen.schema.export import problem_json_schema
 
 
@@ -415,7 +415,8 @@ class ToolService:
                         "compatible": ex.supports(requires, env) if problem_id else True,
                         "device": ex.device_for(requires)})
         return {"executors": out, "requires": requires,
-                "runtimes": sorted(env.runtimes()) if env else ["native"]}
+                "runtimes": sorted(env.runtimes()) if env else ["native"],
+                "console": console_available(p, env) if problem_id else False}
 
     # ---------------------------------------------------------------- runs
 
@@ -444,6 +445,43 @@ class ToolService:
             )
             self.workspace.write_state(problem.id, "last_run", result.model_dump(mode="json"))
             await self.events.broadcast({"type": "run_finished", "problem_id": problem.id,
+                                         "run_id": run_id, "source": source,
+                                         "result": result.model_dump(mode="json")})
+        return result
+
+    async def run_console(self, problem: Problem, *, files: dict[str, str] | None = None,
+                          file: str | None = None, code: str, stdin: str = "",
+                          executor: str | None = None, run_id: str | None = None,
+                          source: str = "ui") -> ConsoleResult:
+        """Run one console snippet in the problem's environment.
+
+        Live buffers are used but never saved, and the result is not recorded as `last_run`:
+        a console run must not change the problem list badge or the Test Result panel.
+        """
+        current = self.workspace.files(problem)
+        if files:
+            current.update({k: v for k, v in files.items() if k in current})
+        run_id = run_id or uuid.uuid4().hex[:12]
+        lock = self.run_lock.setdefault(problem.id, asyncio.Lock())
+        async with lock:
+            await self.events.broadcast({"type": "console_started", "problem_id": problem.id,
+                                         "run_id": run_id, "source": source, "file": file})
+
+            async def on_status(phase: str, detail: str) -> None:
+                await self.events.broadcast({"type": "console_status", "problem_id": problem.id,
+                                             "run_id": run_id, "phase": phase,
+                                             "detail": detail})
+
+            async def on_output(stream: str, text: str) -> None:
+                await self.events.broadcast({"type": "console_output", "problem_id": problem.id,
+                                             "run_id": run_id, "stream": stream, "text": text})
+
+            result = await self.orchestrator.run_snippet(
+                SnippetRequest(problem=problem, files=current, file=file, code=code, stdin=stdin,
+                               executor=executor or self.session.executor),
+                run_id=run_id, on_status=on_status, on_output=on_output,
+            )
+            await self.events.broadcast({"type": "console_finished", "problem_id": problem.id,
                                          "run_id": run_id, "source": source,
                                          "result": result.model_dump(mode="json")})
         return result

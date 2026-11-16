@@ -636,10 +636,22 @@
           "default": "user",
           "enum": [
             "user",
-            "reference"
+            "reference",
+            "snippet"
           ],
           "title": "Mode",
           "type": "string"
+        },
+        "snippet": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SnippetSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "custom_tests": {
           "items": {
@@ -672,6 +684,35 @@
         "problem_yaml"
       ],
       "title": "RunnerRequest",
+      "type": "object"
+    },
+    "SnippetSpec": {
+      "description": "One console execution: code plus the module namespace it runs inside.",
+      "properties": {
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "code": {
+          "default": "",
+          "title": "Code",
+          "type": "string"
+        },
+        "stdin": {
+          "default": "",
+          "title": "Stdin",
+          "type": "string"
+        }
+      },
+      "title": "SnippetSpec",
       "type": "object"
     },
     "TestCase": {

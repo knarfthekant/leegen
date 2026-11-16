@@ -2,6 +2,7 @@ import { DiffEditor, Editor as MonacoEditor, type OnMount } from "@monaco-editor
 import { Check, CircleAlert, CloudCheck, CodeXml, LoaderCircle, Lock, Maximize2, Minimize2, Redo2, RotateCcw, Sparkles, Undo2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Annotation, Proposal } from "../lib/api";
+import { registerSymbolHover, setProblemFiles } from "../lib/editorIntelligence";
 import { languageFor, monaco } from "../lib/monaco";
 import { Button, cx, IconButton } from "./ui";
 
@@ -40,6 +41,8 @@ interface Props {
   proposal: Proposal | null;
   onResolveProposal: (p: Proposal, action: "accept" | "reject") => void;
   onRun: () => void;
+  /** Run the selected text in the Console, with `file` as its module namespace. */
+  onRunSelection: (code: string, file: string) => void;
   onCursor: (info: CursorInfo) => void;
   onReset: () => void;
   revealLine: RevealTarget | null;
@@ -161,11 +164,32 @@ export function Editor(props: Props) {
   }, [shownProposal?.id, file?.path, problemId]);
   const theme = dark ? "lc-dark" : "lc-light";
 
+  // The completion/signature providers read every visible file; the Editor already has them.
+  useEffect(() => {
+    if (files.length) setProblemFiles(problemId, files);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [problemId, files]);
+
   const onMount: OnMount = (editor) => {
     editorRef.current = editor as unknown as Ed;
     decorations.current = editor.createDecorationsCollection();
     registerAnnotationHover();
+    registerSymbolHover(monaco);
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => handlers.current.onRun());
+    editor.addAction({
+      id: "leegen.runSelectionInConsole",
+      label: "Run selection in Console",
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter],
+      contextMenuGroupId: "navigation",
+      contextMenuOrder: 0,
+      run: (ed) => {
+        const model = ed.getModel();
+        const selection = ed.getSelection();
+        if (!model || !selection || selection.isEmpty()) return;
+        const code = model.getValueInRange(selection);
+        if (code.trim()) handlers.current.onRunSelection(code, file.path);
+      },
+    });
     const syncUndo = () => {
       const model = editor.getModel();
       setUndoState({ undo: !!model?.canUndo(), redo: !!model?.canRedo() });

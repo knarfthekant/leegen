@@ -13,11 +13,43 @@ import time
 from pathlib import Path
 
 from leegen.envs.provision import ensure_local_python
-from leegen.executors.base import ExecOutcome, Executor, JobSpec, StatusCallback, _no_status
+from leegen.executors.base import (ExecOutcome, Executor, JobSpec, ResultLineCallback,
+                                   StatusCallback, _no_status)
 from leegen.registry import register
 from leegen.schema.models import Environment
 
 MAX_OUTPUT = 200_000
+
+
+async def _tail(path: Path, on_line: ResultLineCallback, stop: asyncio.Event) -> None:
+    """Follow the harness results file while the job runs, delivering complete lines."""
+    offset = 0
+    pending = ""
+    while True:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                fh.seek(offset)
+                data = fh.read()
+                offset = fh.tell()
+        except FileNotFoundError:
+            data = ""
+        if data:
+            pending += data
+            *lines, pending = pending.split("\n")
+            for line in lines:
+                if line.strip():
+                    try:
+                        await on_line(line)
+                    except Exception:  # noqa: BLE001 - a failed broadcast must not kill the run
+                        pass
+        if stop.is_set():
+            break
+        await asyncio.sleep(0.03)
+    if pending.strip():
+        try:
+            await on_line(pending)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def detect_local_capabilities() -> set[str]:
@@ -135,9 +167,19 @@ class LocalExecutor(Executor):
                                    duration_ms=(time.perf_counter() - started) * 1000)
 
         argv = [fill(a, values) for a in job.command]
-        # the harness has its own per-test deadline; the hard limit adds startup headroom
-        code, out, err, to = await self._exec(job, argv, env, cwd, job.timeout_s + 15, memory)
         results_path = job.bundle / job.results_file
+        tail_stop: asyncio.Event | None = None
+        tail_task: asyncio.Task[None] | None = None
+        if job.on_result_line is not None:
+            tail_stop = asyncio.Event()
+            tail_task = asyncio.create_task(_tail(results_path, job.on_result_line, tail_stop))
+        try:
+            # the harness has its own per-test deadline; the hard limit adds startup headroom
+            code, out, err, to = await self._exec(job, argv, env, cwd, job.timeout_s + 15, memory)
+        finally:
+            if tail_stop is not None and tail_task is not None:
+                tail_stop.set()
+                await tail_task
         results = results_path.read_text() if results_path.exists() else ""
         return ExecOutcome(
             code, stdout=out, stderr=err, results=results, timed_out=to,

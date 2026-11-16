@@ -11,12 +11,14 @@ import "monaco-editor/languages/definitions/markdown/register";
 import "monaco-editor/languages/definitions/shell/register";
 import { loader } from "@monaco-editor/react";
 import { registerWgsl } from "./wgsl";
+import { registerEditorIntelligence } from "./editorIntelligence";
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 // exposed for debugging and the browser smoke test
 (window as unknown as { monaco: typeof monaco }).monaco = monaco;
 loader.config({ monaco });
 registerWgsl(monaco);
+registerEditorIntelligence(monaco);
 
 monaco.editor.defineTheme("lc-light", {
   base: "vs",

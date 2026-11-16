@@ -16,6 +16,11 @@ def main() -> None:
     for key in ("user_dir", "ref_dir"):
         if cfg.get(key):
             cfg[key] = str((base / cfg[key]).resolve())
+    if cfg.get("snippet") is not None:
+        from leegen_harness import snippet
+
+        snippet.run(cfg)
+        return
     kind = cfg["judge"]["kind"]
     if kind == "function":
         from leegen_harness import function_judge

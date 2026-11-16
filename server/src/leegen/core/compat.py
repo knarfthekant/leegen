@@ -46,3 +46,9 @@ def device_for(capabilities: Iterable[str], requires: Iterable[str]) -> str:
     if "mps" in caps:
         return "mps"
     return "cpu"
+
+
+def console_available(problem: Problem, env: Environment | None) -> bool:
+    """The quick-execution console runs Python code in the problem's own environment."""
+    return bool(env is not None and env.language == "python"
+                and any(f.role == "editable" and f.path.endswith(".py") for f in problem.files))

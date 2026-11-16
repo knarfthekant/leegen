@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
-from leegen.core.models import RunResult
+from leegen.core.models import ConsoleResult, RunResult
 from leegen.core.review import Severity
 
 
@@ -79,6 +79,38 @@ class RunFinishedEvent(BaseModel):
     result: RunResult
 
 
+class ConsoleStartedEvent(BaseModel):
+    type: Literal["console_started"]
+    problem_id: str
+    run_id: str
+    source: str
+    file: str | None = None
+
+
+class ConsoleStatusEvent(BaseModel):
+    type: Literal["console_status"]
+    problem_id: str
+    run_id: str
+    phase: Literal["preparing", "queued", "running", "loading"]
+    detail: str
+
+
+class ConsoleOutputEvent(BaseModel):
+    type: Literal["console_output"]
+    problem_id: str
+    run_id: str
+    stream: Literal["stdout", "stderr"]
+    text: str
+
+
+class ConsoleFinishedEvent(BaseModel):
+    type: Literal["console_finished"]
+    problem_id: str
+    run_id: str
+    source: str
+    result: ConsoleResult
+
+
 class AnnotationsChangedEvent(BaseModel):
     type: Literal["annotations_changed"]
     problem_id: str
@@ -122,7 +154,8 @@ class ProblemChangedEvent(BaseModel):
 BackendEvent = Annotated[
     RunStartedEvent | RunStatusEvent | RunFinishedEvent | AnnotationsChangedEvent
     | ProposalsChangedEvent | FilesChangedEvent | CustomTestsChangedEvent | NavigateEvent
-    | ProblemsChangedEvent | ProblemChangedEvent | AgentStatusChangedEvent,
+    | ProblemsChangedEvent | ProblemChangedEvent | AgentStatusChangedEvent
+    | ConsoleStartedEvent | ConsoleStatusEvent | ConsoleOutputEvent | ConsoleFinishedEvent,
     Field(discriminator="type"),
 ]
 
@@ -132,11 +165,20 @@ BackendEvent = Annotated[
 # runner streams harness event lines back and answers with a RunResult (or a validation report).
 
 
+class SnippetSpec(BaseModel):
+    """One console execution: code plus the module namespace it runs inside."""
+
+    file: str | None = None
+    code: str = ""
+    stdin: str = ""
+
+
 class RunnerRequest(BaseModel):
     run_id: str
     problem_yaml: str = Field(description="The full problem, including hidden files and reference.")
     files: dict[str, str] = Field(default_factory=dict, description="Editable file overrides.")
-    mode: Literal["user", "reference"] = "user"
+    mode: Literal["user", "reference", "snippet"] = "user"
+    snippet: SnippetSpec | None = None
     custom_tests: list[CustomTest] = Field(default_factory=list)
     only_visible: bool = False
     packages: list[str] = Field(default_factory=list, description="Pyodide packages to load.")

@@ -77,6 +77,50 @@ try {
   }, SOLUTION);
   await page.waitForTimeout(700); // autosave debounce
 
+  step("editor intelligence: completions, parameter hints and symbol hover");
+  const setModel = (code) => page.evaluate((value) => {
+    const m = window.monaco;
+    const ed = m.editor.getEditors().find((e) => !e.getOption(m.editor.EditorOption.readOnly));
+    ed.getModel().setValue(value);
+    const line = ed.getModel().getLineCount();
+    ed.setPosition({ lineNumber: line, column: ed.getModel().getLineMaxColumn(line) });
+    ed.focus();
+  }, code);
+  const trigger = (id) => page.evaluate((action) => {
+    const m = window.monaco;
+    m.editor.getEditors().find((e) => !e.getOption(m.editor.EditorOption.readOnly)).trigger("smoke", action, {});
+  }, id);
+
+  await setModel(SOLUTION + "\nmer");
+  await trigger("editor.action.triggerSuggest");
+  await page.locator(".suggest-widget").waitFor({ timeout: 5000 });
+  const suggestions = await page.locator(".suggest-widget .monaco-list-row").allInnerTexts();
+  if (!suggestions.some((s) => s.includes("merge_ranges"))) throw new Error("no merge_ranges completion: " + JSON.stringify(suggestions.slice(0, 8)));
+  console.log("  completions:", suggestions.slice(0, 3).map((s) => s.replace(/\s+/g, " ").slice(0, 40)).join(" | "));
+  await page.keyboard.press("Escape");
+
+  await setModel(SOLUTION + "\nmerge_ranges(");
+  await trigger("editor.action.triggerParameterHints");
+  await page.locator(".parameter-hints-widget").waitFor({ timeout: 5000 });
+  const hints = await page.locator(".parameter-hints-widget").innerText();
+  if (!hints.includes("bookings")) throw new Error("parameter hints missing bookings: " + hints);
+  console.log("  signature help:", hints.replace(/\s+/g, " ").slice(0, 60));
+  await page.keyboard.press("Escape");
+
+  await setModel(SOLUTION);
+  await page.waitForTimeout(700);
+  const hoverPoint = await page.evaluate(() => {
+    const m = window.monaco;
+    const ed = m.editor.getEditors().find((e) => !e.getOption(m.editor.EditorOption.readOnly));
+    const p = ed.getScrolledVisiblePosition({ lineNumber: 1, column: 6 });
+    const r = ed.getDomNode().getBoundingClientRect();
+    return { x: r.left + p.left + 2, y: r.top + p.top + p.height / 2 };
+  });
+  await page.mouse.move(hoverPoint.x, hoverPoint.y);
+  await page.locator(".monaco-hover", { hasText: "def merge_ranges(bookings" }).waitFor({ timeout: 5000 });
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(200);
+
   step("run with ⌘↵ and expect all tests to pass");
   await page.keyboard.press("ControlOrMeta+Enter");
   await page.locator(".result-status").waitFor({ timeout: 60000 });
@@ -100,6 +144,40 @@ try {
   // cases are numbered, so they show a description and no title
   await page.locator(".case", { hasText: "example from the statement" }).waitFor();
   if (await page.locator(".case-name").count()) throw new Error("test titles should be gone");
+
+  step("console: a snippet prints to stdout and echoes its last expression");
+  await page.getByRole("tab", { name: "Console" }).click();
+  await page.locator("textarea.console-input").first().fill('print("hi")\n2 + 3');
+  await page.getByRole("button", { name: "Run snippet" }).click();
+  await page.locator(".console-entry .chip", { hasText: "ok" }).first().waitFor({ timeout: 60000 });
+  const consoleText = await page.locator(".console-entry").first().innerText();
+  if (!consoleText.includes("hi")) throw new Error("console stdout missing 'hi':\n" + consoleText);
+  if (!consoleText.includes("5")) throw new Error("console result missing 5:\n" + consoleText);
+  console.log("  console ok:", consoleText.replace(/\s+/g, " ").slice(0, 80));
+  await page.screenshot({ path: `${SHOTS}/lc-smoke-console.png` });
+
+  step("run the selected line in the Console, with the file's definitions");
+  await page.evaluate(() => {
+    const m = window.monaco;
+    const ed = m.editor.getEditors().find((e) => !e.getOption(m.editor.EditorOption.readOnly));
+    const model = ed.getModel();
+    const last = model.getLineCount();
+    const end = model.getLineMaxColumn(last);
+    ed.executeEdits("smoke", [{ range: new m.Range(last, end, last, end), text: "\nmerge_ranges([[4, 5], [1, 2]])" }]);
+    const line = model.getLineCount();
+    ed.setSelection(new m.Range(line, 1, line, model.getLineMaxColumn(line)));
+    ed.focus();
+  });
+  await page.keyboard.press("ControlOrMeta+Shift+Enter");
+  await page.waitForFunction(() => {
+    const entries = document.querySelectorAll(".console-entry");
+    return entries.length >= 2 && entries[0].querySelector(".chip")?.textContent?.trim() === "ok";
+  }, null, { timeout: 60000 });
+  const selectionText = await page.locator(".console-entry").first().innerText();
+  if (!selectionText.includes("[[1, 2], [4, 5]]")) throw new Error("selection run should print the merged list:\n" + selectionText);
+  console.log("  selection ok:", selectionText.replace(/\s+/g, " ").slice(0, 80));
+  await setModel(SOLUTION);
+  await page.waitForTimeout(700); // autosave the restored buffer
 
   step("undo and redo buttons follow the edit history");
   const undo = page.getByRole("button", { name: /^Undo/ });

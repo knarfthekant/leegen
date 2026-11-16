@@ -138,6 +138,27 @@ page navigates (the app routes with `pushState` only). The tools also work in Ch
   it at once. Each tab has its own runner and its own editor session; an agent sees the tab
   whose tools it calls.
 
+## Console, run selection and editor intelligence
+
+- The **Console** tab is a Jupyter-style scratchpad for Python-based environments. It runs in
+  the same Pyodide runner as tests, with mode `snippet`: `prepare` writes the user's files plus
+  the snippet, `execute` streams `output` events, and `finish` assembles a `ConsoleResult`.
+  Output streamed before a hard timeout kill stays visible (the runner accumulates the lines).
+- stdin is pre-seeded from the textarea. `input()` reads it line by line with no echo, and raises
+  `EOFError` when it runs out.
+- With a context file, the file is imported once (a `__main__` guard does not fire), then the
+  snippet runs in that module's namespace, so it can call the file's functions and see its
+  globals. Selections are dedented; the last expression is echoed unless the code ends with `;`.
+  Top-level `await` is not supported.
+- **Run selection** is `Ctrl/Cmd+Shift+Enter` in the editor (also in the context menu). It runs
+  the selected text in the Console with the open file as context.
+- Completions, parameter hints and hover come from an offline Python scanner
+  (`web/src/lib/pythonSymbols.ts`, `pythonCatalog.ts`, `editorIntelligence.ts`), not a language
+  server, and behave the same in both editions. Only Python files get them; WGSL and other
+  languages keep Monaco's word-based suggestions.
+- Console runs never touch `last_run` or the Test Result panel, and they share the per-problem
+  run lock with tests, so the two never overlap.
+
 ## Limits
 
 - Python plus WGSL only: environments with a `browser:` block (today `python` and `webgpu`).

@@ -33,7 +33,7 @@ from leegen.core.events import (
     RunnerEvent,
     RunnerRequest,
 )
-from leegen.core.models import Environment, Metric, Problem, RunResult, TestResult
+from leegen.core.models import ConsoleResult, Environment, Metric, Problem, RunResult, TestResult
 from leegen.core.parse import parse_problem_yaml
 from leegen.core.plan import unique_test_name
 from leegen.core.toolspec import TOOLS
@@ -44,6 +44,7 @@ from leegen.schema.export import problem_json_schema
 class _Records(BaseModel):
     agent_status: AgentStatus
     run_result: RunResult
+    console_result: ConsoleResult
     test_result: TestResult
     metric: Metric
     annotation: Annotation

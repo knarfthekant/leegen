@@ -1,7 +1,7 @@
 // Client for the runner origin (web/runner/): a hidden cross-origin iframe reached over a
 // MessageChannel. The runner is stateless; each request carries what it needs.
 
-import type { RunnerRequest, RunResult } from "../../contracts/generated";
+import type { ConsoleResult, RunnerRequest, RunResult } from "../../contracts/generated";
 
 export interface RunnerHello {
   origin: string;
@@ -131,6 +131,10 @@ export class RunnerClient {
 
   run(request: RunnerRequest): Promise<RunResult> {
     return this.call("run", { request }) as Promise<RunResult>;
+  }
+
+  runSnippet(request: RunnerRequest): Promise<ConsoleResult> {
+    return this.call("run", { request }) as Promise<ConsoleResult>;
   }
 
   cancel(runId: string): Promise<{ cancelled: boolean }> {

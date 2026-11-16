@@ -1,7 +1,7 @@
 // The server edition: REST under /api and a listen-only WebSocket at /api/ws.
 
 import type { CustomTest, Problem, RunResult, WorkspaceState } from "../lib/api";
-import type { AgentStatus } from "../contracts/generated";
+import type { AgentStatus, ConsoleResult } from "../contracts/generated";
 import type { Backend, BackendEvent, BackendStatus, ExecutorListing, ProblemListing, SessionReport } from "./types";
 
 async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -126,6 +126,11 @@ export function createServerBackend(base = ""): Backend {
     saveHints: (id, revealed) => call("PUT", `${api}/workspace/${enc(id)}/hints`, { revealed }),
     run: (problem_id, files, executor, run_id) =>
       call<RunResult>("POST", `${api}/run`, { problem_id, files, executor, run_id }),
+    runConsole: (problem_id, req) =>
+      call<ConsoleResult>("POST", `${api}/console`, {
+        problem_id, files: req.files, file: req.file, code: req.code, stdin: req.stdin,
+        executor: req.executor, run_id: req.runId,
+      }),
     cancel: (runId) => call("POST", `${api}/run/${enc(runId)}/cancel`),
     executors: (problemId) => call<ExecutorListing>("GET", `${api}/executors?problem_id=${enc(problemId)}`),
     reportSession: (report: SessionReport) => call("POST", `${api}/session`, report),

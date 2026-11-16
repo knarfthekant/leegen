@@ -5,7 +5,7 @@
 //
 // Components only talk to `getBackend()` (./index.ts); nothing else knows which edition runs.
 
-import type { AgentStatus, BackendEvent } from "../contracts/generated";
+import type { AgentStatus, BackendEvent, ConsoleResult } from "../contracts/generated";
 import type {
   CustomTest,
   ExecutorInfo,
@@ -27,6 +27,18 @@ export interface ExecutorListing {
   requires: string[];
   /** Runtimes the problem's environment supports: "native" (venv) and/or "pyodide" (browser). */
   runtimes?: string[];
+  /** Whether the quick-execution console can run this problem's language. */
+  console?: boolean;
+}
+
+/** One quick-execution snippet: code plus the file whose namespace it runs inside. */
+export interface ConsoleRequest {
+  files: Record<string, string>;
+  code: string;
+  file: string | null;
+  stdin: string;
+  executor: string | null;
+  runId: string;
 }
 
 /** What the editor reports so agents (get_session) see the user's live state. */
@@ -73,6 +85,8 @@ export interface Backend {
 
   /** Saves `files` too: a run always reflects (and persists) what the user sees. */
   run(problemId: string, files: Record<string, string>, executor: string | null, runId: string): Promise<RunResult>;
+  /** Runs one console snippet. Uses the live buffers but never saves them or `last_run`. */
+  runConsole(problemId: string, request: ConsoleRequest): Promise<ConsoleResult>;
   cancel(runId: string): Promise<unknown>;
   executors(problemId: string): Promise<ExecutorListing>;
 

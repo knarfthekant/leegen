@@ -188,12 +188,20 @@ files:
 - Every `test_*.py` file runs, unless `judge.test_files` lists them explicitly.
 - Tests in readonly files are marked visible; tests in hidden files are hidden.
 - The **first docstring line** of a test becomes its description in the UI. Write it as a
-  sentence ("breaking early still closes the connection").
+  sentence ("breaking early still closes the connection") — every test, visible and hidden,
+  needs one; without it the learner sees only a number.
+- **Group tests in classes whenever the problem has more than one function or theme.** Write
+  one `class Test<Thing>:` per function/theme, and use the same class names in `test_visible.py`
+  and `test_hidden.py`; the UI merges them into one section per class. The class name is the
+  section title, so make it readable (`TestRotate`, not `TestMisc`). Plain functions stay
+  ungrouped and read as anonymous `Test 1..N` cases. Class docstrings are not shown — the
+  per-test docstring is.
 - `async def test_...` works without plugins.
 - Plain `assert` failures show as **fail**; other exceptions show as **error**.
 - Use it for async code, stateful classes, error behaviour (`pytest.raises`), multi-file
   applications, and anything that needs fixtures or several assertions per scenario.
-- The `tests:` list is not used. pytest discovers tests.
+- The `tests:` list is not used. pytest discovers tests, so `sections:`/`section:` do not apply
+  to pytest problems — classes are the grouping mechanism.
 - Tests inside a class (`class TestRetries:`) are grouped under that class name in the UI. Plain
   functions stay ungrouped.
 
@@ -273,6 +281,11 @@ benchmark: {against: reference, repeats: 20, max_slowdown: 3.0}
   has more than ~5 tests, or when cases fall into clear themes (basics, edge cases, scale).
   Unknown section ids and duplicate ids fail validation. Hidden tests may use sections too; a
   section of only hidden tests is shown in the result panel after a run.
+- **For `pytest` problems, group with classes instead of `sections:`.** pytest discovers tests,
+  so the `tests:`/`sections:` mechanism is not used there. Put each test in a
+  `class Test<Thing>:` (one per function/theme), repeat the class names in the visible and
+  hidden test files, and give every test a one-line first docstring. The class becomes the
+  section, so learners can tell which function a case belongs to.
 - The user's own cases (Testcase panel `+`, or the `add_test_case` tool) are named `Test <n>`
   automatically. They can carry a `description` and a `section` too.
 - Keep tests deterministic: seed everything and avoid wall-clock assertions.
@@ -347,7 +360,9 @@ A good description has:
 
 - [ ] `id` is a slug and equals the intended file name.
 - [ ] The description states the signature, I/O format, constraints and a worked example.
-- [ ] Related tests share a `section` (with a description) when there are more than ~5 tests.
+- [ ] Related tests are grouped: one pytest class per function/theme with the same names in
+      visible and hidden files, or declared `sections` for `function`/`script` problems.
+- [ ] Every case has a one-line description (`description:` or a pytest first-line docstring).
 - [ ] The starter code imports cleanly and keeps exact signatures.
 - [ ] The reference is correct, and validation reports it passing every test.
 - [ ] 2–3 visible tests plus hidden edge cases, all named by what they check.

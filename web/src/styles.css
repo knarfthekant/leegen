@@ -419,6 +419,31 @@ details[open] .hint-chevron { transform: rotate(180deg); }
   animation: slide 1.3s var(--ease) infinite;
 }
 
+/* console */
+.console { display: flex; flex-direction: column; gap: 12px; }
+.console-history { display: flex; flex-direction: column; gap: 10px; }
+.console-entry {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+  border-radius: var(--r-md); background: var(--surface-2);
+}
+.console-entry-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.console-composer { display: flex; flex-direction: column; gap: 8px; }
+.console-input {
+  width: 100%; padding: 10px 12px; border: none; border-radius: var(--r-md);
+  background: var(--surface-2); color: var(--text); resize: vertical; outline: none;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
+  transition: box-shadow var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.console-input:focus { box-shadow: 0 0 0 3px var(--accent-soft); background: var(--surface); }
+.console-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.console-actions .muted { margin-left: auto; }
+.console-stdin summary {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none;
+  font-size: 12px; color: var(--text-2); margin-bottom: 6px;
+}
+.console-stdin[open] summary svg { transform: rotate(180deg); }
+.console-stdin summary svg { transition: transform var(--fast) var(--ease); }
+
 /* review */
 .review { display: flex; flex-direction: column; gap: 8px; }
 .review-item {

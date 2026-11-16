@@ -6,6 +6,7 @@ browser runner uses Pyodide, with the same rules and the same report.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -48,6 +49,48 @@ def static_issues(problem: Problem) -> list[str]:
                    if (f := problem.file(p)) is not None and f.role != "hidden"]
         if not visible:
             issues.append("warning: all test files are hidden; consider a readonly test_visible.py")
+        issues.extend(_pytest_style_issues(problem))
+    return issues
+
+
+_TEST_DEF = re.compile(r"^(\s*)(?:async\s+)?def\s+(test_\w+)\s*\([^)]*\)[^:]*:(.*)$")
+_TEST_CLASS = re.compile(r"^\s*class\s+Test\w*")
+_QUOTES = ('"""', "'''", '"', "'")
+
+
+def _pytest_style_issues(problem: Problem) -> list[str]:
+    """Warn (never block) when pytest cases are unlabeled or ungrouped in the UI."""
+    sources = []
+    for path in problem.pytest_files():
+        file = problem.file(path)
+        if file is not None:
+            sources.append(file.content)
+    tests = missing_doc = 0
+    grouped = False
+    for source in sources:
+        lines = source.splitlines()
+        if any(_TEST_CLASS.match(line) for line in lines):
+            grouped = True
+        for i, line in enumerate(lines):
+            match = _TEST_DEF.match(line)
+            if match is None:
+                continue
+            tests += 1
+            rest = match.group(3).strip()
+            if rest.startswith(_QUOTES):
+                continue
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j >= len(lines) or not lines[j].strip().startswith(_QUOTES):
+                missing_doc += 1
+    issues = []
+    if tests >= 2 and not grouped:
+        issues.append("warning: pytest tests are not grouped into classes; use one "
+                      "`class Test<Thing>` per function or theme so the UI can label the cases")
+    if missing_doc:
+        issues.append(f"warning: {missing_doc} pytest test(s) have no first-line docstring; "
+                      "the UI shows it as the case description")
     return issues
 
 

@@ -30,6 +30,54 @@ export interface AnnotationsChangedEvent {
   annotations: Annotation[];
 }
 
+export interface ConsoleFinishedEvent {
+  type: "console_finished";
+  problem_id: string;
+  run_id: string;
+  source: string;
+  result: ConsoleResult;
+}
+
+export interface ConsoleOutputEvent {
+  type: "console_output";
+  problem_id: string;
+  run_id: string;
+  stream: "stdout" | "stderr";
+  text: string;
+}
+
+/** One quick-execution run: a snippet or a selection, never a graded test run. */
+export interface ConsoleResult {
+  run_id: string;
+  problem_id: string;
+  status: "ok" | "error" | "timeout" | "cancelled";
+  executor: string;
+  device: string | null;
+  file: string | null;
+  started_at: number;
+  duration_ms: number;
+  stdout: string;
+  stderr: string;
+  result: string | null;
+  error: string | null;
+}
+
+export interface ConsoleStartedEvent {
+  type: "console_started";
+  problem_id: string;
+  run_id: string;
+  source: string;
+  file: string | null;
+}
+
+export interface ConsoleStatusEvent {
+  type: "console_status";
+  problem_id: string;
+  run_id: string;
+  phase: "preparing" | "queued" | "running" | "loading";
+  detail: string;
+}
+
 export interface CustomTest {
   name: string | null;
   description: string | null;
@@ -152,7 +200,7 @@ export interface TestResult {
   duration_ms: number | null;
 }
 
-export type BackendEvent = RunStartedEvent | RunStatusEvent | RunFinishedEvent | AnnotationsChangedEvent | ProposalsChangedEvent | FilesChangedEvent | CustomTestsChangedEvent | NavigateEvent | ProblemsChangedEvent | ProblemChangedEvent | AgentStatusChangedEvent;
+export type BackendEvent = RunStartedEvent | RunStatusEvent | RunFinishedEvent | AnnotationsChangedEvent | ProposalsChangedEvent | FilesChangedEvent | CustomTestsChangedEvent | NavigateEvent | ProblemsChangedEvent | ProblemChangedEvent | AgentStatusChangedEvent | ConsoleStartedEvent | ConsoleStatusEvent | ConsoleOutputEvent | ConsoleFinishedEvent;
 
 export interface Benchmark {
   against?: "reference";
@@ -276,12 +324,20 @@ export interface RunnerRequest {
   problem_yaml: string;
   /** Editable file overrides. */
   files?: Record<string, string>;
-  mode?: "user" | "reference";
+  mode?: "user" | "reference" | "snippet";
+  snippet?: SnippetSpec | null;
   custom_tests?: CustomTest[];
   only_visible?: boolean;
   /** Pyodide packages to load. */
   packages?: string[];
   device?: string;
+}
+
+/** One console execution: code plus the module namespace it runs inside. */
+export interface SnippetSpec {
+  file?: string | null;
+  code?: string;
+  stdin?: string;
 }
 
 export interface TestCase {

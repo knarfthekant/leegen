@@ -15,6 +15,7 @@ import {
   Shuffle,
   Square,
   SquareCheck,
+  SquareTerminal,
   Tag,
   Terminal,
   Zap,
@@ -24,6 +25,7 @@ import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
 import { Brand, ConnectionDot, RepositoryLink, ThemeToggle } from "../components/Chrome";
 import { Editor, type CursorInfo, type EditorFile, type RevealTarget, type SaveState } from "../components/Editor";
 import { Markdown } from "../components/Markdown";
+import { ConsolePanel, entryFromResult, type ConsoleEntry } from "../components/ConsolePanel";
 import { ProblemDrawer } from "../components/ProblemDrawer";
 import { ElsewhereChip, elsewhere, hardware } from "../components/ProblemRow";
 import { ResultPanel } from "../components/ResultPanel";
@@ -44,7 +46,7 @@ import {
 import { navigate } from "../lib/router";
 import { useDark } from "../lib/theme";
 
-type BottomTab = "testcase" | "result" | "review";
+type BottomTab = "testcase" | "result" | "console" | "review";
 type LeftTab = "description" | "hints";
 
 const BOTTOM_HEAD_PX = 42; // height of the bottom card's tab strip; the collapsed size
@@ -86,8 +88,16 @@ export function WorkspacePage({ id }: { id: string }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bottomCollapsed, setBottomCollapsed] = useState(false);
   const [maximized, setMaximized] = useState(false);
+  // Console (quick execution): history is per problem and lives only in this session.
+  const [consoleEnabled, setConsoleEnabled] = useState(false);
+  const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
+  const [consoleCode, setConsoleCode] = useState("");
+  const [consoleStdin, setConsoleStdin] = useState("");
+  const [consoleFile, setConsoleFile] = useState<string | null>(null);
+  const [consoleRunning, setConsoleRunning] = useState(false);
 
   const runId = useRef<string | null>(null);
+  const consoleRunId = useRef<string | null>(null);
   const saved = useRef<Record<string, string>>({});
   const loaded = useRef<string | null>(null);
   const leftPanel = usePanelRef();
@@ -120,6 +130,12 @@ export function WorkspacePage({ id }: { id: string }) {
     setBottomTab("testcase");
     setLeftTab("description");
     setSaveState("saved");
+    setConsoleEnabled(false);
+    setConsoleEntries([]);
+    setConsoleCode("");
+    setConsoleStdin("");
+    setConsoleFile(null);
+    setConsoleRunning(false);
     Promise.all([api.getProblem(id), api.getWorkspace(id), api.executors(id), api.listProblems()])
       .then(([p, w, ex, list]) => {
         if (!alive) return;
@@ -133,6 +149,8 @@ export function WorkspacePage({ id }: { id: string }) {
         setResult(w.last_run);
         setExecutors(ex.executors);
         setRuntimes(ex.runtimes);
+        setConsoleEnabled(!!ex.console);
+        setConsoleFile(p.files.find((f) => f.role === "editable")?.path ?? null);
         const firstCompatible = ex.executors.find((e) => e.compatible);
         setExecutor(firstCompatible?.id ?? null);
         setProblems(list.problems);
@@ -215,12 +233,46 @@ export function WorkspacePage({ id }: { id: string }) {
     }
   }, [api, running, problem, id, buffers, executor, showBottom]);
 
+  const runConsole = useCallback(
+    async (code: string, file: string | null) => {
+      if (!problem || consoleRunning) return;
+      const rid = newRunId();
+      consoleRunId.current = rid;
+      setConsoleRunning(true);
+      showBottom("console");
+      setConsoleEntries((xs) => [
+        ...xs,
+        {
+          runId: rid, code, file, stdin: consoleStdin, status: "running",
+          stdout: "", stderr: "", result: null, error: null,
+        },
+      ]);
+      try {
+        const r = await api.runConsole(id, {
+          files: buffers, code, file, stdin: consoleStdin, executor, runId: rid,
+        });
+        setConsoleEntries((xs) => xs.map((x) => (x.runId === rid ? entryFromResult(x, r) : x)));
+      } catch (e) {
+        setConsoleEntries((xs) =>
+          xs.map((x) => (x.runId === rid
+            ? { ...x, status: "error" as const, error: String((e as Error).message ?? e) }
+            : x)),
+        );
+      } finally {
+        consoleRunId.current = null;
+        setConsoleRunning(false);
+      }
+    },
+    [api, id, problem, consoleRunning, consoleStdin, buffers, executor, showBottom],
+  );
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        e.preventDefault();
-        run();
-      }
+      if (!(e.metaKey || e.ctrlKey) || e.key !== "Enter" || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT")) return;
+      e.preventDefault();
+      run();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -253,6 +305,43 @@ export function WorkspacePage({ id }: { id: string }) {
           setRunning(false);
           setResult(e.result);
         }
+        break;
+      case "console_started":
+        setConsoleRunning(true);
+        showBottom("console");
+        setConsoleEntries((xs) =>
+          xs.some((x) => x.runId === e.run_id)
+            ? xs
+            : [...xs, {
+                runId: e.run_id, code: "", file: e.file ?? null, stdin: "",
+                status: "running", stdout: "", stderr: "", result: null, error: null,
+              }],
+        );
+        break;
+      case "console_status":
+        setConsoleEntries((xs) =>
+          xs.map((x) => (x.runId === e.run_id ? { ...x, phase: e.phase } : x)));
+        break;
+      case "console_output":
+        setConsoleEntries((xs) =>
+          xs.map((x) => {
+            if (x.runId !== e.run_id) return x;
+            return e.stream === "stderr"
+              ? { ...x, stderr: x.stderr + e.text }
+              : { ...x, stdout: x.stdout + e.text };
+          }));
+        break;
+      case "console_finished":
+        setConsoleRunning(false);
+        setConsoleEntries((xs) => {
+          const fresh: ConsoleEntry = {
+            runId: e.run_id, code: "", file: e.result.file ?? null, stdin: "",
+            status: "running", stdout: "", stderr: "", result: null, error: null,
+          };
+          return xs.some((x) => x.runId === e.run_id)
+            ? xs.map((x) => (x.runId === e.run_id ? entryFromResult(x, e.result) : x))
+            : [...xs, entryFromResult(fresh, e.result)];
+        });
         break;
       case "annotations_changed": {
         const next = e.annotations;
@@ -359,6 +448,13 @@ export function WorkspacePage({ id }: { id: string }) {
   const selected = compatible.find((e) => e.id === executor);
   const reviewCount = annotations.length + proposals.length;
   const hw = hardware(problem);
+  const consoleDisabledReason = !consoleEnabled
+    ? null
+    : compatible.length === 0
+      ? (elsewhere(runtimes)
+          ? `The console runs in the ${elsewhere(runtimes)!.label}.`
+          : `No executor provides ${problem.requires.join(", ")}.`)
+      : null;
 
   return (
     <div className="ws-page">
@@ -487,6 +583,7 @@ export function WorkspacePage({ id }: { id: string }) {
                   proposal={activeProposal}
                   onResolveProposal={resolveProposal}
                   onRun={run}
+                  onRunSelection={(code, path) => void runConsole(code, path)}
                   onCursor={setCursor}
                   onReset={reset}
                   revealLine={revealLine}
@@ -529,6 +626,9 @@ export function WorkspacePage({ id }: { id: string }) {
                       dot: result && !running ? (result.status === "passed" ? "pass" : "fail") : null,
                     },
                     { id: "review", label: "Review", icon: MessageSquare, badge: reviewCount > 0 ? reviewCount : null },
+                    ...(consoleEnabled
+                      ? [{ id: "console" as const, label: "Console", icon: SquareTerminal }]
+                      : []),
                   ]}
                   trailing={
                     <IconButton
@@ -555,6 +655,24 @@ export function WorkspacePage({ id }: { id: string }) {
                       params={problem.judge.params ?? []}
                       sections={problem.sections}
                       onCancel={() => runId.current && api.cancel(runId.current)}
+                    />
+                  )}
+                  {bottomTab === "console" && (
+                    <ConsolePanel
+                      entries={consoleEntries}
+                      running={consoleRunning}
+                      files={editorFiles.map((f) => ({ path: f.path, role: f.role }))}
+                      contextFile={consoleFile}
+                      onChangeContextFile={setConsoleFile}
+                      code={consoleCode}
+                      onChangeCode={setConsoleCode}
+                      stdin={consoleStdin}
+                      onChangeStdin={setConsoleStdin}
+                      canRun={compatible.length > 0}
+                      disabledReason={consoleDisabledReason}
+                      onRun={() => void runConsole(consoleCode, consoleFile)}
+                      onCancel={() => consoleRunId.current && api.cancel(consoleRunId.current)}
+                      onClear={() => setConsoleEntries([])}
                     />
                   )}
                   {bottomTab === "review" && (

@@ -1,0 +1,247 @@
+schema_version: 1
+id: list-operations
+title: 'Lists: Slicing, Sorting, and Shaping'
+difficulty: intro
+tags:
+- python
+- lists
+- slicing
+- sorting
+track: python-data-structures
+order: 1
+environment: python
+description: |
+  Before a data structure can help you in a design problem, its everyday operations
+  need to be reflexes. This one is about the **list**: slicing, sorting with keys,
+  and building new lists with comprehensions.
+
+  ## Your task
+
+  Implement four functions in `solution.py`. **None of them may mutate the input
+  list** - always return a new one (a hidden test checks this).
+
+  | Function | What it does |
+  |---|---|
+  | `rotate(items, k)` | New list rotated **right** by `k` positions. `k` may be larger than `len(items)` or negative. `rotate([], k)` is `[]`. |
+  | `chunk(items, size)` | Split into consecutive chunks of at most `size` elements. Raise `ValueError` if `size <= 0`. |
+  | `top_scores(scores, k)` | The `k` highest scores, highest first. `k` may exceed the list length; `k <= 0` gives `[]`. |
+  | `keep_truthy(items)` | Only the truthy elements, original order preserved. |
+
+  ## Worked example
+
+  ```text
+  rotate([1, 2, 3, 4, 5], 2)   ->  [4, 5, 1, 2, 3]
+  chunk([1, 2, 3, 4, 5], 2)    ->  [[1, 2], [3, 4], [5]]
+  top_scores([72, 95, 88], 2)  ->  [95, 88]
+  keep_truthy([0, "a", "", 3]) ->  ["a", 3]
+  ```
+
+  ## Concepts these exercise
+
+  - Slicing with computed bounds (`items[n - k:]`) never raises on out-of-range
+    values - an overshot slice is silently empty.
+  - `k % len(items)` normalizes any rotation amount, including negative `k`
+    (Python's modulo of a negative number is still non-negative here).
+  - `sorted(..., reverse=True)` returns a **new** list; a comprehension filters
+    and builds in one pass.
+
+  :::note
+  A rotation needs no loop: the last `k % n` elements move to the front, and one
+  slice pair does the split for you.
+  :::
+
+  **Constraints:** `0 <= len(items) <= 10**5`, `-10**9 <= k <= 10**9`. Every
+  function should run in O(n) or O(n log n).
+hints:
+- 'Slicing past the end never raises: `items[100:]` is just `[]`. Lean on that instead of index arithmetic
+  with guards.'
+- 'Rotate right by `k`: the last `k % n` elements come first, the rest keep their order. One slice pair
+  does it.'
+- '`chunk` is one slice per step of `range(0, len(items), size)`.'
+files:
+- path: solution.py
+  content: |
+    """List operations: slicing, sorting and reshaping.
+
+    Implement each function. Every one returns a NEW list - none of them
+    may mutate the input.
+    """
+
+
+    def rotate(items: list, k: int) -> list:
+        """Return a new list rotated right by k positions.
+
+        >>> rotate([1, 2, 3, 4, 5], 2)
+        [4, 5, 1, 2, 3]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def chunk(items: list, size: int) -> list:
+        """Split items into consecutive chunks of at most `size` elements.
+
+        >>> chunk([1, 2, 3, 4, 5], 2)
+        [[1, 2], [3, 4], [5]]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def top_scores(scores: list, k: int) -> list:
+        """Return the k highest scores in descending order.
+
+        >>> top_scores([72, 95, 88, 61], 2)
+        [95, 88]
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+
+
+    def keep_truthy(items: list) -> list:
+        """Return only the truthy elements, in their original order.
+
+        >>> keep_truthy([0, "a", "", None, 3, [], "b"])
+        ['a', 3, 'b']
+        """
+        # TODO: replace with your implementation
+        raise NotImplementedError
+- path: test_visible.py
+  role: readonly
+  content: |
+    from solution import chunk, keep_truthy, rotate, top_scores
+
+
+    class TestRotate:
+        def test_rotate_moves_the_last_k_to_the_front(self):
+            """Rotate right by 2: the last two elements move to the front."""
+            assert rotate([1, 2, 3, 4, 5], 2) == [4, 5, 1, 2, 3]
+
+
+    class TestChunk:
+        def test_chunk_uneven_tail_stays_shorter(self):
+            """Chunk size 2: the leftover tail stays a shorter final chunk."""
+            assert chunk([1, 2, 3, 4, 5], 2) == [[1, 2], [3, 4], [5]]
+
+
+    class TestTopScores:
+        def test_top_scores_descending(self):
+            """Top 2 of four scores: highest first."""
+            assert top_scores([72, 95, 88, 61], 2) == [95, 88]
+
+
+    class TestKeepTruthy:
+        def test_keep_truthy_drops_falsy_values_in_order(self):
+            """Falsy values are dropped; the truthy ones keep their order."""
+            assert keep_truthy([0, "a", "", None, 3, [], "b"]) == ["a", 3, "b"]
+- path: test_hidden.py
+  role: hidden
+  content: |
+    import pytest
+
+    from solution import chunk, keep_truthy, rotate, top_scores
+
+
+    class TestRotate:
+        def test_rotate_empty_list(self):
+            """An empty list has nothing to rotate: return []."""
+            assert rotate([], 3) == []
+
+        def test_rotate_k_larger_than_length_wraps_around(self):
+            """k larger than the list wraps: rotating 3 items by 7 is rotating by 1."""
+            assert rotate([1, 2, 3], 7) == [3, 1, 2]
+
+        def test_rotate_zero_returns_a_copy(self):
+            """k = 0 returns a new list in the same order, not the input object."""
+            src = [1, 2]
+            out = rotate(src, 0)
+            assert out == [1, 2]
+            assert out is not src
+
+        def test_rotate_negative_k_rotates_left(self):
+            """A negative k rotates left: -1 moves the first element to the end."""
+            assert rotate([1, 2, 3, 4], -1) == [2, 3, 4, 1]
+
+
+    class TestChunk:
+        def test_chunk_size_larger_than_list_makes_one_chunk(self):
+            """size larger than the list: one chunk holds everything."""
+            assert chunk([1, 2], 10) == [[1, 2]]
+
+        def test_chunk_size_zero_raises_value_error(self):
+            """size <= 0 is invalid: raise ValueError."""
+            with pytest.raises(ValueError):
+                chunk([1], 0)
+
+        def test_chunk_empty_list(self):
+            """An empty list has no chunks: return []."""
+            assert chunk([], 3) == []
+
+
+    class TestTopScores:
+        def test_top_scores_k_bigger_than_list_returns_all_sorted(self):
+            """k larger than the list: return every score, highest first."""
+            assert top_scores([3, 1], 10) == [3, 1]
+
+        def test_top_scores_all_ties(self):
+            """Ties count separately: two 5s are both returned for k = 2."""
+            assert top_scores([5, 5, 5], 2) == [5, 5]
+
+        def test_top_scores_empty_list(self):
+            """An empty score list has no top scores: return []."""
+            assert top_scores([], 3) == []
+
+        def test_top_scores_k_zero_or_negative(self):
+            """k <= 0 asks for nothing: return []."""
+            assert top_scores([9, 8], 0) == []
+            assert top_scores([9, 8], -3) == []
+
+
+    class TestKeepTruthy:
+        def test_keep_truthy_empty_list(self):
+            """An empty list stays empty."""
+            assert keep_truthy([]) == []
+
+        def test_keep_truthy_all_falsy(self):
+            """Only falsy values: nothing survives."""
+            assert keep_truthy([0, "", None, [], {}]) == []
+
+
+    class TestNoMutation:
+        def test_functions_do_not_mutate_their_input(self):
+            """Every function returns a new list; the input stays unchanged."""
+            src = [3, 1, 2]
+            rotate(src, 1)
+            top_scores(src, 2)
+            keep_truthy(src)
+            chunk(src, 2)
+            assert src == [3, 1, 2]
+reference:
+  files:
+  - path: solution.py
+    content: |
+      """List operations: slicing, sorting and reshaping."""
+
+
+      def rotate(items: list, k: int) -> list:
+          if not items:
+              return []
+          n = len(items)
+          k %= n
+          return items[n - k:] + items[:n - k]
+
+
+      def chunk(items: list, size: int) -> list:
+          if size <= 0:
+              raise ValueError("size must be positive")
+          return [items[i:i + size] for i in range(0, len(items), size)]
+
+
+      def top_scores(scores: list, k: int) -> list:
+          return sorted(scores, reverse=True)[:max(k, 0)]
+
+
+      def keep_truthy(items: list) -> list:
+          return [x for x in items if x]
+judge:
+  kind: pytest

@@ -441,6 +441,12 @@ export function canRun(caps: Iterable<string>, runtime: string, requires: Iterab
   return runtimes(env).has(runtime) && satisfies(caps, requires);
 }
 
+/** Mirrors leegen.core.compat.console_available: Python problems with an editable .py file. */
+export function consoleAvailable(problem: FullProblem, env: Environment | null | undefined): boolean {
+  return Boolean(env?.language === "python"
+    && files(problem).some((f) => f.role === "editable" && f.path.endsWith(".py")));
+}
+
 export function deviceFor(caps: Iterable<string>, requires: Iterable<string>): string {
   const c = new Set(caps);
   const r = new Set(requires);
