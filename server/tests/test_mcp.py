@@ -74,7 +74,7 @@ async def test_tutoring_flow():
 
         run = data(await client.call_tool("run_tests", {}))
         assert run["status"] == "failed" and run["failing_tests"]
-        data(await client.call_tool("add_test_case", {"args": [[[1, 2]]]}))
+        data(await client.call_tool("add_test_case", {"args": [[[1, 2]]], "section": "basics"}))
         assert st.workspace.read_state("merge-ranges", "custom_tests", [])[-1]["input"]["args"] == [[[1, 2]]]
         cleared = data(await client.call_tool("clear_annotations", {}))
         assert cleared["removed"] == 2
@@ -118,12 +118,15 @@ async def test_add_test_case_sections_and_names():
         st = app_state()
         st.session.update(problem_id="merge-ranges")
         st.workspace.write_state("merge-ranges", "custom_tests", [])
-        data(await client.call_tool("add_test_case", {"args": [[[1, 2]]]}))
+        data(await client.call_tool("add_test_case", {"args": [[[1, 2]]], "section": "basics"}))
         data(await client.call_tool("add_test_case", {
-            "args": [[[3, 4]]], "description": "touching", "section": "edge-cases"}))
+            "args": [[[3, 4]]], "section": "edge-cases"}))
         tests = st.workspace.read_state("merge-ranges", "custom_tests", [])
         assert [t["name"] for t in tests] == ["Test 1", "Test 2"]
-        assert tests[1]["description"] == "touching" and tests[1]["section"] == "edge-cases"
+        assert [t["section"] for t in tests] == ["basics", "edge-cases"]
+        # several groups: the caller must say which one
+        missing = await client.call_tool("add_test_case", {"args": [[]]})
+        assert missing.is_error and "section must be one of" in missing.content[0].text
         bad = await client.call_tool("add_test_case", {"args": [[]], "section": "nope"})
         assert bad.is_error and "unknown section" in bad.content[0].text
         st.workspace.write_state("merge-ranges", "custom_tests", [])

@@ -440,10 +440,10 @@ export class BrowserToolService {
     return written;
   }
 
-  async addTestCase(args: unknown, opts: { kwargs?: Record<string, unknown> | null; name?: string | null; description?: string | null; section?: string | null; problemId?: string | null } = {}) {
+  async addTestCase(args: unknown, opts: { kwargs?: Record<string, unknown> | null; name?: string | null; section?: string | null; problemId?: string | null } = {}) {
     const p = await this.problem(opts.problemId);
     const tests = await this.state(p.id, "custom_tests", [] as CustomTestRecord[]);
-    tests.push(makeCustomTest(p, tests, args, opts.kwargs, opts.name, opts.description, opts.section));
+    tests.push(makeCustomTest(p, tests, args, opts.kwargs, opts.name, opts.section));
     await this.setCustomTests(p.id, tests);
     return { custom_tests: tests.length };
   }
@@ -725,6 +725,7 @@ export function errorResult(problemId: string, runId: string, error: string, sta
     duration_ms: 0,
     passed: 0,
     total: 0,
+    sections: [],
     tests: [],
     metrics: [],
     compile_output: null,

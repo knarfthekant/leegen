@@ -42,11 +42,11 @@ can create more problems whenever you need them.
 
 | Focus | Problem | Judge |
 | --- | --- | --- |
-| CUDA | [Your First CUDA Kernel](problems/cuda-vector-add.yaml) | Compiled CUDA harness |
-| PyTorch | [Decode with a KV Cache](problems/kv-cache-basics.yaml) | Tensor inputs and numerical comparisons |
-| Python algorithms | [Merge Booking Ranges](problems/merge-ranges.yaml) | Function tests with generated inputs |
-| Python language features | [Iterators, Await, and the Two Kinds of Suspension](problems/iterators-and-await.yaml) | Visible and hidden pytest suites |
-| WebGPU | [Tiled Matrix Multiply in WebGPU](problems/webgpu-tiled-matmul.yaml) | WGSL kernel tests and GPU timing |
+| CUDA | [Your First CUDA Kernel](data/problems/cuda-vector-add.yaml) | Compiled CUDA harness |
+| PyTorch | [Decode with a KV Cache](data/problems/kv-cache-basics.yaml) | Tensor inputs and numerical comparisons |
+| Python algorithms | [Merge Booking Ranges](data/problems/merge-ranges.yaml) | Function tests with generated inputs |
+| Python language features | [Iterators, Await, and the Two Kinds of Suspension](data/problems/iterators-and-await.yaml) | Visible and hidden pytest suites |
+| WebGPU | [Tiled Matrix Multiply in WebGPU](data/problems/webgpu-tiled-matmul.yaml) | WGSL kernel tests and GPU timing |
 
 ## Choose an edition
 
@@ -60,7 +60,7 @@ edits. They differ in where code runs, where work is stored, and how the agent c
 | Execution | Python in Pyodide; WGSL kernels through WebGPU | Native local CPU, Apple MPS, or CUDA; remote SSH and Slurm executors |
 | Problems | Python and WebGPU; `function` and `pytest` judges | Python, C++, PyTorch, Triton, and CUDA; `function`, `pytest`, and `script` judges |
 | Agent connection | WebMCP tools on the page in a supported browser, such as Codex's built-in browser | MCP server over HTTP, usable by Codex, Claude Code, and other MCP clients |
-| Storage | Browser IndexedDB, scoped to the site and browser | YAML files in `problems/` and work in `workspace/` |
+| Storage | Browser IndexedDB, scoped to the site and browser | YAML files in `data/problems/` and work in `data/workspace/` |
 | Offline | Works offline after the required app and runtime files have been cached | Runs locally; remote execution needs a connection to the host |
 
 The problem list marks exercises that need the other edition. Browser data is separate from
@@ -201,10 +201,10 @@ Then ask your agent to create a problem, or open one and ask for a hint. The rep
 
 ## Under the hood
 
-Each problem is a self-contained YAML file in `problems/`. It declares the exercise content,
+Each problem is a self-contained YAML file in `data/problems/`. It declares the exercise content,
 editable and supporting files, tests, reference solution, environment, and hardware needs.
 In the server edition, your saved solution and review state live in the gitignored
-`workspace/<id>/` directory. The browser edition stores its copies in IndexedDB.
+`data/workspace/<id>/` directory. The browser edition stores its copies in IndexedDB.
 
 Both editions plan a job bundle and run the shared harness. The server writes the bundle to a
 temporary directory and sends it to an executor; the browser runner builds it in Pyodide's

@@ -354,12 +354,11 @@ class ToolService:
         return {}
 
     async def add_test_case(self, args: list[Any], kwargs: dict[str, Any] | None = None,
-                            name: str | None = None, description: str | None = None,
-                            section: str | None = None,
+                            name: str | None = None, section: str | None = None,
                             problem_id: str | None = None) -> dict[str, Any]:
         p = self.problem(problem_id)
         tests = self._state(p.id, "custom_tests", [])
-        tests.append(review.make_custom_test(p, tests, args, kwargs, name, description, section))
+        tests.append(review.make_custom_test(p, tests, args, kwargs, name, section))
         await self.set_custom_tests(p.id, tests)
         return {"custom_tests": len(tests)}
 

@@ -176,33 +176,29 @@ judge:
 sections:
   - id: basics
     title: Basics
-    description: The example and a non-square product.
+    description: The 2 x 2 example from the statement and a rectangular (2 x 3) times (3 x 1) product.
   - id: edges
     title: Edges
-    description: Sizes that are not multiples of the tile, thin matrices.
+    description: Sizes that cut a tile (37 x 23 times 23 x 41), a long inner dimension (k = 300 spans 19 tiles), and single rows and columns.
   - id: scale
     title: Scale
     description: A 256 x 256 product; reports the kernel's GPU time.
 tests:
   - name: Example
     section: basics
-    description: The 2 x 2 example from the statement.
     input: {args: [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]}
     expected: [[19, 22], [43, 50]]
   - name: Rectangular
     section: basics
-    description: (2 x 3) times (3 x 1).
     input: {args: [[[1, 2, 3], [4, 5, 6]], [[1], [0], [-1]]]}
     expected: [[-2], [-2]]
   - name: Ragged tiles
     section: edges
     visible: false
-    description: 37 x 23 times 23 x 41, every dimension cuts a tile.
     input: {gen: _gen.py:matrices, seed: 1, kwargs: {m: 37, k: 23, n: 41}}
   - name: Long inner dimension
     section: edges
     visible: false
-    description: k = 300 spans 19 tiles.
     input: {gen: _gen.py:matrices, seed: 2, kwargs: {m: 5, k: 300, n: 7}}
   - name: Single row and column
     section: edges

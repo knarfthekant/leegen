@@ -39,6 +39,15 @@ export function RepositoryLink() {
   );
 }
 
+const SEVERITY: Record<ServiceStatus["state"], number> = {
+  online: 0, connecting: 1, degraded: 1, unavailable: 1, offline: 2,
+};
+
+/**
+ * One chip for the whole system. Its colour follows the worst service, in place: nothing is added
+ * beside it when something fails. The details (and which service has the problem) are in the
+ * panel that opens from it, with the failing services listed first.
+ */
 export function ConnectionDot() {
   const { services } = useBackendStatus();
   const root = useRef<HTMLDivElement>(null);
@@ -46,7 +55,9 @@ export function ConnectionDot() {
   const panelId = useId();
   const primary = services[0];
   const online = services.filter((s) => s.state === "online").length;
-  const issues = services.filter((s) => s !== primary && s.state !== "online");
+  const worst = services.reduce((a, s) => (SEVERITY[s.state] > SEVERITY[a.state] ? s : a), services[0] ?? primary);
+  const ordered = [...services].sort((a, b) => SEVERITY[b.state] - SEVERITY[a.state]);
+  const problems = services.filter((s) => s.state !== "online");
 
   useEffect(() => {
     const closeOutside = (e: PointerEvent) => {
@@ -57,6 +68,7 @@ export function ConnectionDot() {
   }, []);
 
   if (!primary) return null;
+  const tone = serviceTone(worst.state);
   return (
     <div className="service-status" ref={root} onKeyDown={(e) => {
       if (e.key === "Escape" && panel.current?.open) {
@@ -68,10 +80,12 @@ export function ConnectionDot() {
       if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget) && panel.current) panel.current.open = false;
     }}>
       <details className="service-disclosure" ref={panel}>
-        <summary className={`chip service-trigger tone-${serviceTone(primary.state)}`}
+        <summary className={`chip service-trigger tone-${tone}`}
           aria-label="Service status" aria-controls={panelId} title="Show service status"
-          aria-description={`${primary.label} ${stateLabel(primary.state).toLowerCase()}. ${online} of ${services.length} services online.`}>
-          <ServiceSymbol state={primary.state} />
+          aria-description={problems.length
+            ? `${problems.map((s) => `${s.label} ${stateLabel(s.state).toLowerCase()}`).join(", ")}. ${online} of ${services.length} services online.`
+            : `${online} of ${services.length} services online.`}>
+          <ServiceSymbol state={worst.state} />
           <span>{primary.label} {stateLabel(primary.state).toLowerCase()}</span>
           <span className="service-count">{online}/{services.length}</span>
           <ChevronDown size={13} className="service-chevron" aria-hidden />
@@ -82,8 +96,8 @@ export function ConnectionDot() {
             <span>{online} of {services.length} online</span>
           </div>
           <ul className="service-list">
-            {services.map((service) => (
-              <li key={service.id} className="service-item">
+            {ordered.map((service) => (
+              <li key={service.id} className={`service-item tone-${serviceTone(service.state)}${service.state === "online" ? "" : " has-issue"}`}>
                 <div className="row between">
                   <strong>{service.label}</strong>
                   <Chip tone={serviceTone(service.state)}>
@@ -96,17 +110,6 @@ export function ConnectionDot() {
           </ul>
         </div>
       </details>
-      <div className="service-issues" aria-live="polite" aria-atomic="true">
-        {issues.map((service) => (
-          <Chip key={service.id} tone={serviceTone(service.state)} title={service.detail} onClick={() => {
-            if (!panel.current) return;
-            panel.current.open = true;
-            panel.current.querySelector("summary")?.focus();
-          }}>
-            <ServiceSymbol state={service.state} />{service.label} {stateLabel(service.state).toLowerCase()}
-          </Chip>
-        ))}
-      </div>
     </div>
   );
 }

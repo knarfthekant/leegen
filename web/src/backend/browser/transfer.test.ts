@@ -1,9 +1,10 @@
 /// <reference types="node" />
-// Zip and folder plumbing for export/import (repo layout), with an in-memory directory handle.
+// Zip and folder plumbing for export/import (data layout), with an in-memory directory handle.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFolder, saveToFolder } from "./folder.ts";
+import { normalise } from "./transfer.ts";
 import { crc32, readZip, writeZip } from "./zip.ts";
 import type { Db } from "./db.ts";
 
@@ -99,4 +100,27 @@ test("save to a folder, then read it back (only problems/ and workspace/)", asyn
   assert.equal((await saveToFolder(db, entries)).written, 0);   // unchanged files are not rewritten
   const { entries: back } = await readFolder(db);
   assert.deepEqual(back.map((e) => e.path).sort(), ["problems/a.yaml", "workspace/a/solution.py"]);
+});
+
+test("a picked checkout uses its data/ folder; a data folder is used as it is", async () => {
+  const checkout: Node = new Map<string, Node | Uint8Array>([
+    ["README.md", enc.encode("code")], ["data", new Map()],
+  ]);
+  const meta = new Map<string, unknown>([["folder_handle", dirHandle("leegen", checkout)]]);
+  const db = { get: async (_s: string, k: string) => meta.get(k), put: async () => undefined } as unknown as Db;
+  const entries = [{ path: "problems/a.yaml", data: enc.encode("id: a\n") }];
+  await saveToFolder(db, entries);
+  assert.ok(!checkout.has("problems"), "nothing is written next to the code");
+  assert.ok((checkout.get("data") as Node).has("problems"));
+  assert.deepEqual((await readFolder(db)).entries.map((e) => e.path), ["problems/a.yaml"]);
+});
+
+test("import finds the data root in a data folder, a checkout, or a bare export", () => {
+  const file = (path: string) => ({ path, data: enc.encode("x") });
+  for (const prefix of ["", "data/", "leegen/data/", "leegen-main/data/"]) {
+    const out = normalise([file(`${prefix}problems/a.yaml`), file(`${prefix}workspace/a/solution.py`),
+      file("leegen/README.md".slice(prefix ? 0 : 0))]);
+    assert.deepEqual(out.map((e) => e.path).filter((p) => /^(problems|workspace)\//.test(p)).sort(),
+      ["problems/a.yaml", "workspace/a/solution.py"], prefix);
+  }
 });

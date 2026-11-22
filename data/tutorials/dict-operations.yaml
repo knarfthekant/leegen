@@ -1,0 +1,198 @@
+schema_version: 1
+id: dict-operations
+title: 'Dicts: Lookups, Counting, and Reshaping'
+summary: Count, invert, merge and rank with dicts, without mutating the inputs.
+tags: [python, dicts, hashing]
+environment: python
+order: 4
+cells:
+  - type: markdown
+    text: |
+      The **dict** is the structure you will reach for in half of all coding questions. O(1) lookups
+      turn "have I seen X?" from a scan into a hash. This tutorial drills the operations that matter:
+      counting, inversion, merging, and sorting by value.
+
+      None of the functions below may mutate their inputs.
+
+      `d.get(key, default)` is a lookup that never raises, and a comprehension rebuilds a dict in one
+      expression:
+
+      ```python
+      ages = {"ada": 36, "alan": 41}
+      ages.get("grace", 0)                            # 0
+      {name: age + 1 for name, age in ages.items()}   # {"ada": 37, "alan": 42}
+      ```
+
+      Run the cell to see it.
+
+  - type: code
+    id: demo
+    starter: |
+      ages = {"ada": 36, "alan": 41}
+      print("missing key:", ages.get("grace", 0))
+      print("a year later:", {name: age + 1 for name, age in ages.items()})
+      ages
+
+  - type: markdown
+    text: |
+      **Count.** Write `tally(words)` counting how often each word occurs. `tally([])` is `{}`.
+
+      `counts[w] = counts.get(w, 0) + 1` counts without a `KeyError`. `setdefault` and
+      `collections.defaultdict` are the other two idioms for the same job.
+
+      ```python
+      tally(["a", "b", "a"])   # {"a": 2, "b": 1}
+      ```
+
+  - type: code
+    id: tally
+    starter: |
+      def tally(words):
+          ...
+
+      tally(["a", "b", "a"])
+    reference: |
+      def tally(words):
+          counts = {}
+          for word in words:
+              counts[word] = counts.get(word, 0) + 1
+          return counts
+
+      tally(["a", "b", "a"])
+    checks:
+      - description: duplicates add up
+        code: |
+          assert tally(["a", "b", "a"]) == {"a": 2, "b": 1}
+      - description: an empty list gives an empty dict
+        code: assert tally([]) == {}
+      - description: one word counts once
+        code: |
+          assert tally(["solo"]) == {"solo": 1}
+      - description: the input list is left alone
+        code: |
+          words = ["x", "y", "x"]
+          tally(words)
+          assert words == ["x", "y", "x"]
+
+  - type: markdown
+    text: |
+      **Invert.** Write `invert(mapping)` swapping keys and values. If two keys share a value, the
+      **later** key wins. This is a one-line dict comprehension; watch which side is the key.
+
+      ```python
+      invert({"x": 1, "y": 2})   # {1: "x", 2: "y"}
+      ```
+
+  - type: code
+    id: invert
+    starter: |
+      def invert(mapping):
+          ...
+
+      invert({"x": 1, "y": 2})
+    reference: |
+      def invert(mapping):
+          return {value: key for key, value in mapping.items()}
+
+      invert({"x": 1, "y": 2})
+    checks:
+      - description: keys and values swap
+        code: |
+          assert invert({"x": 1, "y": 2}) == {1: "x", 2: "y"}
+      - description: with a duplicate value the later key wins
+        code: |
+          assert invert({"first": 1, "second": 1}) == {1: "second"}
+      - description: an empty dict inverts to an empty dict
+        code: assert invert({}) == {}
+      - description: the input dict is left alone
+        code: |
+          mapping = {"x": 1}
+          invert(mapping)
+          assert mapping == {"x": 1}
+
+  - type: markdown
+    text: |
+      **Merge.** Write `merge(base, override)` returning a **new** dict with the keys of both.
+      `override`'s value wins on conflicts, and neither input changes.
+
+      `{**base, **override}` (or `base | override` on Python 3.9+) does it; the later dict wins.
+
+      ```python
+      merge({"a": 1, "b": 2}, {"b": 9})   # {"a": 1, "b": 9}
+      ```
+
+  - type: code
+    id: merge
+    starter: |
+      def merge(base, override):
+          ...
+
+      merge({"a": 1, "b": 2}, {"b": 9})
+    reference: |
+      def merge(base, override):
+          return {**base, **override}
+
+      merge({"a": 1, "b": 2}, {"b": 9})
+    checks:
+      - description: both dicts' keys survive and override wins
+        code: |
+          assert merge({"a": 1, "b": 2}, {"b": 9}) == {"a": 1, "b": 9}
+      - description: neither input is mutated
+        code: |
+          base = {"a": 1}
+          override = {"b": 2}
+          result = merge(base, override)
+          assert result == {"a": 1, "b": 2}
+          assert base == {"a": 1}
+          assert override == {"b": 2}
+      - description: an empty override still returns a new dict, not base itself
+        code: |
+          base = {"a": 1}
+          result = merge(base, {})
+          assert result == {"a": 1}
+          assert result is not base
+
+  - type: markdown
+    text: |
+      **Rank.** Write `ranked(scores)` where `scores` maps name to score. Return a list of
+      `(name, score)` tuples, highest score first, ties broken by name alphabetically.
+
+      Python compares tuples element by element, so the key `(-score, name)` sorts scores descending
+      and names ascending in one pass. No two-pass sort needed.
+
+      ```python
+      ranked({"ada": 90, "grace": 99, "linus": 90})
+      # [("grace", 99), ("ada", 90), ("linus", 90)]
+      ```
+
+  - type: code
+    id: ranked
+    starter: |
+      def ranked(scores):
+          ...
+
+      ranked({"ada": 90, "grace": 99, "linus": 90})
+    reference: |
+      def ranked(scores):
+          return sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
+
+      ranked({"ada": 90, "grace": 99, "linus": 90})
+    checks:
+      - description: highest score first, ties sorted by name
+        code: |
+          assert ranked({"ada": 90, "grace": 99, "linus": 90}) == [
+              ("grace", 99), ("ada", 90), ("linus", 90)
+          ]
+      - description: an empty dict gives an empty ranking
+        code: assert ranked({}) == []
+      - description: negative scores still sort highest first
+        code: |
+          assert ranked({"a": -1, "b": -5}) == [("a", -1), ("b", -5)]
+      - description: one entry is its own ranking
+        code: |
+          assert ranked({"solo": 7}) == [("solo", 7)]
+      - description: the input dict is left alone
+        code: |
+          scores = {"a": 1, "b": 2}
+          ranked(scores)
+          assert scores == {"a": 1, "b": 2}

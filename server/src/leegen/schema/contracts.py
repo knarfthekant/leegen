@@ -288,18 +288,20 @@ def review_fixtures(problems: dict[str, Problem]) -> dict[str, Any]:
 
     section = mr.sections[0].id if mr.sections else None
     for args in [
-        {"problem": "merge-ranges", "existing": [], "args": [[[1, 3], [2, 4]]]},
+        {"problem": "merge-ranges", "existing": [], "args": [[[1, 3], [2, 4]]],
+         "section": section},
+        {"problem": "merge-ranges", "existing": [], "args": [[]]},
         {"problem": "merge-ranges", "existing": [{"name": "Test 1"}], "args": [[]],
-         "description": "empty", "section": section},
-        {"problem": "merge-ranges", "existing": [], "args": [[]], "name": mr.tests[0].name},
+         "section": section},
+        {"problem": "merge-ranges", "existing": [], "args": [[]], "name": mr.tests[0].name,
+         "section": section},
         {"problem": "merge-ranges", "existing": [], "args": [[]], "section": "nope"},
-        {"problem": "merge-ranges", "existing": [], "args": "not-a-list"},
+        {"problem": "merge-ranges", "existing": [], "args": "not-a-list", "section": section},
         {"problem": "iterators-and-await", "existing": [], "args": []},
     ]:
         p = mr if args["problem"] == "merge-ranges" else language
         cases.append(_case("make_custom_test", args, lambda a=args, p=p: review.make_custom_test(
-            p, a["existing"], a["args"], a.get("kwargs"), a.get("name"), a.get("description"),
-            a.get("section"))))
+            p, a["existing"], a["args"], a.get("kwargs"), a.get("name"), a.get("section"))))
 
     for args in [{"wanted": None, "taken": []}, {"wanted": None, "taken": ["Test 1", "Test 2"]},
                  {"wanted": "Edge", "taken": []}, {"wanted": " Edge ", "taken": ["Edge"]},
@@ -341,7 +343,7 @@ FIXTURE_PROBLEMS = ["merge-ranges", "iterators-and-await", "kv-cache-basics",
 
 def outputs() -> dict[Path, str]:
     root = settings().root
-    problems = {pid: parse_problem_yaml((root / "problems" / f"{pid}.yaml").read_text())
+    problems = {pid: parse_problem_yaml((settings().problems_dir / f"{pid}.yaml").read_text())
                 for pid in FIXTURE_PROBLEMS}
     records = _all_required(_Records.model_json_schema(mode="serialization"))
     inputs = _Inputs.model_json_schema(mode="validation")

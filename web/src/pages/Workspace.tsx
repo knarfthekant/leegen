@@ -223,7 +223,7 @@ export function WorkspacePage({ id }: { id: string }) {
     } catch (e) {
       setResult({
         run_id: rid, problem_id: id, status: "error", executor: executor ?? "-", device: null,
-        started_at: Date.now() / 1000, duration_ms: 0, passed: 0, total: 0, tests: [], metrics: [],
+        started_at: Date.now() / 1000, duration_ms: 0, passed: 0, total: 0, sections: [], tests: [], metrics: [],
         compile_output: null, error: String((e as Error).message ?? e), stdout: "", stderr: "",
         mode: "user",
       });
@@ -653,7 +653,6 @@ export function WorkspacePage({ id }: { id: string }) {
                       running={running}
                       phase={runPhase}
                       params={problem.judge.params ?? []}
-                      sections={problem.sections}
                       onCancel={() => runId.current && api.cancel(runId.current)}
                     />
                   )}

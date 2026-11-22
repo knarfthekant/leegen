@@ -131,24 +131,23 @@ try {
   if (status !== "Accepted") throw new Error(`expected Accepted, got ${status}`);
   await page.screenshot({ path: `${SHOTS}/lc-smoke-passed.png` });
 
-  step("sections group the test cases, with descriptions");
+  step("every case sits in a group: one title, one description and one segmented bar");
   await page.getByRole("tab", { name: "Testcase" }).click();
-  await page.locator(".group-head", { hasText: "Basics" }).waitFor();
-  await page.locator(".group-desc", { hasText: "examples from the statement" }).waitFor();
-  const heads = await page.locator(".group-head").allInnerTexts();
-  console.log("  sections:", heads.map((h) => h.replace(/\s+/g, " ")).join(" | "));
-  await page.locator(".group-head", { hasText: "Basics" }).click(); // collapse
-  if (await page.locator(".group-desc", { hasText: "examples from the statement" }).count()) throw new Error("section did not collapse");
-  await page.locator(".group-head", { hasText: "Basics" }).click();
-  await page.locator(".pill", { hasText: "Test 1" }).first().click();
-  // cases are numbered, so they show a description and no title
-  await page.locator(".case", { hasText: "example from the statement" }).waitFor();
+  await page.locator(".tg-title", { hasText: "Basics" }).waitFor();
+  await page.locator(".tg-desc", { hasText: "statement's example" }).waitFor();
+  const heads = await page.locator(".tg-title").allInnerTexts();
+  console.log("  groups:", heads.join(" | "));
+  if (await page.locator(".group-head, .pill").count()) throw new Error("folding headers and pills should be gone");
+  // the arguments sit directly under the selected segment: no scrolling to find them
+  await page.locator(".tg .seg", { hasText: /^2$/ }).first().click();
+  await page.locator(".tg-detail", { hasText: "Test 2" }).waitFor();
+  if (!(await page.locator(".tg-detail", { hasText: "bookings" }).isVisible())) throw new Error("case inputs not shown under the bar");
   if (await page.locator(".case-name").count()) throw new Error("test titles should be gone");
 
   step("console: a snippet prints to stdout and echoes its last expression");
   await page.getByRole("tab", { name: "Console" }).click();
   await page.locator("textarea.console-input").first().fill('print("hi")\n2 + 3');
-  await page.getByRole("button", { name: "Run snippet" }).click();
+  await page.getByRole("button", { name: /^Run \(/ }).last().click();
   await page.locator(".console-entry .chip", { hasText: "ok" }).first().waitFor({ timeout: 60000 });
   const consoleText = await page.locator(".console-entry").first().innerText();
   if (!consoleText.includes("hi")) throw new Error("console stdout missing 'hi':\n" + consoleText);
@@ -201,16 +200,17 @@ try {
 
   step("add a custom test case (expected comes from the reference)");
   await page.getByRole("tab", { name: "Testcase" }).click();
-  await page.getByRole("button", { name: "Add test case" }).click();
+  await page.getByRole("button", { name: "Add a test case to Basics" }).click();
   const ta = page.locator("textarea.field-input").first();
   await ta.fill("[[4, 5], [1, 4]]");
   await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await page.getByRole("tab", { name: "Test Result" }).click();
-  // 7 built-in tests, so the custom case is Test 8 (named "Test 1" by the server)
-  await page.locator(".pill", { hasText: "Test 8" }).waitFor({ timeout: 60000 });
-  await page.locator(".pill", { hasText: "Test 8" }).click();
-  const caseText = await page.locator(".case").innerText();
+  // segments are numbered in display order: the custom case joins Basics, after its 3 built-in cases
+  const seg = page.locator(".tg .seg").filter({ hasText: /^4$/ });
+  await seg.waitFor({ timeout: 60000 });
+  await seg.click();
+  const caseText = await page.locator(".tg-detail").innerText();
   if (!caseText.includes("[[1, 5]]")) throw new Error("custom case expected [[1, 5]]:\n" + caseText);
   console.log("  custom case ok:", caseText.split("\n").filter(Boolean).slice(0, 8).join(" | "));
   await page.screenshot({ path: `${SHOTS}/lc-smoke-custom.png` });

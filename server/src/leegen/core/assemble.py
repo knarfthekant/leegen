@@ -7,8 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from leegen.core.models import (CheckResult, ConsoleResult, ConsoleStatus, Metric, Problem,
-                                RunResult,
-                                TestResult)
+                                ResultSection, RunResult, TestResult)
 
 
 @dataclass
@@ -124,9 +123,18 @@ def assemble(run_id: str, problem: Problem, mode: str, tests: list[dict[str, Any
 
     errors: list[str] = []
     by_name: dict[str, TestResult] = {}
+    # declared groups first, in the author's order; pytest classes follow as they are announced
+    groups: dict[str, ResultSection] = {
+        s.id: ResultSection(id=s.id, title=s.title, description=s.description)
+        for s in problem.sections}
     for ev in parse_events(outcome.results):
         kind = ev.get("type")
-        if kind == "test":
+        if kind == "section" and ev.get("id"):
+            old = groups.get(ev["id"])
+            groups[ev["id"]] = ResultSection(
+                id=ev["id"], title=ev.get("title") or ev["id"],
+                description=ev.get("description") or (old.description if old else None))
+        elif kind == "test":
             fields = {k: ev.get(k) for k in TestResult.model_fields if k in ev}
             by_name[ev["name"]] = TestResult(**fields)
         elif kind == "metric":
@@ -147,10 +155,12 @@ def assemble(run_id: str, problem: Problem, mode: str, tests: list[dict[str, Any
                        f"process exited (code {outcome.exit_code}) before this test ran"))
             ordered.append(TestResult(
                 name=t["name"], visible=t.get("visible", True), custom=t.get("custom", False),
-                description=t.get("description"), section=t.get("section"),
+                section=t.get("section"),
                 status="timeout" if outcome.timed_out else "error", message=reason))
     ordered.extend(by_name.values())  # pytest/script tests aren't declared up front
     result.tests = ordered
+    used = {t.section for t in ordered if t.section}
+    result.sections = [g for g in groups.values() if g.id in used]
     result.total = len(ordered)
     result.passed = sum(t.status == "pass" for t in ordered)
     result.error = "\n\n".join(errors) or None

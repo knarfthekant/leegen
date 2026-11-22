@@ -138,23 +138,24 @@ def with_proposal(items: list[dict[str, Any]], proposal: dict[str, Any]) -> list
 
 def make_custom_test(problem: Problem, existing: list[dict[str, Any]], args: list[Any],
                      kwargs: dict[str, Any] | None = None, name: str | None = None,
-                     description: str | None = None,
                      section: str | None = None) -> dict[str, Any]:
-    """A user test case for a function-judge problem (expected value comes from the reference)."""
+    """A user test case for a function-judge problem (expected value comes from the reference).
+
+    Every case belongs to a group. With one group the section is implied; with several the
+    caller must name one.
+    """
     if problem.judge.kind != "function":
         raise ValueError("custom test cases are only supported for function-judge problems")
     if not problem.reference:
         raise ValueError("this problem has no reference solution to compute expected output")
     if not isinstance(args, list):
         raise ValueError("args must be a list of positional arguments")
-    if section is not None and section not in {s.id for s in problem.sections}:
-        raise ValueError(f"unknown section {section!r}; "
-                         f"sections: {[s.id for s in problem.sections]}")
+    ids = [s.id for s in problem.sections]
+    if section is None and len(ids) == 1:
+        section = ids[0]
+    if section is None or section not in ids:
+        raise ValueError(f"section must be one of {ids}" if section is None
+                         else f"unknown section {section!r}; sections: {ids}")
     taken = {t.name for t in problem.tests} | {t.get("name") for t in existing if t.get("name")}
-    test: dict[str, Any] = {"input": {"args": args, "kwargs": kwargs or {}},
-                            "name": unique_test_name(name, taken)}
-    if description:
-        test["description"] = description
-    if section:
-        test["section"] = section
-    return test
+    return {"input": {"args": args, "kwargs": kwargs or {}}, "section": section,
+            "name": unique_test_name(name, taken)}

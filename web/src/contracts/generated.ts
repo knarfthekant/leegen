@@ -88,7 +88,6 @@ export interface ConsoleStatusEvent {
 
 export interface CustomTest {
   name: string | null;
-  description: string | null;
   section: string | null;
   input: Record<string, unknown>;
   expected: unknown;
@@ -145,6 +144,13 @@ export interface ProposalsChangedEvent {
   added: boolean;
 }
 
+/** A group of results as the UI shows it: declared `sections`, or a pytest class. */
+export interface ResultSection {
+  id: string;
+  title: string;
+  description: string | null;
+}
+
 export interface RunFinishedEvent {
   type: "run_finished";
   problem_id: string;
@@ -164,6 +170,7 @@ export interface RunResult {
   duration_ms: number;
   passed: number;
   total: number;
+  sections: ResultSection[];
   tests: TestResult[];
   metrics: Metric[];
   compile_output: string | null;
@@ -198,7 +205,6 @@ export interface TestResult {
   status: "pass" | "fail" | "error" | "timeout" | "skipped";
   visible: boolean;
   custom: boolean;
-  description: string | null;
   section: string | null;
   input: unknown;
   expected: unknown;
@@ -281,7 +287,7 @@ export interface Problem {
   /** Slug; also the file name. */
   id: string;
   title: string;
-  difficulty?: "intro" | "easy" | "medium" | "hard";
+  difficulty?: "easy" | "medium" | "hard";
   tags?: string[];
   /** Optional curriculum this problem belongs to. */
   track?: string | null;
@@ -299,7 +305,7 @@ export interface Problem {
   /** Correct solution. Required to validate the problem and for `expected: from_reference` and user-added tests. */
   reference?: Reference | null;
   judge: Judge;
-  /** Optional groups for tests. Each test opts in with `section: <id>`. */
+  /** Test groups, required for `function` and `script` judges. Every test names its group with `section: <id>`. (`pytest` groups come from `class Test<Thing>`.) */
   sections?: TestSection[];
   tests?: TestCase[];
   limits?: Limits;
@@ -355,10 +361,8 @@ export interface TestCase {
   name: string;
   /** Visible tests show inputs before running. */
   visible?: boolean;
-  /** Shown with the case; Markdown allowed. */
-  description?: string | null;
-  /** Id of an entry in the problem's `sections`; groups this case. */
-  section?: string | null;
+  /** Id of an entry in the problem's `sections`. Every case belongs to exactly one group; the group's description is the only explanation the user sees. */
+  section: string;
   /** function kind only. */
   input?: TestInput | null;
   /** Expected value (JSON), or `from_reference` to compute it with the reference solution at run time. */
@@ -379,7 +383,8 @@ export interface TestInput {
 export interface TestSection {
   /** Slug that tests reference. */
   id: string;
+  /** Short group name, shown above the group's segmented bar. */
   title: string;
-  /** Shown under the section header. */
-  description?: string | null;
+  /** What this group checks, in one or two plain sentences (Markdown allowed). The one explanation for every case in the group; cases have no description of their own. */
+  description: string;
 }

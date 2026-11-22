@@ -49,49 +49,63 @@ def static_issues(problem: Problem) -> list[str]:
                    if (f := problem.file(p)) is not None and f.role != "hidden"]
         if not visible:
             issues.append("warning: all test files are hidden; consider a readonly test_visible.py")
-        issues.extend(_pytest_style_issues(problem))
     return issues
 
 
-_TEST_DEF = re.compile(r"^(\s*)(?:async\s+)?def\s+(test_\w+)\s*\([^)]*\)[^:]*:(.*)$")
-_TEST_CLASS = re.compile(r"^\s*class\s+Test\w*")
+_TEST_DEF = re.compile(r"^(\s*)(?:async\s+)?def\s+(test_\w+)\s*\(")
+_TEST_CLASS = re.compile(r"^class\s+(Test\w*)\b[^:]*:(.*)$")
 _QUOTES = ('"""', "'''", '"', "'")
 
 
-def _pytest_style_issues(problem: Problem) -> list[str]:
-    """Warn (never block) when pytest cases are unlabeled or ungrouped in the UI."""
-    sources = []
+def grouping_errors(problem: Problem) -> list[str]:
+    """Blocking problems with how a pytest problem is grouped.
+
+    Every test lives in a `class Test<Thing>` that has a docstring: the class name is the group
+    title and its docstring is the group's one explanation. `function`/`script` problems are
+    checked by the model (declared `sections`) and after the reference run.
+    """
+    if problem.judge.kind != "pytest":
+        return []
+    issues: list[str] = []
     for path in problem.pytest_files():
         file = problem.file(path)
-        if file is not None:
-            sources.append(file.content)
-    tests = missing_doc = 0
-    grouped = False
-    for source in sources:
-        lines = source.splitlines()
-        if any(_TEST_CLASS.match(line) for line in lines):
-            grouped = True
+        if file is None:
+            continue
+        lines = file.content.splitlines()
+        loose = []
         for i, line in enumerate(lines):
-            match = _TEST_DEF.match(line)
-            if match is None:
+            test = _TEST_DEF.match(line)
+            if test is not None and test.group(1) == "":
+                loose.append(test.group(2))
+            cls = _TEST_CLASS.match(line)
+            if cls is None:
                 continue
-            tests += 1
-            rest = match.group(3).strip()
-            if rest.startswith(_QUOTES):
-                continue
+            rest = cls.group(2).strip()
             j = i + 1
             while j < len(lines) and not lines[j].strip():
                 j += 1
-            if j >= len(lines) or not lines[j].strip().startswith(_QUOTES):
-                missing_doc += 1
-    issues = []
-    if tests >= 2 and not grouped:
-        issues.append("warning: pytest tests are not grouped into classes; use one "
-                      "`class Test<Thing>` per function or theme so the UI can label the cases")
-    if missing_doc:
-        issues.append(f"warning: {missing_doc} pytest test(s) have no first-line docstring; "
-                      "the UI shows it as the case description")
+            if not rest.startswith(_QUOTES) and (j >= len(lines)
+                                                 or not lines[j].strip().startswith(_QUOTES)):
+                issues.append(f"{path}: class {cls.group(1)} needs a docstring; it is the "
+                              "group's description in the UI")
+        if loose:
+            issues.append(f"{path}: tests must be grouped in a `class Test<Thing>`, one per "
+                          f"function or theme; module-level: {', '.join(loose[:5])}"
+                          + (" ..." if len(loose) > 5 else ""))
     return issues
+
+
+def ungrouped_results(problem: Problem, run: RunResult) -> list[str]:
+    """Blocking problems in a finished run: a result that names no (declared) group."""
+    declared = {s.id for s in problem.sections}
+    bad = [t.name for t in run.tests
+           if not t.section or (problem.judge.kind == "script" and t.section not in declared)]
+    if not bad:
+        return []
+    hint = ("emit each test with a `section` that is one of the declared `sections`"
+            if problem.judge.kind == "script" else "put each test in a `class Test<Thing>`")
+    return [f"{len(bad)} result(s) belong to no group ({', '.join(bad[:5])}"
+            f"{' ...' if len(bad) > 5 else ''}); {hint}"]
 
 
 def precheck(problem: Problem, *, env: Environment | None, known_envs: list[str],
@@ -100,6 +114,8 @@ def precheck(problem: Problem, *, env: Environment | None, known_envs: list[str]
     if env is None:
         return ValidationReport(False, issues=[f"unknown environment {problem.environment!r} "
                                                f"(known: {', '.join(sorted(known_envs))})"])
+    if errors := grouping_errors(problem):
+        return ValidationReport(False, summary="tests are not grouped", issues=errors)
     if not problem.reference:
         return ValidationReport(False, issues=["no reference solution; add `reference.files` so "
                                                "the problem can be validated"])
@@ -113,6 +129,9 @@ def precheck(problem: Problem, *, env: Environment | None, known_envs: list[str]
 def after_reference(problem: Problem, ref: RunResult) -> ValidationReport | None:
     """A failure report if the reference doesn't pass, else None (go run the starter)."""
     if ref.status == "passed":
+        if errors := ungrouped_results(problem, ref):
+            return ValidationReport(False, summary="tests are not grouped", issues=errors,
+                                    reference_run=ref)
         return None
     issues = static_issues(problem)
     issues.insert(0, f"reference solution does not pass: {ref.status} ({ref.passed}/{ref.total})")

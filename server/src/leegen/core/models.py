@@ -152,9 +152,9 @@ class TestCase(_Strict):
 
     name: str
     visible: bool = Field(True, description="Visible tests show inputs before running.")
-    description: str | None = Field(None, description="Shown with the case; Markdown allowed.")
-    section: str | None = Field(
-        None, description="Id of an entry in the problem's `sections`; groups this case."
+    section: str = Field(
+        description="Id of an entry in the problem's `sections`. Every case belongs to exactly "
+        "one group; the group's description is the only explanation the user sees."
     )
     input: TestInput | None = Field(None, description="function kind only.")
     expected: Any = Field(
@@ -172,8 +172,12 @@ class TestSection(_Strict):
     __test__ = False
 
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$", description="Slug that tests reference.")
-    title: str
-    description: str | None = Field(None, description="Shown under the section header.")
+    title: str = Field(description="Short group name, shown above the group's segmented bar.")
+    description: str = Field(
+        min_length=1,
+        description="What this group checks, in one or two plain sentences (Markdown allowed). "
+        "The one explanation for every case in the group; cases have no description of their own.",
+    )
 
 
 class Limits(_Strict):
@@ -193,7 +197,7 @@ class Problem(_Strict):
     schema_version: Literal[1] = 1
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,63}$", description="Slug; also the file name.")
     title: str
-    difficulty: Literal["intro", "easy", "medium", "hard"] = "medium"
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
     tags: list[str] = Field(default_factory=list)
     track: str | None = Field(None, description="Optional curriculum this problem belongs to.")
     order: int | None = Field(None, description="Position within the track.")
@@ -213,7 +217,8 @@ class Problem(_Strict):
     judge: Judge
     sections: list[TestSection] = Field(
         default_factory=list,
-        description="Optional groups for tests. Each test opts in with `section: <id>`.",
+        description="Test groups, required for `function` and `script` judges. Every test names "
+        "its group with `section: <id>`. (`pytest` groups come from `class Test<Thing>`.)",
     )
     tests: list[TestCase] = Field(default_factory=list)
     limits: Limits = Field(default_factory=Limits)
@@ -232,8 +237,11 @@ class Problem(_Strict):
         section_ids = [s.id for s in self.sections]
         if len(section_ids) != len(set(section_ids)):
             raise ValueError("duplicate section ids")
+        if self.judge.kind in ("function", "script") and not self.sections:
+            raise ValueError(f"judge.kind={self.judge.kind} requires `sections`: every test "
+                             "belongs to a group with a title and a description")
         for t in self.tests:
-            if t.section is not None and t.section not in section_ids:
+            if t.section not in section_ids:
                 raise ValueError(f"test {t.name!r}: unknown section {t.section!r}")
         editable = {f.path for f in self.files if f.role == "editable"}
         if self.reference:
@@ -333,7 +341,6 @@ class TestResult(BaseModel):
     status: TestStatus
     visible: bool = True
     custom: bool = False
-    description: str | None = None
     section: str | None = None
     input: Any = None
     expected: Any = None
@@ -341,6 +348,14 @@ class TestResult(BaseModel):
     message: str | None = None
     stdout: str | None = None
     duration_ms: float | None = None
+
+
+class ResultSection(BaseModel):
+    """A group of results as the UI shows it: declared `sections`, or a pytest class."""
+
+    id: str
+    title: str
+    description: str | None = None
 
 
 class Metric(BaseModel):
@@ -361,6 +376,7 @@ class RunResult(BaseModel):
     duration_ms: float
     passed: int = 0
     total: int = 0
+    sections: list[ResultSection] = Field(default_factory=list)
     tests: list[TestResult] = Field(default_factory=list)
     metrics: list[Metric] = Field(default_factory=list)
     compile_output: str | None = None

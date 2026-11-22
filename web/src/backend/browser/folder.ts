@@ -1,6 +1,7 @@
 // Folder sync through the File System Access API (Chromium): save everything to a folder in the
-// repo layout, or load problems and work from one. Point it at a leegen checkout and the
-// local server and the browser edition see the same problems/ and workspace/.
+// data layout, or load problems and work from one. Point it at the local server's data folder
+// (or a leegen checkout, whose `data/` is used) and the local server and the browser edition
+// see the same problems/ and workspace/.
 
 import type { Db } from "./db.ts";
 import type { ZipEntry } from "./zip.ts";
@@ -23,7 +24,7 @@ interface DirHandle {
 }
 type Picker = (opts: { id?: string; mode?: "read" | "readwrite" }) => Promise<DirHandle>;
 
-const ROOTS = ["problems", "workspace"];
+const ROOTS = ["problems", "workspace"];   // tutorials/ is not part of the browser edition yet
 const SKIP = new Set(["__pycache__", "node_modules", ".git", ".pytest_cache"]);
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -46,8 +47,18 @@ export async function folderName(db: Db): Promise<string | null> {
   return (await db.get<DirHandle>("meta", "folder_handle"))?.name ?? null;
 }
 
+/** A checkout holds the data root in `data/`; use it unless the picked folder is a data root. */
+async function dataRoot(picked: DirHandle): Promise<DirHandle> {
+  let hasData = false;
+  for await (const h of picked.values()) {
+    if (h.kind === "directory" && ROOTS.includes(h.name)) return picked;
+    if (h.kind === "directory" && h.name === "data") hasData = true;
+  }
+  return hasData ? picked.getDirectoryHandle("data") : picked;
+}
+
 export async function saveToFolder(db: Db, entries: ZipEntry[], pickNew = false): Promise<{ folder: string; written: number }> {
-  const root = await folder(db, "readwrite", pickNew);
+  const root = await dataRoot(await folder(db, "readwrite", pickNew));
   let written = 0;
   for (const e of entries) {
     const parts = e.path.split("/");
@@ -66,7 +77,7 @@ export async function saveToFolder(db: Db, entries: ZipEntry[], pickNew = false)
 }
 
 export async function readFolder(db: Db, pickNew = false): Promise<{ folder: string; entries: ZipEntry[] }> {
-  const root = await folder(db, "read", pickNew);
+  const root = await dataRoot(await folder(db, "read", pickNew));
   const entries: ZipEntry[] = [];
   const walk = async (dir: DirHandle, prefix: string) => {
     for await (const h of dir.values()) {

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import inspect
 import os
+import re
 import time
 from typing import Any
 
@@ -21,6 +22,7 @@ from leegen_harness.protocol import emit, truncate
 _VISIBLE: set[str] = set()
 _DEADLINE: float | None = None
 _SEEN: set[str] = set()
+_GROUPS: dict[str, str | None] = {}   # class name -> docstring already announced
 
 
 def pytest_configure(config: Any) -> None:
@@ -28,6 +30,7 @@ def pytest_configure(config: Any) -> None:
     _VISIBLE = {p for p in os.environ.get("LEEGEN_VISIBLE_FILES", "").split(",") if p}
     _DEADLINE = float(os.environ.get("LEEGEN_DEADLINE", "0")) or None
     _SEEN.clear()
+    _GROUPS.clear()
 
 
 def _name(nodeid: str) -> str:
@@ -38,6 +41,25 @@ def _section(nodeid: str) -> str | None:
     """Tests inside a class are grouped under the class name (`TestFoo::test_bar`)."""
     parts = nodeid.split("::")
     return parts[1] if len(parts) > 2 else None
+
+
+def _title(cls_name: str) -> str:
+    """`TestMergeRanges` -> `Merge ranges`."""
+    words = re.sub(r"^Test_?", "", cls_name) or cls_name
+    words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])|_+", " ", words).strip()
+    return words[:1].upper() + words[1:].lower() if words else cls_name
+
+
+def _announce_group(report: Any) -> None:
+    """One `section` event per test class; a later class of the same name may add its docstring."""
+    name = _section(report.nodeid)
+    if name is None:
+        return
+    doc = getattr(report, "_lc_cls_doc", None)
+    if name in _GROUPS and (_GROUPS[name] or not doc):
+        return
+    _GROUPS[name] = doc
+    emit({"type": "section", "id": name, "title": _title(name), "description": doc})
 
 
 def _file(nodeid: str) -> str:
@@ -89,8 +111,8 @@ def pytest_runtest_logreport(report: Any) -> None:
             else:
                 status, message = ("error" if report.when == "setup" or excinfo else "fail"), text
         out = "\n".join(c for _, c in report.sections if c) or None
+        _announce_group(report)
         emit({"type": "test", "name": _name(report.nodeid), "status": status, "visible": visible,
-              "description": getattr(report, "_lc_doc", None),
               "section": _section(report.nodeid),
               "message": truncate(message), "stdout": truncate(out),
               "duration_ms": round(report.duration * 1000, 3)})
@@ -101,7 +123,7 @@ def pytest_runtest_makereport(item: Any, call: Any) -> Any:
     outcome = yield
     report = outcome.get_result()
     report._lc_excinfo = call.excinfo
-    doc = inspect.getdoc(getattr(item, "obj", None)) if hasattr(item, "obj") else None
-    report._lc_doc = doc.splitlines()[0] if doc else None
+    cls_doc = inspect.getdoc(item.cls) if getattr(item, "cls", None) is not None else None
+    report._lc_cls_doc = " ".join(cls_doc.split("\n\n")[0].split()) if cls_doc else None
 
 

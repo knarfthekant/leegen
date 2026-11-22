@@ -111,24 +111,28 @@ files:
 
 
     class TestRotateRoster:
+        """Rotating right by k moves the tail to the front. Also k = 0 (a copy), an empty roster, a negative k (rotates left) and k beyond the length (wraps)."""
         def test_rotate_roster_moves_the_tail_to_the_front(self):
             """Rotate right by 1: the last item moves to the front."""
             assert rotate_roster([1, 2, 3, 4], 1) == [4, 1, 2, 3]
 
 
     class TestLastN:
+        """The last n items in their original order. Also n = 0, a negative n, and n larger than the list."""
         def test_last_n_keeps_a_window_on_the_tail(self):
             """The last n items, in their original order."""
             assert last_n([1, 2, 3, 4, 5], 2) == [4, 5]
 
 
     class TestServe:
+        """FIFO service that skips blocked tasks. Also everything blocked, nothing blocked, and no tasks."""
         def test_serve_skips_blocked_tasks_in_fifo_order(self):
             """Blocked tasks are skipped; the rest leave in FIFO order."""
             assert serve(["t1", "t2", "t3"], {"t2"}) == ["t1", "t3"]
 
 
     class TestInterleave:
+        """Alternating items from two lists until one runs out. Also an empty first side, an empty second side, and both empty."""
         def test_interleave_alternates_until_one_runs_out(self):
             """Alternate items until one side runs out."""
             assert interleave([1, 2, 3], ["a"]) == [1, "a", 2, 3]
@@ -139,6 +143,7 @@ files:
 
 
     class TestRotateRoster:
+        """Rotating right by k moves the tail to the front. Also k = 0 (a copy), an empty roster, a negative k (rotates left) and k beyond the length (wraps)."""
         def test_rotate_roster_zero_is_a_copy(self):
             """k = 0 returns a new list in the same order, not the input object."""
             src = [1, 2]
@@ -160,6 +165,7 @@ files:
 
 
     class TestLastN:
+        """The last n items in their original order. Also n = 0, a negative n, and n larger than the list."""
         def test_last_n_zero_is_empty(self):
             """n = 0 asks for nothing."""
             assert last_n([1, 2, 3], 0) == []
@@ -174,6 +180,7 @@ files:
 
 
     class TestServe:
+        """FIFO service that skips blocked tasks. Also everything blocked, nothing blocked, and no tasks."""
         def test_serve_all_blocked(self):
             """All tasks blocked: nothing is served."""
             assert serve(["t1", "t2"], {"t1", "t2"}) == []
@@ -188,6 +195,7 @@ files:
 
 
     class TestInterleave:
+        """Alternating items from two lists until one runs out. Also an empty first side, an empty second side, and both empty."""
         def test_interleave_empty_first(self):
             """An empty first side leaves the second side untouched."""
             assert interleave([], [1, 2]) == [1, 2]

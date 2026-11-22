@@ -1,11 +1,13 @@
 # Tutorials
 
-A tutorial is one notebook-like page: Markdown cells and runnable code cells, top to bottom.
+Use a tutorial instead of a problem when the goal is to teach: a gentle introduction to a
+concept, built up in small steps. (There is no `intro` difficulty for problems; introductions are
+tutorials.) A tutorial is one notebook-like page: Markdown cells and runnable code cells, top to bottom.
 Unlike a problem there is no side-by-side description and editor; the learner reads, edits a
 cell and runs it. Each code cell carries hidden **checks** that run after the learner's code
 and show up only then, as a row of ticks.
 
-Write `tutorials/<id>.yaml` (the file name must equal `id`), then run
+Write `data/tutorials/<id>.yaml` (the file name must equal `id`), then run
 `cd server && uv run leegen tutorial validate <id>`.
 
 ```yaml
@@ -57,8 +59,8 @@ Each check runs on a copy of the namespace, so a check cannot disturb the next o
 
 ## Storage and API
 
-The learner's code is one file per cell, `workspace/tut-<id>/cells/<cell-id>.py`, and the latest
-check outcomes are in `workspace/tut-<id>/.leegen/cell_results.json`. REST (server edition):
+The learner's code is one file per cell, `data/workspace/tut-<id>/cells/<cell-id>.py`, and the latest
+check outcomes are in `data/workspace/tut-<id>/.leegen/cell_results.json`. REST (server edition):
 `GET /api/tutorials`, `GET /api/tutorials/{id}`, `PUT .../files`, `POST .../reset`,
 `POST .../cells/{cell}/run`. The checks and references never leave the server.
 

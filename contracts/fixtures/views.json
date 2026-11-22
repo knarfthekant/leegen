@@ -69,12 +69,12 @@
           {
             "id": "basics",
             "title": "Basics",
-            "description": "The examples from the statement, plus the empty input."
+            "description": "The statement's example (`[8, 10]` and `[10, 12]` touch and merge), bookings that arrive out of order so you must sort first, and the empty input."
           },
           {
             "id": "edge-cases",
             "title": "Edge cases",
-            "description": "Ranges that nest, touch, or sit at unusual coordinates."
+            "description": "A range fully inside another must not shrink the merged end. Also zero-length ranges, including duplicates, and negative times."
           },
           {
             "id": "scale",
@@ -86,7 +86,6 @@
           {
             "name": "Example",
             "visible": true,
-            "description": "The example from the statement; `[8, 10]` and `[10, 12]` touch and merge.",
             "section": "basics",
             "input": {
               "args": [
@@ -124,7 +123,6 @@
           {
             "name": "Unsorted input",
             "visible": true,
-            "description": "Bookings arrive out of order, so sort before merging.",
             "section": "basics",
             "input": {
               "args": [
@@ -162,7 +160,6 @@
           {
             "name": "Empty",
             "visible": true,
-            "description": null,
             "section": "basics",
             "input": {
               "args": [
@@ -174,25 +171,21 @@
           {
             "name": "Nested ranges",
             "visible": false,
-            "description": "A range fully inside another must not shrink the merged end.",
             "section": "edge-cases"
           },
           {
             "name": "Single point bookings",
             "visible": false,
-            "description": "Zero-length ranges, including duplicates.",
             "section": "edge-cases"
           },
           {
             "name": "Negative times",
             "visible": false,
-            "description": null,
             "section": "edge-cases"
           },
           {
             "name": "Large random",
             "visible": false,
-            "description": null,
             "section": "scale"
           }
         ],
@@ -356,13 +349,23 @@
             "language": null
           }
         ],
-        "sections": [],
+        "sections": [
+          {
+            "id": "basics",
+            "title": "Basics",
+            "description": "Small shapes that mirror the statement, one sequence and a batch of two with four heads."
+          },
+          {
+            "id": "edges",
+            "title": "Edge shapes",
+            "description": "A single position, a 96-step sequence and wide heads (D = 128). The cache must stay correct as it grows."
+          }
+        ],
         "tests": [
           {
             "name": "Tiny (B=1, T=3, D=8, H=2)",
             "visible": true,
-            "description": null,
-            "section": null,
+            "section": "basics",
             "input": {
               "kwargs": {
                 "B": 1,
@@ -377,8 +380,7 @@
           {
             "name": "Batch of 2, four heads",
             "visible": true,
-            "description": null,
-            "section": null,
+            "section": "basics",
             "input": {
               "kwargs": {
                 "B": 2,
@@ -394,20 +396,17 @@
           {
             "name": "Single position",
             "visible": false,
-            "description": null,
-            "section": null
+            "section": "edges"
           },
           {
             "name": "Long sequence",
             "visible": false,
-            "description": null,
-            "section": null
+            "section": "edges"
           },
           {
             "name": "Wide heads",
             "visible": false,
-            "description": null,
-            "section": null
+            "section": "edges"
           }
         ],
         "has_reference": true,
@@ -426,7 +425,7 @@
       "result": {
         "id": "cuda-vector-add",
         "title": "Your First CUDA Kernel",
-        "difficulty": "intro",
+        "difficulty": "easy",
         "tags": [
           "cuda",
           "gpu",
@@ -449,7 +448,7 @@
       "result": {
         "id": "cuda-vector-add",
         "title": "Your First CUDA Kernel",
-        "difficulty": "intro",
+        "difficulty": "easy",
         "tags": [
           "cuda",
           "gpu",
@@ -486,7 +485,23 @@
             "language": null
           }
         ],
-        "sections": [],
+        "sections": [
+          {
+            "id": "basics",
+            "title": "Basics",
+            "description": "Tiny inputs, from a single element to a thousand. The first runs fewer threads than one block holds."
+          },
+          {
+            "id": "block-boundaries",
+            "title": "Block boundaries",
+            "description": "Sizes that land exactly on a block edge or leave a partial last block, where an unguarded `i < n` check reads or writes out of range."
+          },
+          {
+            "id": "scale",
+            "title": "Scale",
+            "description": "Four million elements. Every thread must pick up its own element and none may be skipped."
+          }
+        ],
         "tests": [],
         "has_reference": true,
         "limits": {
@@ -572,12 +587,12 @@
           {
             "id": "basics",
             "title": "Basics",
-            "description": "The example and a non-square product."
+            "description": "The 2 x 2 example from the statement and a rectangular (2 x 3) times (3 x 1) product."
           },
           {
             "id": "edges",
             "title": "Edges",
-            "description": "Sizes that are not multiples of the tile, thin matrices."
+            "description": "Sizes that cut a tile (37 x 23 times 23 x 41), a long inner dimension (k = 300 spans 19 tiles), and single rows and columns."
           },
           {
             "id": "scale",
@@ -589,7 +604,6 @@
           {
             "name": "Example",
             "visible": true,
-            "description": "The 2 x 2 example from the statement.",
             "section": "basics",
             "input": {
               "args": [
@@ -629,7 +643,6 @@
           {
             "name": "Rectangular",
             "visible": true,
-            "description": "(2 x 3) times (3 x 1).",
             "section": "basics",
             "input": {
               "args": [
@@ -670,25 +683,21 @@
           {
             "name": "Ragged tiles",
             "visible": false,
-            "description": "37 x 23 times 23 x 41, every dimension cuts a tile.",
             "section": "edges"
           },
           {
             "name": "Long inner dimension",
             "visible": false,
-            "description": "k = 300 spans 19 tiles.",
             "section": "edges"
           },
           {
             "name": "Single row and column",
             "visible": false,
-            "description": null,
             "section": "edges"
           },
           {
             "name": "256 x 256",
             "visible": false,
-            "description": null,
             "section": "scale"
           }
         ],

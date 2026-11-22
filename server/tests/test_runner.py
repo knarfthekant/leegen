@@ -89,18 +89,22 @@ async def test_pytest_judge():
     ref = await run(p, mode="reference")
     assert ref.status == "passed" and ref.total == 9
     visible = {t.name for t in ref.tests if t.visible}
-    assert "test_allows_up_to_capacity" in visible
-    assert "test_keys_are_independent" not in visible
+    assert "TestBurst.test_allows_up_to_capacity" in visible
+    assert "TestBuckets.test_keys_are_independent" not in visible
+    assert {s.id for s in ref.sections} == {"TestBurst", "TestBuckets", "TestCosts"}
     starter = await run(p)
     statuses = {t.name: t.status for t in starter.tests}
-    assert statuses["test_denies_when_empty"] == "fail"
-    assert statuses["test_cost_above_capacity_raises"] == "fail"  # pytest.raises -> fail, not error
+    assert statuses["TestBurst.test_denies_when_empty"] == "fail"
+    assert statuses["TestCosts.test_cost_above_capacity_raises"] == "fail"  # pytest.raises -> fail, not error
 
 
-async def test_pytest_async_tests_and_docstrings():
+async def test_pytest_classes_become_described_groups():
     r = await run("iterators-and-await", mode="reference")
     assert r.status == "passed"
-    assert any(t.description == "fair_countdown(n) yields n, n-1, ..., 1" for t in r.tests)
+    by = {g.id: g for g in r.sections}
+    assert by["TestValuesAndOrder"].title == "Values and order"
+    assert by["TestValuesAndOrder"].description == "Does it produce the right items, in the right order?"
+    assert all(t.section in by for t in r.tests)
 
 
 @pytest.mark.skipif(shutil.which("c++") is None, reason="no C++ compiler")
@@ -108,6 +112,7 @@ async def test_script_judge_cpp():
     p = parse_problem_yaml((FIXTURES / "cpp-sum.yaml").read_text())
     ref = await run(p, mode="reference")
     assert ref.status == "passed" and ref.total == 3, ref
+    assert [s.id for s in ref.sections] == ["sums"] and all(t.section == "sums" for t in ref.tests)
     assert ref.metrics and ref.metrics[0].name == "cases"
     starter = await run(p)
     assert starter.status == "failed"
@@ -134,23 +139,24 @@ async def test_gpu_problem_on_local_accelerator():
     assert r.device in ("mps", "cuda")
 
 
-async def test_section_and_description_reach_results():
+async def test_sections_reach_results():
     r = await run("merge-ranges", mode="reference")
     by = {t.name: t for t in r.tests}
-    assert by["Example"].section == "basics" and "statement" in by["Example"].description
-    assert by["Large random"].section == "scale"
+    assert by["Example"].section == "basics" and by["Large random"].section == "scale"
+    assert [(g.id, bool(g.description)) for g in r.sections] == [
+        ("basics", True), ("edge-cases", True), ("scale", True)]
 
 
 async def test_custom_tests_are_named_test_n_without_collisions():
     r = await run("merge-ranges", files={"solution.py": GOOD}, custom_tests=[
-        {"input": {"args": [[[1, 2]]]}},
-        {"input": {"args": [[[3, 4]]]}, "description": "mine", "section": "scale"},
+        {"input": {"args": [[[1, 2]]]}, "section": "basics"},
+        {"input": {"args": [[[3, 4]]]}, "section": "scale"},
         {"input": {"args": [[[5, 6]]]}, "name": "Example", "section": "bogus"},
     ])
     custom = [t for t in r.tests if t.custom]
     assert [t.name for t in custom] == ["Test 1", "Test 2", "Example (2)"]
-    assert custom[1].description == "mine" and custom[1].section == "scale"
-    assert custom[2].section is None
+    assert custom[1].section == "scale"
+    assert custom[2].section is None   # an unknown group is dropped, never invented
 
 
 def test_unique_test_name():

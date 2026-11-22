@@ -1,0 +1,215 @@
+schema_version: 1
+id: list-operations
+title: 'Lists: Slicing, Sorting, and Shaping'
+summary: Slice, rotate, chunk, rank and filter lists without mutating them.
+tags: [python, lists, slicing, sorting]
+environment: python
+order: 3
+cells:
+  - type: markdown
+    text: |
+      The **list** is the structure you will reshape most often. Its everyday operations need to be
+      reflexes: slicing, sorting with a key, and building new lists with comprehensions.
+
+      Every function in this tutorial returns a **new** list and leaves its input alone.
+
+      Slicing never raises on out-of-range bounds. An overshot slice is just empty:
+
+      ```python
+      items = [1, 2, 3, 4, 5]
+      items[1:3]     # [2, 3]
+      items[100:]    # []
+      items[-2:]     # [4, 5]
+      ```
+
+      Run the cell to see it.
+
+  - type: code
+    id: demo
+    starter: |
+      items = [1, 2, 3, 4, 5]
+      print("middle:", items[1:3])
+      print("overshoot:", items[100:])
+      print("last two:", items[-2:])
+      items
+
+  - type: markdown
+    text: |
+      **Rotate.** Write `rotate(items, k)` returning a new list rotated **right** by `k` positions:
+      the last `k` elements move to the front.
+
+      `k` may be larger than the list, or negative (a negative `k` rotates left). Python's `%` of a
+      negative number is still non-negative, so `k % len(items)` normalises every case. An empty list
+      rotates to `[]`.
+
+      ```python
+      rotate([1, 2, 3, 4, 5], 2)   # [4, 5, 1, 2, 3]
+      ```
+
+  - type: code
+    id: rotate
+    starter: |
+      def rotate(items, k):
+          ...
+
+      rotate([1, 2, 3, 4, 5], 2)
+    reference: |
+      def rotate(items, k):
+          if not items:
+              return []
+          n = len(items)
+          k %= n
+          return items[n - k:] + items[:n - k]
+
+      rotate([1, 2, 3, 4, 5], 2)
+    checks:
+      - description: rotating by 2 moves the last two to the front
+        code: assert rotate([1, 2, 3, 4, 5], 2) == [4, 5, 1, 2, 3]
+      - description: an empty list stays empty
+        code: assert rotate([], 3) == []
+      - description: k larger than the length wraps around
+        code: assert rotate([1, 2, 3], 7) == [3, 1, 2]
+      - description: a negative k rotates left
+        code: assert rotate([1, 2, 3, 4], -1) == [2, 3, 4, 1]
+      - description: k = 0 returns a new list, not the input object
+        code: |
+          src = [1, 2]
+          out = rotate(src, 0)
+          assert out == [1, 2]
+          assert out is not src
+      - description: the input list is left alone
+        code: |
+          src = [3, 1, 2]
+          rotate(src, 1)
+          assert src == [3, 1, 2]
+
+  - type: markdown
+    text: |
+      **Chunk.** Write `chunk(items, size)` splitting a list into consecutive chunks of at most `size`
+      elements. The last chunk may be shorter. Raise `ValueError` if `size <= 0`.
+
+      One slice per step of `range(0, len(items), size)` does it.
+
+      ```python
+      chunk([1, 2, 3, 4, 5], 2)   # [[1, 2], [3, 4], [5]]
+      ```
+
+  - type: code
+    id: chunk
+    starter: |
+      def chunk(items, size):
+          ...
+
+      chunk([1, 2, 3, 4, 5], 2)
+    reference: |
+      def chunk(items, size):
+          if size <= 0:
+              raise ValueError("size must be positive")
+          return [items[i:i + size] for i in range(0, len(items), size)]
+
+      chunk([1, 2, 3, 4, 5], 2)
+    checks:
+      - description: an uneven tail stays a shorter final chunk
+        code: assert chunk([1, 2, 3, 4, 5], 2) == [[1, 2], [3, 4], [5]]
+      - description: a size larger than the list makes one chunk
+        code: assert chunk([1, 2], 10) == [[1, 2]]
+      - description: an empty list has no chunks
+        code: assert chunk([], 3) == []
+      - description: size 0 raises ValueError
+        code: |
+          try:
+              chunk([1], 0)
+          except ValueError:
+              pass
+          else:
+              raise AssertionError("expected ValueError for size 0")
+      - description: a negative size raises ValueError
+        code: |
+          try:
+              chunk([1], -2)
+          except ValueError:
+              pass
+          else:
+              raise AssertionError("expected ValueError for a negative size")
+      - description: the input list is left alone
+        code: |
+          src = [3, 1, 2]
+          chunk(src, 2)
+          assert src == [3, 1, 2]
+
+  - type: markdown
+    text: |
+      **Rank.** Write `top_scores(scores, k)` returning the `k` highest scores, highest first.
+
+      `sorted(..., reverse=True)` returns a **new** list, so the input is safe. `k` may exceed the
+      list length, and `k <= 0` gives `[]`. Beware: a slice like `[:k]` with a negative `k` is not
+      empty, so clamp it.
+
+      ```python
+      top_scores([72, 95, 88, 61], 2)   # [95, 88]
+      ```
+
+  - type: code
+    id: top
+    starter: |
+      def top_scores(scores, k):
+          ...
+
+      top_scores([72, 95, 88, 61], 2)
+    reference: |
+      def top_scores(scores, k):
+          return sorted(scores, reverse=True)[:max(k, 0)]
+
+      top_scores([72, 95, 88, 61], 2)
+    checks:
+      - description: the top two come out highest first
+        code: assert top_scores([72, 95, 88, 61], 2) == [95, 88]
+      - description: k larger than the list returns every score, sorted
+        code: assert top_scores([3, 1], 10) == [3, 1]
+      - description: ties count separately
+        code: assert top_scores([5, 5, 5], 2) == [5, 5]
+      - description: an empty list gives an empty result
+        code: assert top_scores([], 3) == []
+      - description: k of 0 or less gives an empty list
+        code: |
+          assert top_scores([9, 8], 0) == []
+          assert top_scores([9, 8], -3) == []
+      - description: the input list is left alone
+        code: |
+          src = [3, 1, 2]
+          top_scores(src, 2)
+          assert src == [3, 1, 2]
+
+  - type: markdown
+    text: |
+      **Filter.** Write `keep_truthy(items)` returning only the truthy elements, in their original
+      order. A comprehension filters and builds in one pass.
+
+      ```python
+      keep_truthy([0, "a", "", None, 3, [], "b"])   # ["a", 3, "b"]
+      ```
+
+  - type: code
+    id: truthy
+    starter: |
+      def keep_truthy(items):
+          ...
+
+      keep_truthy([0, "a", "", None, 3, [], "b"])
+    reference: |
+      def keep_truthy(items):
+          return [x for x in items if x]
+
+      keep_truthy([0, "a", "", None, 3, [], "b"])
+    checks:
+      - description: falsy values are dropped and the order is kept
+        code: assert keep_truthy([0, "a", "", None, 3, [], "b"]) == ["a", 3, "b"]
+      - description: an empty list stays empty
+        code: assert keep_truthy([]) == []
+      - description: only falsy values leaves nothing
+        code: assert keep_truthy([0, "", None, [], {}]) == []
+      - description: the input list is left alone
+        code: |
+          src = [0, 1, 2]
+          keep_truthy(src)
+          assert src == [0, 1, 2]

@@ -20,6 +20,7 @@ files:
       int main() {
         struct Case { std::string name; std::vector<int> xs; long long want; };
         std::vector<Case> cases = {{"empty", {}, 0}, {"small", {1, 2, 3}, 6}, {"negative", {-5, 2}, -3}};
+        lc::section("sums");
         for (auto& c : cases) {
           long long got = sum(c.xs);
           lc::test(c.name, got == c.want, std::to_string(c.want), std::to_string(got), "", c.name != "negative");
@@ -36,3 +37,7 @@ judge:
   kind: script
   build: [[c++, -std=c++17, -O2, "-I{bundle}/_lc/include", -o, main, main.cpp, solution.cpp]]
   command: [./main]
+sections:
+  - id: sums
+    title: Sums
+    description: An empty array, a small positive one and one with a negative entry.

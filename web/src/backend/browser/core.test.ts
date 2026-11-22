@@ -42,7 +42,7 @@ const calls: Record<string, (a: Record<string, any>) => unknown> = {
     ),
   with_proposal: (a) => core.withProposal(a.items, a.proposal),
   make_custom_test: (a) =>
-    core.makeCustomTest(problems[a.problem], a.existing, a.args, a.kwargs, a.name, a.description, a.section),
+    core.makeCustomTest(problems[a.problem], a.existing, a.args, a.kwargs, a.name, a.section),
   unique_test_name: (a) => core.uniqueTestName(a.wanted, new Set(a.taken)),
 };
 

@@ -1,0 +1,193 @@
+schema_version: 1
+id: tuples-and-unpacking
+title: Tuples, zip, enumerate, and Unpacking
+summary: Transpose, min/max, record loops and star unpacking.
+tags: [python, tuples, unpacking, zip, enumerate]
+environment: python
+order: 6
+cells:
+  - type: markdown
+    text: |
+      Tuples are Python's make-a-record type, and the operations around them (`zip`, `enumerate`,
+      star unpacking) are what make Python loops read like data transformation instead of index
+      bookkeeping.
+
+      ```python
+      name, salary = ("ada", 100)              # unpack a tuple
+      first, *rest = [1, 2, 3]                 # first = 1, rest = [2, 3]
+      list(zip([1, 2], ["a", "b"]))            # [(1, "a"), (2, "b")]
+      list(enumerate(["a", "b"]))              # [(0, "a"), (1, "b")]
+      ```
+
+      Run the cell to see them.
+
+  - type: code
+    id: demo
+    starter: |
+      name, salary = ("ada", 100)
+      first, *rest = [1, 2, 3]
+      print(name, salary)
+      print(first, rest)
+      print(list(zip([1, 2], ["a", "b"])))
+      print(list(enumerate(["a", "b"])))
+
+  - type: markdown
+    text: |
+      **Transpose.** Write `transpose(rows)` where `rows` is a list of lists. Return the columns as a
+      list of lists. Ragged rows truncate to the shortest row, and `transpose([])` is `[]`.
+
+      `zip(*rows)` does it in one call: the star spreads the rows out as separate arguments, and `zip`
+      re-groups them by position. `zip` stops at the shortest input, which is exactly the truncation
+      wanted here.
+
+      ```python
+      transpose([[1, 2, 3], [4, 5, 6]])   # [[1, 4], [2, 5], [3, 6]]
+      ```
+
+  - type: code
+    id: transpose
+    starter: |
+      def transpose(rows):
+          ...
+
+      transpose([[1, 2, 3], [4, 5, 6]])
+    reference: |
+      def transpose(rows):
+          if not rows:
+              return []
+          return [list(col) for col in zip(*rows)]
+
+      transpose([[1, 2, 3], [4, 5, 6]])
+    checks:
+      - description: rows and columns swap
+        code: assert transpose([[1, 2, 3], [4, 5, 6]]) == [[1, 4], [2, 5], [3, 6]]
+      - description: no rows means no columns
+        code: assert transpose([]) == []
+      - description: ragged rows truncate to the shortest row
+        code: assert transpose([[1, 2, 3], [4, 5]]) == [[1, 4], [2, 5]]
+      - description: one row becomes one-element columns
+        code: assert transpose([[1, 2, 3]]) == [[1], [2], [3]]
+      - description: the columns are lists, not tuples
+        code: assert all(type(col) is list for col in transpose([[1, 2], [3, 4]]))
+
+  - type: markdown
+    text: |
+      **Multiple return values.** Write `minmax(nums)` returning a tuple `(smallest, largest)`, or
+      `(None, None)` for an empty list.
+
+      Returning a tuple is the idiomatic multi-value return; callers unpack it:
+      `lo, hi = minmax(xs)`.
+
+      ```python
+      minmax([4, 1, 9, 3])   # (1, 9)
+      ```
+
+  - type: code
+    id: minmax
+    starter: |
+      def minmax(nums):
+          ...
+
+      minmax([4, 1, 9, 3])
+    reference: |
+      def minmax(nums):
+          if not nums:
+              return (None, None)
+          return (min(nums), max(nums))
+
+      minmax([4, 1, 9, 3])
+    checks:
+      - description: returns (smallest, largest)
+        code: assert minmax([4, 1, 9, 3]) == (1, 9)
+      - description: one element is both extremes
+        code: assert minmax([5]) == (5, 5)
+      - description: no elements gives (None, None)
+        code: assert minmax([]) == (None, None)
+      - description: negative numbers sort normally
+        code: assert minmax([-3, -1, -7]) == (-7, -1)
+      - description: the result is a tuple
+        code: assert type(minmax([1, 2])) is tuple
+
+  - type: markdown
+    text: |
+      **Unpack in a loop.** Write `senior_pay(employees, min_years)` where `employees` is a list of
+      `(name, salary, years)` tuples. Return the total salary of employees with `years >= min_years`.
+
+      Unpack each record in the loop header, `for name, salary, years in employees:`, instead of
+      indexing with `row[1]`. Use `_` for a name you don't need.
+
+      ```python
+      senior_pay([("ada", 100, 6), ("bob", 80, 2)], 5)   # 100
+      ```
+
+  - type: code
+    id: pay
+    starter: |
+      def senior_pay(employees, min_years):
+          ...
+
+      senior_pay([("ada", 100, 6), ("bob", 80, 2)], 5)
+    reference: |
+      def senior_pay(employees, min_years):
+          total = 0
+          for _name, salary, years in employees:
+              if years >= min_years:
+                  total += salary
+          return total
+
+      senior_pay([("ada", 100, 6), ("bob", 80, 2)], 5)
+    checks:
+      - description: sums pay for employees who meet the threshold
+        code: |
+          employees = [("ada", 100, 6), ("bob", 80, 2), ("cy", 50, 9)]
+          assert senior_pay(employees, 5) == 150
+      - description: no employees pay nothing
+        code: assert senior_pay([], 5) == 0
+      - description: nobody qualifying sums to 0
+        code: assert senior_pay([("bob", 80, 2)], 5) == 0
+      - description: a threshold of exactly the years counts
+        code: assert senior_pay([("a", 10, 5)], 5) == 10
+      - description: a zero threshold includes everyone
+        code: assert senior_pay([("a", 10, 1), ("b", 20, 2)], 0) == 30
+
+  - type: markdown
+    text: |
+      **Star unpacking.** Write `first_last(items)` returning `(first, last)`. An empty list gives
+      `(None, None)`, and a single element is both ends: `(x, x)`.
+
+      `first, *middle, last = items` grabs both ends in one statement. But a pattern with two plain
+      targets needs at least two elements, so the empty and one-element cases need their own guards.
+
+      ```python
+      first_last(["a", "b", "c"])   # ("a", "c")
+      ```
+
+  - type: code
+    id: ends
+    starter: |
+      def first_last(items):
+          ...
+
+      first_last(["a", "b", "c"])
+    reference: |
+      def first_last(items):
+          if not items:
+              return (None, None)
+          if len(items) == 1:
+              only = items[0]
+              return (only, only)
+          first, *_middle, last = items
+          return (first, last)
+
+      first_last(["a", "b", "c"])
+    checks:
+      - description: both ends of the list as a tuple
+        code: assert first_last(["a", "b", "c"]) == ("a", "c")
+      - description: an empty list gives (None, None)
+        code: assert first_last([]) == (None, None)
+      - description: one element is both ends
+        code: assert first_last(["x"]) == ("x", "x")
+      - description: two elements are the ends
+        code: assert first_last([1, 2]) == (1, 2)
+      - description: the result is a tuple
+        code: assert type(first_last([1, 2, 3])) is tuple

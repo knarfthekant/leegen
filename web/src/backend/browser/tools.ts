@@ -66,7 +66,7 @@ export const HANDLERS: Record<string, Handler> = {
     return { proposal_id: p.id, status: "pending user review" };
   },
   add_test_case: (s, a) =>
-    s.addTestCase(a.args, { kwargs: a.kwargs, name: a.name, description: a.description, section: a.section, problemId: a.problem_id }),
+    s.addTestCase(a.args, { kwargs: a.kwargs, name: a.name, section: a.section, problemId: a.problem_id }),
 };
 
 // ------------------------------------------------------------------ input validation

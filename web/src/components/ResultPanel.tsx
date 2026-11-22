@@ -1,10 +1,10 @@
 import { Clock, Cpu, Gauge, ListChecks, Square, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { PublicSection, RunResult, TestResult } from "../lib/api";
+import type { RunResult } from "../lib/api";
 import { bareSection, groupBySection } from "../lib/sections";
-import { CaseGroups } from "./CaseGroups";
-import { Markdown } from "./Markdown";
-import { Button, Chip, cx } from "./ui";
+import { CaseTitle } from "./TestcasePanel";
+import { TestGroups } from "./TestGroups";
+import { Button, Chip } from "./ui";
 import { Value } from "./Value";
 
 const STATUS_TEXT: Record<RunResult["status"], string> = {
@@ -38,14 +38,12 @@ export function ResultPanel({
   running,
   onCancel,
   params = [],
-  sections = [],
   phase = null,
 }: {
   result: RunResult | null;
   running: boolean;
   onCancel: () => void;
   params?: string[];
-  sections?: PublicSection[];
   phase?: { phase: string; detail: string } | null;
 }) {
   const [sel, setSel] = useState(0);
@@ -89,7 +87,6 @@ export function ResultPanel({
       </div>
     );
 
-  const t: TestResult | undefined = result.tests[sel];
   const ok = result.status === "passed";
   return (
     <div className="panel-body">
@@ -134,49 +131,41 @@ export function ResultPanel({
       )}
 
       {result.tests.length > 0 && (
-        <CaseGroups
+        <TestGroups
           groups={groupBySection(
-            result.tests.map((x, index) => ({ ...x, index })),
-            sections,
+            result.tests.map((x, index) => ({ ...x, key: x.name + index, index })),
+            result.sections,
             bareSection,
           )}
-          sectioned={sections.length > 0 || result.tests.some((x) => x.section)}
-          render={(x) => (
-            <button
-              key={x.name + x.index}
-              className={cx("pill", x.status === "pass" ? "pass" : "fail", sel === x.index && "active")}
-              onClick={() => setSel(x.index)}
-            >
-              <span className="status-dot" />
-              Test {x.index + 1}
-              {!x.visible && !x.custom && <span className="pill-note">hidden</span>}
-            </button>
+          selected={sel}
+          onSelect={setSel}
+          state={(x) => (x.status === "pass" ? "pass" : "fail")}
+          hidden={(x) => !x.visible && !x.custom}
+          detail={(x, n) => (
+            <div className="case">
+              <CaseTitle n={n}>
+                <Chip tone={x.status === "pass" ? "pass" : "fail"}>
+                  <span className="cap">{x.status}</span>
+                </Chip>
+                {x.duration_ms != null && <span className="muted small tabular">{x.duration_ms.toFixed(1)} ms</span>}
+              </CaseTitle>
+              {x.message && x.status !== "pass" && <Value label="Message" value={x.message} raw tone="fail" />}
+              {!x.visible && x.status === "pass" && <p className="muted small">Hidden test: details are shown only when it fails.</p>}
+              {x.input != null && <InputView input={x.input} params={params} />}
+              {x.actual != null || x.expected != null ? (
+                <>
+                  <Value label="Output" value={x.actual} tone={x.status === "pass" ? undefined : "fail"} />
+                  <Value label="Expected" value={x.expected} />
+                </>
+              ) : null}
+              {x.message && x.status === "pass" && <Value label="Message" value={x.message} raw />}
+              {x.stdout && <Value label="Stdout" value={x.stdout} raw />}
+            </div>
           )}
         />
       )}
 
-      {t && (
-        <div className="case">
-          <div className="row">
-            <Chip tone={t.status === "pass" ? "pass" : "fail"}>
-              <span className="cap">{t.status}</span>
-            </Chip>
-          </div>
-          {t.description && <div className="muted"><Markdown source={t.description} /></div>}
-          {!t.visible && t.status === "pass" && <p className="muted small">Hidden test: details are shown only when it fails.</p>}
-          {t.input != null && <InputView input={t.input} params={params} />}
-          {t.actual != null || t.expected != null ? (
-            <>
-              <Value label="Output" value={t.actual} tone={t.status === "pass" ? undefined : "fail"} />
-              <Value label="Expected" value={t.expected} />
-            </>
-          ) : null}
-          {t.message && <Value label="Message" value={t.message} raw />}
-          {t.stdout && <Value label="Stdout" value={t.stdout} raw />}
-          {t.duration_ms != null && <div className="muted small tabular">{t.duration_ms.toFixed(1)} ms</div>}
-        </div>
-      )}
-      {!t && result.stderr && <Value label="stderr" value={result.stderr} raw />}
+      {result.tests.length === 0 && result.stderr && <Value label="stderr" value={result.stderr} raw />}
     </div>
   );
 }

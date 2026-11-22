@@ -50,7 +50,6 @@ class Proposal(BaseModel):
 
 class CustomTest(BaseModel):
     name: str | None = None
-    description: str | None = None
     section: str | None = None
     input: dict[str, Any] = Field(default_factory=dict)
     expected: Any = None

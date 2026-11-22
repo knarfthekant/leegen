@@ -1,12 +1,14 @@
-// Export / import in the repo layout, so work moves between the browser and a local checkout:
+// Export / import in the data layout: the same tree as the local server's data folder (`data/`,
+// or wherever LEEGEN_DATA points), so work moves between the browser and a local install:
 //
 //   problems/<id>.yaml
 //   problems/<id>/assets/...
 //   workspace/<id>/<editable files>
 //   workspace/<id>/.leegen/<state>.json      (custom_tests, last_run, annotations, ...)
 //
-// Unzip an export at the repo root and the local server sees the same problems and work; zip a
-// checkout's problems/ and workspace/ folders and import them here.
+// Unzip an export into the data folder and the local server sees the same problems and work.
+// Import accepts that tree, the data folder itself, or a whole checkout (its `data/` is found).
+// `tutorials/` is not part of the browser edition yet, so it is ignored on import.
 
 import type { Db, ProblemRecord, WorkspaceRecord } from "./db.ts";
 import type { RunnerClient } from "./runner.ts";
@@ -25,7 +27,7 @@ const dec = new TextDecoder();
 const STATE_DIR = ".leegen";
 const SAFE_SEGMENT = /^(?!\.\.?$)[^/\\\0]+$/;
 
-/** Everything in the repo layout: problems, assets, the user's files and state. */
+/** Everything in the data layout: problems, assets, the user's files and state. */
 export async function collectEntries(db: Db, seedAssets: (id: string, rel: string) => Promise<Blob | undefined>): Promise<ZipEntry[]> {
   const entries: ZipEntry[] = [];
   const problems = await db.all<ProblemRecord>("problems");
@@ -60,12 +62,17 @@ export async function exportZip(db: Db, seedAssets: (id: string, rel: string) =>
   return writeZip(await collectEntries(db, seedAssets));
 }
 
-/** Paths relative to the repo root: tolerate one leading folder (a zipped checkout). */
-function normalise(entries: ZipEntry[]): ZipEntry[] {
-  const atRoot = entries.some((e) => /^(problems|workspace)\//.test(e.path));
-  return entries
-    .map((e) => ({ ...e, path: e.path.replace(/\\/g, "/") }))
-    .map((e) => (atRoot ? e : { ...e, path: e.path.replace(/^[^/]+\//, "") }))
+const DATA_ROOT = /^((?:[^/]+\/){0,2})(problems|workspace|tutorials)\//;
+
+/** Paths relative to the data root: drop whatever precedes it (a zipped data folder or checkout). */
+export function normalise(entries: ZipEntry[]): ZipEntry[] {
+  const slashed = entries.map((e) => ({ ...e, path: e.path.replace(/\\/g, "/") }));
+  const prefixes = slashed.flatMap((e) => DATA_ROOT.exec(e.path)?.[1] ?? []);
+  // the shortest prefix is the data root; `data/problems` beats `data/problems/x/problems`
+  const prefix = prefixes.reduce((a, b) => (b.length < a.length ? b : a), prefixes[0] ?? "");
+  return slashed
+    .filter((e) => e.path.startsWith(prefix))
+    .map((e) => ({ ...e, path: e.path.slice(prefix.length) }))
     .filter((e) => e.path.split("/").every((s) => SAFE_SEGMENT.test(s)) && !e.path.split("/").includes("__MACOSX"));
 }
 
@@ -73,7 +80,7 @@ export async function importZip(blob: Blob, db: Db, runner: RunnerClient, servic
   return importEntries(await readZip(blob), db, runner, service);
 }
 
-/** Import repo-layout entries (from a zip or a folder). */
+/** Import data-layout entries (from a zip or a folder). */
 export async function importEntries(raw: ZipEntry[], db: Db, runner: RunnerClient, service: BrowserToolService): Promise<ImportSummary> {
   const summary: ImportSummary = { problems: [], unchanged: [], workspaces: [], errors: [] };
   const entries = normalise(raw);

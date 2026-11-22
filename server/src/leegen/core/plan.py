@@ -43,8 +43,7 @@ def test_payload(problem: Problem, custom_tests: list[dict[str, Any]] | None = N
         if only_visible and not t.visible:
             continue
         tests.append({
-            "name": t.name, "visible": t.visible, "custom": False,
-            "description": t.description, "section": t.section,
+            "name": t.name, "visible": t.visible, "custom": False, "section": t.section,
             "input": t.input.model_dump(mode="json") if t.input else None,
             "expected": None if t.needs_reference else t.expected,
             "needs_reference": t.needs_reference,
@@ -60,7 +59,6 @@ def test_payload(problem: Problem, custom_tests: list[dict[str, Any]] | None = N
             section = ct.get("section")
             tests.append({
                 "name": name, "visible": True, "custom": True,
-                "description": ct.get("description"),
                 "section": section if section in section_ids else None,
                 "input": ct.get("input") or {}, "needs_reference": needs_ref,
                 "expected": None if needs_ref else expected,

@@ -12,7 +12,8 @@ export function filterProblems(problems: ProblemSummary[], query: string): Probl
   );
 }
 
-export const hardware = (p: { requires: string[] }) => p.requires.filter((r) => r !== "cpu");
+export const hardware = (p: { requires: string[]; environment?: string }) =>
+  p.requires.filter((r) => r !== "cpu" && r !== p.environment);
 
 /** Where a problem runs when it can't run in this edition (from its environment's runtimes). */
 export function elsewhere(runtimes: string[] | undefined): { label: string; title: string; server: boolean } | null {

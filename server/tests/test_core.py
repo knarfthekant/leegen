@@ -120,7 +120,7 @@ def test_browser_only_environment_is_refused_by_native_executors():
 def test_rest_and_service_parity():
     client = TestClient(app_state_app())
     assert client.get("/api/problems/nope").status_code == 404
-    r = client.post("/api/workspace/merge-ranges/custom_tests", json={"args": [[[5, 6]]]})
+    r = client.post("/api/workspace/merge-ranges/custom_tests", json={"args": [[[5, 6]]], "section": "basics"})
     assert r.status_code == 200 and r.json()["custom_tests"] >= 1
     bad = client.post("/api/workspace/merge-ranges/custom_tests",
                       json={"args": [[]], "section": "nope"})
@@ -173,3 +173,20 @@ def test_problem_schema_accepts_webgpu_requirement():
     data = json.loads((settings().root / "schema" / "problem.schema.json").read_text())
     assert "webgpu" in json.dumps(data["properties"]["requires"])
     assert Problem.model_fields["requires"]
+
+
+def test_user_content_lives_under_one_data_root(monkeypatch, tmp_path):
+    from leegen.config import settings
+
+    monkeypatch.delenv("LEEGEN_PROBLEMS", raising=False)
+    monkeypatch.delenv("LEEGEN_TUTORIALS", raising=False)
+    monkeypatch.delenv("LEEGEN_WORKSPACE", raising=False)
+    monkeypatch.setenv("LEEGEN_DATA", str(tmp_path))
+    settings.cache_clear()
+    try:
+        s = settings()
+        data = tmp_path.resolve()
+        assert (s.data_dir, s.problems_dir, s.tutorials_dir, s.workspace_dir) == (
+            data, data / "problems", data / "tutorials", data / "workspace")
+    finally:
+        settings.cache_clear()

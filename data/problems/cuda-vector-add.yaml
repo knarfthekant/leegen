@@ -1,7 +1,7 @@
 schema_version: 1
 id: cuda-vector-add
 title: Your First CUDA Kernel
-difficulty: intro
+difficulty: easy
 tags: [cuda, gpu, kernels]
 environment: cuda
 requires: [cuda]
@@ -122,10 +122,13 @@ files:
       }
 
       int main() {
+          lc::section("basics");
           run_case("n = 1", 1, true);
           run_case("n = 1000", 1000, true);
+          lc::section("block-boundaries");
           run_case("n = 256 (exactly one block)", 256, false);
           run_case("n = 12345 (partial last block)", 12345, false);
+          lc::section("scale");
           run_case("n = 2^22", 1 << 22, false);
           return 0;
       }
@@ -148,4 +151,14 @@ judge:
   kind: script
   build: [[nvcc, -O2, -std=c++17, "-I{bundle}/_lc/include", -o, main, main.cu, kernel.cu]]
   command: [./main]
+sections:
+  - id: basics
+    title: Basics
+    description: Tiny inputs, from a single element to a thousand. The first runs fewer threads than one block holds.
+  - id: block-boundaries
+    title: Block boundaries
+    description: Sizes that land exactly on a block edge or leave a partial last block, where an unguarded `i < n` check reads or writes out of range.
+  - id: scale
+    title: Scale
+    description: Four million elements. Every thread must pick up its own element and none may be skipped.
 limits: {timeout_s: 30}

@@ -39,8 +39,13 @@ reference:
 judge:
   kind: function
   entry: solution.py:add
+sections:
+  - id: basics
+    title: Basics
+    description: Adding two small numbers.
 tests:
   - name: small
+    section: basics
     input: {args: [1, 2]}
     expected: 3
 `;
@@ -103,7 +108,7 @@ try {
   await page.goto(APP + "/");
   await page.getByText("Merge Booking Ranges").first().waitFor();
   const seeds = await page.locator(".problem-row").count();
-  if (seeds !== 13) throw new Error(`expected 13 bundled problems, got ${seeds}`);
+  if (seeds !== 9) throw new Error(`expected 9 bundled problems, got ${seeds}`);
   await page.getByRole("button", { name: "Minimize Codex guide" }).click();
   const isolated = await page.evaluate(() => crossOriginIsolated);
   if (!isolated) throw new Error("the app page is not cross-origin isolated");
@@ -170,7 +175,7 @@ try {
   step("console: snippet with stdout and an echoed expression");
   await page.getByRole("tab", { name: "Console" }).click();
   await page.locator("textarea.console-input").first().fill('print("hi")\n2 + 3');
-  await page.getByRole("button", { name: "Run snippet" }).click();
+  await page.getByRole("button", { name: /^Run \(/ }).last().click();
   await page.locator(".console-entry .chip", { hasText: "ok" }).first().waitFor({ timeout: 90_000 });
   const consoleText = await page.locator(".console-entry").first().innerText();
   if (!consoleText.includes("hi") || !consoleText.includes("5")) throw new Error("console output:\n" + consoleText);
@@ -226,9 +231,9 @@ try {
   step("run_tests through the tool, and a custom test case");
   const run = await tool("run_tests", {});
   if (run.status !== "passed") throw new Error("run_tests: " + JSON.stringify(run));
-  await tool("add_test_case", { args: [[[4, 5], [1, 4]]], description: "touching blocks" });
+  await tool("add_test_case", { args: [[[4, 5], [1, 4]]], section: "basics" });
   const full = await tool("run_tests", { full: true });
-  const custom = full.tests.find((t) => t.description === "touching blocks");
+  const custom = full.tests.find((t) => /^Test \d+$/.test(t.name) && t.section === "basics");
   if (!custom || JSON.stringify(custom.expected) !== "[[1,5]]") throw new Error("custom test: " + JSON.stringify(custom));
 
   step("a runaway loop is stopped and reported as a timeout");

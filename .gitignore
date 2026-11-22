@@ -1,5 +1,5 @@
-# user state
-workspace/
+# user state (problems/ and tutorials/ next to it are tracked content)
+/data/workspace/
 # build / deps
 web/node_modules/
 web/dist/

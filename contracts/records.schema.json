@@ -502,18 +502,6 @@
           "default": null,
           "title": "Name"
         },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
         "section": {
           "anyOf": [
             {
@@ -540,7 +528,6 @@
       "type": "object",
       "required": [
         "name",
-        "description",
         "section",
         "input",
         "expected"
@@ -776,6 +763,38 @@
       "title": "ProposalsChangedEvent",
       "type": "object"
     },
+    "ResultSection": {
+      "description": "A group of results as the UI shows it: declared `sections`, or a pytest class.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description"
+      ],
+      "title": "ResultSection",
+      "type": "object"
+    },
     "RunFinishedEvent": {
       "properties": {
         "type": {
@@ -874,6 +893,13 @@
           "title": "Total",
           "type": "integer"
         },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/ResultSection"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
         "tests": {
           "items": {
             "$ref": "#/$defs/TestResult"
@@ -934,6 +960,7 @@
         "duration_ms",
         "passed",
         "total",
+        "sections",
         "tests",
         "metrics",
         "compile_output",
@@ -1059,18 +1086,6 @@
           "title": "Custom",
           "type": "boolean"
         },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
         "section": {
           "anyOf": [
             {
@@ -1137,7 +1152,6 @@
         "status",
         "visible",
         "custom",
-        "description",
         "section",
         "input",
         "expected",

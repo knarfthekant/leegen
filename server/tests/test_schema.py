@@ -15,10 +15,13 @@ def test_seed_problems_load():
     assert store.errors() == []
     ids = {p.id for p in store.list()}
     assert ids == {"merge-ranges", "iterators-and-await", "kv-cache-basics",
-                   "cuda-vector-add", "webgpu-tiled-matmul",
-                   "list-operations", "dict-operations", "set-operations",
-                   "tuples-and-unpacking", "counter-and-defaultdict",
+                   "cuda-vector-add", "webgpu-tiled-matmul", "counter-and-defaultdict",
                    "deque-operations", "heapq-operations", "lru-cache-design"}
+
+
+def test_no_seed_problem_is_intro():
+    # introductions are tutorials now, not a difficulty level
+    assert all(p.difficulty != "intro" for p in ProblemStore().list())
 
 
 def test_yaml_round_trip():
@@ -32,7 +35,8 @@ def base(**over):
         "id": "x-problem", "title": "X", "environment": "python", "description": "d",
         "files": [{"path": "solution.py", "content": "def f(x):\n    pass\n"}],
         "judge": {"kind": "function", "entry": "solution.py:f"},
-        "tests": [{"name": "t", "input": {"args": [1]}, "expected": 1}],
+        "sections": [{"id": "g", "title": "G", "description": "What the group checks."}],
+        "tests": [{"name": "t", "section": "g", "input": {"args": [1]}, "expected": 1}],
     }
     data.update(over)
     return data
@@ -48,11 +52,19 @@ def test_minimal_problem_is_valid():
     ({"files": [{"path": "s.py", "role": "readonly", "content": ""}]}, "editable"),
     ({"judge": {"kind": "function"}}, "entry"),
     ({"judge": {"kind": "function", "entry": "missing.py:f"}}, "not in files"),
-    ({"tests": [{"name": "t", "input": {"args": [1]}}]}, "reference"),
-    ({"tests": [{"name": "t", "input": {}, "expected": 1}, {"name": "t", "input": {}, "expected": 1}]},
-     "duplicate test"),
+    ({"tests": [{"name": "t", "section": "g", "input": {"args": [1]}}]}, "reference"),
+    ({"tests": [{"name": "t", "section": "g", "input": {}, "expected": 1},
+                {"name": "t", "section": "g", "input": {}, "expected": 1}]}, "duplicate test"),
     ({"judge": {"kind": "pytest"}}, "test files"),
     ({"unknown_field": 1}, "extra"),
+    ({"difficulty": "intro"}, "difficulty"),
+    ({"tests": [{"name": "t", "input": {"args": [1]}, "expected": 1}]}, "section"),
+    ({"sections": [], "tests": [{"name": "t", "section": "g", "input": {}, "expected": 1}]},
+     "requires `sections`"),
+    ({"tests": [{"name": "t", "section": "g", "description": "per-test text",
+                 "input": {"args": [1]}, "expected": 1}]}, "description"),
+    ({"judge": {"kind": "script", "command": ["./run"]}, "sections": [], "tests": []},
+     "requires `sections`"),
 ])
 def test_invalid_problems_rejected(over, needle):
     with pytest.raises(ValidationError) as exc:
@@ -78,21 +90,26 @@ def test_json_schema_exports():
 
 def test_sections_round_trip_and_validate():
     data = base(
-        sections=[{"id": "basics", "title": "Basics", "description": "d"}, {"id": "edge", "title": "Edge"}],
-        tests=[{"name": "a", "section": "basics", "description": "x", "input": {"args": [1]}, "expected": 1},
-               {"name": "b", "input": {"args": [2]}, "expected": 2}],
+        sections=[{"id": "basics", "title": "Basics", "description": "d"},
+                  {"id": "edge", "title": "Edge", "description": "e"}],
+        tests=[{"name": "a", "section": "basics", "input": {"args": [1]}, "expected": 1},
+               {"name": "b", "section": "edge", "input": {"args": [2]}, "expected": 2}],
     )
     p = Problem.model_validate(data)
     assert parse_problem_yaml(dump_problem_yaml(p)) == p
     view = public_problem(p)
     assert [s["id"] for s in view["sections"]] == ["basics", "edge"]
-    assert view["tests"][0]["section"] == "basics" and view["tests"][1]["section"] is None
+    assert [t["section"] for t in view["tests"]] == ["basics", "edge"]
+    assert all("description" not in t for t in view["tests"])
 
 
 @pytest.mark.parametrize("over,needle", [
     ({"tests": [{"name": "a", "section": "nope", "input": {"args": [1]}, "expected": 1}]}, "unknown section"),
-    ({"sections": [{"id": "a", "title": "A"}, {"id": "a", "title": "B"}]}, "duplicate section"),
-    ({"sections": [{"id": "Bad Id", "title": "A"}]}, "id"),
+    ({"sections": [{"id": "g", "title": "A", "description": "a"},
+                   {"id": "g", "title": "B", "description": "b"}]}, "duplicate section"),
+    ({"sections": [{"id": "Bad Id", "title": "A", "description": "a"}]}, "id"),
+    ({"sections": [{"id": "g", "title": "A"}]}, "description"),
+    ({"sections": [{"id": "g", "title": "A", "description": ""}]}, "description"),
 ])
 def test_invalid_sections_rejected(over, needle):
     with pytest.raises(ValidationError) as exc:
@@ -100,13 +117,17 @@ def test_invalid_sections_rejected(over, needle):
     assert needle.lower() in str(exc.value).lower()
 
 
-def test_seed_problem_without_sections_still_loads():
-    p = ProblemStore().get("kv-cache-basics")
-    assert p is not None and p.sections == [] and all(t.section is None for t in p.tests)
+def test_every_seed_test_belongs_to_a_described_group():
+    for p in ProblemStore().list():
+        if p.judge.kind == "pytest":
+            continue
+        assert p.sections, p.id
+        assert all(sec.description for sec in p.sections), p.id
+        assert all(t.section for t in p.tests), p.id
 
 
-def test_pytest_validation_warns_about_grouping_and_docstrings():
-    from leegen.core.validation import static_issues
+def test_pytest_grouping_is_mandatory_and_docstring_backed():
+    from leegen.core.validation import grouping_errors
 
     def problem(test_source: str):
         return parse_problem_yaml(f"""
@@ -124,12 +145,14 @@ reference:
 judge: {{kind: pytest}}
 """)
 
-    loose = static_issues(problem(
+    loose = grouping_errors(problem(
         "def test_a():\n    assert True\n\ndef test_b():\n    assert True\n"))
-    assert any("grouped into classes" in i for i in loose)
-    assert any("docstring" in i for i in loose)
+    assert any("class Test<Thing>" in i and "test_a" in i for i in loose)
 
-    tidy = static_issues(problem(
-        'class TestF:\n    def test_a(self):\n        """A."""\n        assert True\n'))
-    assert not any("grouped into classes" in i for i in tidy)
-    assert not any("docstring" in i for i in tidy)
+    undocumented = grouping_errors(problem(
+        "class TestF:\n    def test_a(self):\n        assert True\n"))
+    assert any("TestF needs a docstring" in i for i in undocumented)
+
+    tidy = grouping_errors(problem(
+        'class TestF:\n    """What F does."""\n\n    def test_a(self):\n        assert True\n'))
+    assert tidy == []

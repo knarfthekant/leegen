@@ -69,11 +69,12 @@ CLI, for agents without MCP. Run from `server/`:
 ## Repo map
 
 ```
-problems/<id>.yaml          problem bank (one self-contained file per problem)
-problems/<id>/assets/       optional images referenced from the description
-tutorials/<id>.yaml         tutorials: notebook-like pages of Markdown + code cells (docs/tutorials.md)
-environments/<id>.yaml      runtimes: language, python version, dependencies, hardware needs
-workspace/<id>/             the user's code (real files) + .leegen/*.json state (gitignored)
+data/                       everything the user owns (LEEGEN_DATA); code never writes outside it
+data/problems/<id>.yaml     problem bank (one self-contained file per problem)
+data/problems/<id>/assets/  optional images referenced from the description
+data/tutorials/<id>.yaml    tutorials: notebook-like pages of Markdown + code cells (docs/tutorials.md)
+data/workspace/<id>/        the user's code (real files) + .leegen/*.json state (gitignored)
+environments/<id>.yaml      runtimes: language, python version, dependencies, hardware needs (engine)
 docs/authoring.md           full authoring guide (also served by the get_authoring_guide tool)
 docs/browser.md             the browser edition: architecture, build, deploy, limits
 docs/executors.md           executor kinds and executors.yaml
@@ -89,6 +90,17 @@ web/runner/                 browser edition's runner origin (Pyodide worker, dea
 server/src/leegen/browser_runner.py   what the Pyodide worker calls (prepare/execute/finish)
 server/src/leegen/browser_edition/    browser build: Pyodide fetch, data bundle, _headers
 ```
+
+## Code and data
+
+The repo separates the engine from what the user owns, so the engine can later be packaged on
+its own. `server/`, `web/`, `environments/`, `contracts/`, `schema/` and `docs/` are code. The
+**data root** `data/` (override with `LEEGEN_DATA`) holds `problems/`, `tutorials/` and
+`workspace/`. Settings derive all three from it (`config.py`: `data_dir`, `problems_dir`,
+`tutorials_dir`, `workspace_dir`); `LEEGEN_PROBLEMS`, `LEEGEN_TUTORIALS` and `LEEGEN_WORKSPACE`
+still override one part. Never hard-code `problems/` or `workspace/` relative to the repo root;
+read the path from `settings()`. The browser edition's export zip and folder sync use the same
+tree, so a data folder and a browser export are interchangeable.
 
 ## Authoring protocol
 
@@ -116,20 +128,21 @@ Short version:
 5. **Tests:** 2–3 visible tests that mirror the examples in the description, then hidden tests
    for edge cases (empty input, boundaries, duplicates, large or random inputs, error paths).
    Seed all randomness. For floats and tensors use `float` or `allclose` with explicit
-   tolerances; GPU float32 needs `rtol≈1e-4`. The UI shows cases as `Test 1..N` with only their
-   `description`, so give every test a one-line `description` (for pytest: the first docstring
-   line). Group related tests with top-level `sections` (`id`, `title`, `description`) and
-   `section: <id>` on each test for `function`/`script` problems. For `pytest`, group instead
-   with **one `class Test<Thing>:` per function or theme**, using the same class names in
-   `test_visible.py` and `test_hidden.py` — the class becomes the UI section (see the authoring
-   guide).
+   tolerances; GPU float32 needs `rtol≈1e-4`. **Every test belongs to a group, and the group
+   holds the only explanation.** The UI shows cases as `Test 1..N` inside a segmented bar per
+   group, with no per-test text. For `function`/`script` problems declare top-level `sections`
+   (`id`, `title` and a required `description`) and put `section: <id>` on every test (a script
+   harness calls `lc::section("<id>")`). For `pytest`, group with **one `class Test<Thing>:` per
+   function or theme**, each with a docstring that is the group description, using the same
+   class names in `test_visible.py` and `test_hidden.py`. A test outside a class, or a missing
+   group or description, fails validation (see the authoring guide).
 6. **Description:** Markdown with KaTeX math, `mermaid` code fences, inline `<svg>` figures and
    `:::note` / `:::warning` / `:::details{summary="..."}` / `:::figure{caption="..."}` blocks.
    No raw HTML other than SVG, and no scripts. State the exact function signature, input/output
    format and constraints, plus at least one worked example.
 7. **Validate, then save:** `validate_problem_yaml` returns a report. Fix every issue, then call
    `create_problem` (or `update_problem`). It saves only if the reference passes every test and
-   the starter fails at least one. Without MCP, write `problems/<id>.yaml` and run
+   the starter fails at least one. Without MCP, write `data/problems/<id>.yaml` and run
    `uv run leegen validate <id>`.
 8. `id` is a lowercase slug and must equal the file name. Use `track` + `order` for multi-part
    curricula (for example `cuda-101`, orders 1..N).
@@ -165,10 +178,10 @@ When the user asks for help with the problem they have open:
    overall feedback. Clear stale comments with `clear_annotations` once they no longer apply.
 5. **Change code with `propose_edit`, never by writing files directly.** Suggestions appear as a
    diff the user accepts or rejects. Prefer small `edits` (exact search/replace) over replacing
-   the whole file. (If something does write `workspace/<id>/...` directly, the app turns it into
+   the whole file. (If something does write `data/workspace/<id>/...` directly, the app turns it into
    a suggestion anyway.)
 6. Other tools: `add_test_case` adds an input to the user's Testcase panel (function judge; it
-   is named `Test <n>` and can take a `description` and a `section`);
+   is shown as `Test <n>`; it takes a `section` (required when the problem has several groups));
    `open_problem` moves the browser to a problem.
 7. For a code review: do correctness first (point at failing cases), then complexity, then
    style. Praise what is good.
@@ -228,7 +241,7 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   - `store/workspace.py` holds the user's files and JSON state.
   - `state.py` keeps the in-memory session the browser reports (unsaved buffers, cursor) and the
     WebSocket hub.
-  - `watcher.py` pushes `problems/` changes to the UI and turns direct edits to workspace files
+  - `watcher.py` pushes `data/problems/` changes to the UI and turns direct edits to workspace files
     into proposals.
 - **ToolService** (`service.py`) holds every operation the UI and agents perform, with its stores,
   session, event sink and orchestrator injected (wired in `state.py`). MCP (`mcp_server/server.py`)
@@ -268,7 +281,7 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
 
 ### Tutorials
 
-- A tutorial (`core/tutorial.py`, `tutorials/<id>.yaml`, guide in `docs/tutorials.md`) is a list of
+- A tutorial (`core/tutorial.py`, `data/tutorials/<id>.yaml`, guide in `docs/tutorials.md`) is a list of
   Markdown and code cells. It reuses the console pipeline, not a judge kind: `plan_snippet()` takes
   `prior` (earlier cells' code, replayed silently in one namespace) and `checks`
   (`{description, code}`); the harness (`snippet.py`) runs them after the cell and emits `check`

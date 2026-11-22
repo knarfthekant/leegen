@@ -33,7 +33,7 @@ def bundle_files(problem, mode: str) -> dict[str, str]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True, type=Path)
-    ap.add_argument("--problems-dir", type=Path, default=Path("problems"))
+    ap.add_argument("--problems-dir", type=Path, default=Path("data/problems"))
     ap.add_argument("ids", nargs="+")
     args = ap.parse_args()
 

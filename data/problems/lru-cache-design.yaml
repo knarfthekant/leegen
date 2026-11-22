@@ -128,15 +128,15 @@ judge:
 sections:
 - id: examples
   title: Worked examples
-  description: The three examples from the statement.
+  description: The statement's three examples. `get(1)` makes 1 the most recent, so `put(3)` evicts 2. A `get` on a missing key is `-1`. Putting an existing key again refreshes it.
 - id: eviction
   title: Eviction order
   description: Which key leaves when the cache fills, and what counts as a use.
 - id: edge-cases
   title: Edge cases
+  description: Keys and values the cache must treat like any other, such as negative ints.
 tests:
 - name: Example - eviction follows usage order
-  description: get(1) makes 1 the most recent, so put(3) evicts 2.
   section: examples
   input:
     args:
@@ -171,7 +171,6 @@ tests:
   - -1
   - 30
 - name: Example - missing key returns -1
-  description: A get on an empty or missing key is -1.
   section: examples
   input:
     args:
@@ -192,7 +191,6 @@ tests:
   - null
   - 1
 - name: Example - updating an existing key refreshes recency
-  description: put(1) again makes 1 newest, so put(3) evicts 2, not 1.
   section: examples
   input:
     args:
@@ -228,7 +226,6 @@ tests:
   - 11
   - -1
 - name: Capacity 1 evicts on every new key
-  description: The smallest possible cache; each new key evicts the previous one.
   section: eviction
   input:
     args:
@@ -258,7 +255,6 @@ tests:
   - -1
   - 20
 - name: get refreshes recency before eviction
-  description: get(1) between fills means 2 is the one evicted.
   section: eviction
   input:
     args:
@@ -297,7 +293,6 @@ tests:
   - 1
   - 3
 - name: Re-putting the same key does not evict
-  description: Updating key 1 at capacity 2 must not push anything out.
   section: eviction
   input:
     args:
@@ -328,7 +323,6 @@ tests:
   - 2
   - 5
 - name: Eviction chain under pressure
-  description: A long sequence where each new key evicts the current LRU.
   section: eviction
   input:
     args:
@@ -368,7 +362,6 @@ tests:
   - 4
   - -1
 - name: Negative keys and values are ordinary ints
-  description: The cache is keyed by value equality, including negatives.
   section: edge-cases
   input:
     args:

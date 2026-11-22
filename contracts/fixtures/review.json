@@ -654,7 +654,8 @@
               4
             ]
           ]
-        ]
+        ],
+        "section": "basics"
       },
       "result": {
         "input": {
@@ -672,8 +673,20 @@
           ],
           "kwargs": {}
         },
+        "section": "basics",
         "name": "Test 1"
       }
+    },
+    {
+      "fn": "make_custom_test",
+      "args": {
+        "problem": "merge-ranges",
+        "existing": [],
+        "args": [
+          []
+        ]
+      },
+      "error": "section must be one of ['basics', 'edge-cases', 'scale']"
     },
     {
       "fn": "make_custom_test",
@@ -687,7 +700,6 @@
         "args": [
           []
         ],
-        "description": "empty",
         "section": "basics"
       },
       "result": {
@@ -697,9 +709,8 @@
           ],
           "kwargs": {}
         },
-        "name": "Test 2",
-        "description": "empty",
-        "section": "basics"
+        "section": "basics",
+        "name": "Test 2"
       }
     },
     {
@@ -710,7 +721,8 @@
         "args": [
           []
         ],
-        "name": "Example"
+        "name": "Example",
+        "section": "basics"
       },
       "result": {
         "input": {
@@ -719,6 +731,7 @@
           ],
           "kwargs": {}
         },
+        "section": "basics",
         "name": "Example (2)"
       }
     },
@@ -739,7 +752,8 @@
       "args": {
         "problem": "merge-ranges",
         "existing": [],
-        "args": "not-a-list"
+        "args": "not-a-list",
+        "section": "basics"
       },
       "error": "args must be a list of positional arguments"
     },

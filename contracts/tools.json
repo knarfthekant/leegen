@@ -4,7 +4,7 @@
     {
       "name": "add_test_case",
       "title": "Add a test case",
-      "description": "Add a custom test case to the user's Testcase panel (function-judge problems only).\nThe expected output is computed by the reference solution. Unnamed cases are called\n`Test <n>`. `section` must be one of the problem's section ids (see get_problem).",
+      "description": "Add a custom test case to the user's Testcase panel (function-judge problems only).\nThe expected output is computed by the reference solution. Every case belongs to a\ngroup: `section` must be one of the problem's section ids (see get_problem), and may be\nomitted only when the problem has a single group. Cases are shown as `Test <n>`.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -37,18 +37,6 @@
             ],
             "default": null,
             "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Description"
           },
           "section": {
             "anyOf": [

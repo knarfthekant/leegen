@@ -99,7 +99,7 @@ def shim_problem(t: Tutorial) -> Problem:
     files = [ProblemFile(path=cell_path(c.id), role="editable", content=c.starter)
              for c in t.code_cells()]
     files.append(ProblemFile(path="test_tutorial.py", role="hidden", content=""))
-    return Problem(id=shim_id(t.id), title=t.title, environment=t.environment, difficulty="intro",
+    return Problem(id=shim_id(t.id), title=t.title, environment=t.environment, difficulty="easy",
                    tags=t.tags, description=t.summary or t.title, files=files,
                    judge=Judge(kind="pytest"))
 

@@ -16,9 +16,10 @@ def _default_root() -> Path:
 @dataclass(frozen=True)
 class Settings:
     root: Path
+    data_dir: Path            # everything the user owns: problems, tutorials, workspace
     problems_dir: Path
     tutorials_dir: Path
-    environments_dir: Path
+    environments_dir: Path    # runtime definitions: part of the engine, not user data
     workspace_dir: Path
     cache_dir: Path
     executors_file: Path
@@ -43,12 +44,16 @@ class Settings:
 @lru_cache
 def settings() -> Settings:
     root = Path(os.environ.get("LEEGEN_ROOT", _default_root())).resolve()
+    # One data root holds all user content, so code and data can live apart (a packaged install
+    # points LEEGEN_DATA at the user's folder). The per-folder variables still override a part.
+    data = Path(os.environ.get("LEEGEN_DATA", root / "data")).resolve()
     return Settings(
         root=root,
-        problems_dir=Path(os.environ.get("LEEGEN_PROBLEMS", root / "problems")),
-        tutorials_dir=Path(os.environ.get("LEEGEN_TUTORIALS", root / "tutorials")),
+        data_dir=data,
+        problems_dir=Path(os.environ.get("LEEGEN_PROBLEMS", data / "problems")),
+        tutorials_dir=Path(os.environ.get("LEEGEN_TUTORIALS", data / "tutorials")),
         environments_dir=Path(os.environ.get("LEEGEN_ENVIRONMENTS", root / "environments")),
-        workspace_dir=Path(os.environ.get("LEEGEN_WORKSPACE", root / "workspace")),
+        workspace_dir=Path(os.environ.get("LEEGEN_WORKSPACE", data / "workspace")),
         cache_dir=Path(os.environ.get("LEEGEN_CACHE", Path.home() / ".cache" / "leegen")),
         executors_file=Path(
             os.environ.get(

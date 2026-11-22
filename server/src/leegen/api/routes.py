@@ -94,14 +94,13 @@ class TestCaseBody(BaseModel):
     args: list[Any]
     kwargs: dict[str, Any] | None = None
     name: str | None = None
-    description: str | None = None
     section: str | None = None
 
 
 @router.post("/workspace/{problem_id}/custom_tests")
 async def add_test_case(problem_id: str, body: TestCaseBody) -> dict[str, Any]:
     return await _acall(_svc().add_test_case(body.args, body.kwargs, body.name,
-                                             body.description, body.section, problem_id))
+                                             body.section, problem_id))
 
 
 class HintsBody(BaseModel):

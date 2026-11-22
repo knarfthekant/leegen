@@ -2,6 +2,7 @@
 //
 //   #include <leegen/judge.h>
 //   lc::test("n = 1024", ok, /*expected*/ "1024 matches", /*actual*/ got, /*message*/ "", /*visible*/ true);
+//   lc::section("sizes");   // group for the tests that follow: an id from `sections:` in the YAML
 //   lc::metric("kernel_ms", 0.42, "ms");
 //
 // Events are appended as JSON lines to the file named by $LEEGEN_RESULTS.
@@ -44,6 +45,20 @@ inline void emit_line(const std::string& line) {
   std::fclose(f);
 }
 
+// The group that following tests belong to: an id declared under `sections:` in the problem.
+inline std::string& current_section() {
+  static std::string id;
+  return id;
+}
+
+inline void section(const std::string& id) { current_section() = id; }
+
+inline std::string section_field() {
+  return current_section().empty()
+             ? std::string()
+             : ",\"section\":\"" + json_escape(current_section()) + "\"";
+}
+
 inline void test(const std::string& name, bool passed, const std::string& expected = "",
                  const std::string& actual = "", const std::string& message = "",
                  bool visible = true) {
@@ -51,13 +66,14 @@ inline void test(const std::string& name, bool passed, const std::string& expect
             "\",\"status\":\"" + (passed ? "pass" : "fail") + "\",\"visible\":" +
             (visible ? "true" : "false") + ",\"expected\":\"" + json_escape(expected) +
             "\",\"actual\":\"" + json_escape(actual) + "\",\"message\":" +
-            (message.empty() ? std::string("null") : "\"" + json_escape(message) + "\"") + "}");
+            (message.empty() ? std::string("null") : "\"" + json_escape(message) + "\"") +
+            section_field() + "}");
 }
 
 inline void error(const std::string& name, const std::string& message, bool visible = true) {
   emit_line(std::string("{\"type\":\"test\",\"name\":\"") + json_escape(name) +
             "\",\"status\":\"error\",\"visible\":" + (visible ? "true" : "false") +
-            ",\"message\":\"" + json_escape(message) + "\"}");
+            ",\"message\":\"" + json_escape(message) + "\"" + section_field() + "}");
 }
 
 inline void metric(const std::string& name, double value, const std::string& unit = "") {

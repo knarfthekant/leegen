@@ -126,7 +126,7 @@ function inputWithoutDefaults(input: TestInput): Dict {
 export function publicProblem(p: FullProblem) {
   const tests = (p.tests ?? []).map((t) => {
     const visible = t.visible ?? true;
-    const item: Dict = { name: t.name, visible, description: t.description ?? null, section: t.section ?? null };
+    const item: Dict = { name: t.name, visible, section: t.section ?? null };
     if (visible) {
       item.input = t.input ? inputWithoutDefaults(t.input) : null;
       item.expected = needsReference(t) ? null : (t.expected ?? null);
@@ -155,7 +155,7 @@ export function publicProblem(p: FullProblem) {
   };
 }
 
-export const BRIEF_TEST_KEYS = ["name", "section", "description", "status", "visible", "input", "expected", "actual", "message", "stdout"] as const;
+export const BRIEF_TEST_KEYS = ["name", "section", "status", "visible", "input", "expected", "actual", "message", "stdout"] as const;
 
 /** A run as the tutoring agent sees it: failing tests only, unless `full`. */
 export function briefRun(result: Dict | null | undefined, full = false): Dict | null {
@@ -379,8 +379,7 @@ export function withProposal<T extends { file: string }>(items: T[], proposal: T
 export interface CustomTestRecord {
   input: { args: unknown[]; kwargs: Record<string, unknown> } | Dict;
   name?: string;
-  description?: string;
-  section?: string;
+  section: string;
   expected?: unknown;
 }
 
@@ -390,7 +389,6 @@ export function makeCustomTest(
   args: unknown,
   kwargs?: Record<string, unknown> | null,
   name?: string | null,
-  description?: string | null,
   section?: string | null,
 ): CustomTestRecord {
   if (problem.judge.kind !== "function") {
@@ -399,17 +397,18 @@ export function makeCustomTest(
   if (!problem.reference) throw new InvalidError("this problem has no reference solution to compute expected output");
   if (!Array.isArray(args)) throw new InvalidError("args must be a list of positional arguments");
   const sectionIds = (problem.sections ?? []).map((s) => s.id);
-  if (section != null && !sectionIds.includes(section)) {
-    throw new InvalidError(`unknown section ${pyRepr(section)}; sections: ${pyRepr(sectionIds)}`);
+  // every case belongs to a group; with a single group it is implied
+  if (section == null && sectionIds.length === 1) section = sectionIds[0];
+  if (section == null || !sectionIds.includes(section)) {
+    throw new InvalidError(section == null
+      ? `section must be one of ${pyRepr(sectionIds)}`
+      : `unknown section ${pyRepr(section)}; sections: ${pyRepr(sectionIds)}`);
   }
   const taken = new Set<string>([
     ...(problem.tests ?? []).map((t) => t.name),
     ...existing.map((t) => t.name).filter((n): n is string => !!n),
   ]);
-  const test: CustomTestRecord = { input: { args, kwargs: kwargs ?? {} }, name: uniqueTestName(name, taken) };
-  if (description) test.description = description;
-  if (section) test.section = section;
-  return test;
+  return { input: { args, kwargs: kwargs ?? {} }, section, name: uniqueTestName(name, taken) };
 }
 
 // ------------------------------------------------------------------ compat.py

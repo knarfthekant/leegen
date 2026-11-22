@@ -116,12 +116,14 @@ files:
 
 
     class TestTopWords:
+        """The n most common words, ties in first-appearance order. Also n beyond the vocabulary, no words, and n = 0."""
         def test_top_words_most_common_with_ties_by_first_occurrence(self):
             """The n most common words; ties keep first-appearance order."""
             assert top_words(["b", "a", "b", "a", "c"], 2) == [("b", 2), ("a", 2)]
 
 
     class TestGroupByFirstLetter:
+        """Words grouped under their first character. First letters are case-sensitive, and no words means no groups."""
         def test_group_by_first_letter(self):
             """Group words under their first character."""
             assert group_by_first_letter(["apple", "avocado", "banana"]) == {
@@ -130,6 +132,7 @@ files:
 
 
     class TestGroupAnagrams:
+        """Anagrams share a group and first-seen order is kept. Also no words, no anagram pairs, and repeated words."""
         def test_group_anagrams_classic(self):
             """Anagrams share a group; first-seen order is preserved."""
             assert group_anagrams(["eat", "tea", "tan", "ate", "nat"]) == [
@@ -138,6 +141,7 @@ files:
 
 
     class TestNetCounts:
+        """Only items whose seen count beats their blocked count, mapped to the margin. Also no input and words that appear only in the seen list."""
         def test_net_counts_positive_margins_only(self):
             """Only positive nets: seen count minus blocked count."""
             assert net_counts(["x", "x", "x", "y"], ["x", "y"]) == {"x": 2}
@@ -148,6 +152,7 @@ files:
 
 
     class TestTopWords:
+        """The n most common words, ties in first-appearance order. Also n beyond the vocabulary, no words, and n = 0."""
         def test_top_words_n_exceeds_distinct_words(self):
             """n larger than the vocabulary: every word, most common first."""
             assert top_words(["a", "b"], 10) == [("a", 1), ("b", 1)]
@@ -162,6 +167,7 @@ files:
 
 
     class TestGroupByFirstLetter:
+        """Words grouped under their first character. First letters are case-sensitive, and no words means no groups."""
         def test_group_by_first_letter_case_sensitive(self):
             """First letters are case-sensitive: A and a are different keys."""
             assert group_by_first_letter(["A", "a"]) == {"A": ["A"], "a": ["a"]}
@@ -172,6 +178,7 @@ files:
 
 
     class TestGroupAnagrams:
+        """Anagrams share a group and first-seen order is kept. Also no words, no anagram pairs, and repeated words."""
         def test_group_anagrams_empty(self):
             """No words, no groups."""
             assert group_anagrams([]) == []
@@ -186,6 +193,7 @@ files:
 
 
     class TestNetCounts:
+        """Only items whose seen count beats their blocked count, mapped to the margin. Also no input and words that appear only in the seen list."""
         def test_net_counts_nothing_positive(self):
             """The blocked count cancels the seen count: {}."""
             assert net_counts(["x"], ["x", "x"]) == {}

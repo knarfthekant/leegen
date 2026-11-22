@@ -1,6 +1,7 @@
 /* Small design-system primitives. Styling lives in styles.css under the matching class names. */
 import { ChevronDown, LoaderCircle, type LucideIcon } from "lucide-react";
 import {
+  type CSSProperties,
   useLayoutEffect,
   useRef,
   useState,
@@ -128,6 +129,73 @@ export function Tabs<T extends string>({
   );
 }
 
+export interface SegmentItem<T extends string> {
+  id: T;
+  label: string;
+  icon?: LucideIcon;
+  count?: number | null;
+}
+
+/**
+ * A segmented switch: equal-width segments and one thumb that slides under the active label.
+ * The control's size depends only on its item count, so it never moves when the value changes.
+ * Arrow keys, Home and End move the selection (roving tabindex).
+ */
+export function Segmented<T extends string>({
+  items,
+  value,
+  onChange,
+  label,
+  className,
+}: {
+  items: SegmentItem<T>[];
+  value: T;
+  onChange: (id: T) => void;
+  label: string;
+  className?: string;
+}) {
+  const index = Math.max(0, items.findIndex((i) => i.id === value));
+  const move = (to: number) => {
+    const next = items[(to + items.length) % items.length];
+    onChange(next.id);
+    document.getElementById(`seg-${label}-${next.id}`)?.focus();
+  };
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className={cx("segmented", className)}
+      style={{ "--n": items.length, "--i": index } as CSSProperties}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowRight") move(index + 1);
+        else if (e.key === "ArrowLeft") move(index - 1);
+        else if (e.key === "Home") move(0);
+        else if (e.key === "End") move(items.length - 1);
+        else return;
+        e.preventDefault();
+      }}
+    >
+      <span className="segmented-thumb" aria-hidden />
+      {items.map(({ id, label: text, icon: Icon, count }) => (
+        <button
+          key={id}
+          id={`seg-${label}-${id}`}
+          type="button"
+          role="tab"
+          aria-selected={value === id}
+          tabIndex={value === id ? 0 : -1}
+          className={cx("segmented-item", value === id && "active")}
+          onClick={() => onChange(id)}
+        >
+          {Icon && <Icon size={15} strokeWidth={1.8} />}
+          <span className="segmented-label">{text}</span>
+          {count != null && <span className="segmented-count tabular">{count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export type Tone = "neutral" | "pass" | "warn" | "fail" | "accent";
 
 export function Chip({
@@ -163,7 +231,7 @@ export function Chip({
   );
 }
 
-export const DIFFICULTY_TONE: Record<Difficulty, Tone> = { intro: "accent", easy: "pass", medium: "warn", hard: "fail" };
+export const DIFFICULTY_TONE: Record<Difficulty, Tone> = { easy: "pass", medium: "warn", hard: "fail" };
 
 export function DifficultyChip({ value }: { value: Difficulty }) {
   return (

@@ -1,4 +1,4 @@
-export type Difficulty = "intro" | "easy" | "medium" | "hard";
+export type Difficulty = "easy" | "medium" | "hard";
 export type TestStatus = "pass" | "fail" | "error" | "timeout" | "skipped";
 export type RunStatus = "passed" | "failed" | "error" | "timeout" | "compile_error" | "cancelled";
 
@@ -41,8 +41,7 @@ export interface PublicSection {
 export interface PublicTest {
   name: string;
   visible: boolean;
-  description: string | null;
-  section?: string | null;
+  section: string | null;
   input?: TestInput | null;
   expected?: unknown;
 }
@@ -68,8 +67,7 @@ export type Severity = Annotation["severity"];
 
 export interface CustomTest {
   name?: string;
-  description?: string;
-  section?: string;
+  section: string;
   input: TestInput;
 }
 

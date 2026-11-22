@@ -194,18 +194,30 @@ judge:
   kind: function
   entry: solution.py:decode_with_cache
   compare: {kind: allclose, rtol: 1.0e-4, atol: 1.0e-5}
+sections:
+  - id: basics
+    title: Basics
+    description: Small shapes that mirror the statement, one sequence and a batch of two with four heads.
+  - id: edges
+    title: Edge shapes
+    description: A single position, a 96-step sequence and wide heads (D = 128). The cache must stay correct as it grows.
 tests:
   - name: Tiny (B=1, T=3, D=8, H=2)
+    section: basics
     input: {gen: _setup.py:make_inputs, seed: 0, kwargs: {B: 1, T: 3, D: 8, H: 2}}
   - name: Batch of 2, four heads
+    section: basics
     input: {gen: _setup.py:make_inputs, seed: 1, kwargs: {B: 2, T: 6, D: 16, H: 4}}
   - name: Single position
+    section: edges
     visible: false
     input: {gen: _setup.py:make_inputs, seed: 2, kwargs: {B: 1, T: 1, D: 8, H: 1}}
   - name: Long sequence
+    section: edges
     visible: false
     input: {gen: _setup.py:make_inputs, seed: 3, kwargs: {B: 2, T: 96, D: 64, H: 8}}
   - name: Wide heads
+    section: edges
     visible: false
     input: {gen: _setup.py:make_inputs, seed: 4, kwargs: {B: 3, T: 24, D: 128, H: 2}}
 limits: {timeout_s: 60}

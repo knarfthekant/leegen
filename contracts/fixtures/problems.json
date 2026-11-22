@@ -63,12 +63,12 @@
       {
         "id": "basics",
         "title": "Basics",
-        "description": "The examples from the statement, plus the empty input."
+        "description": "The statement's example (`[8, 10]` and `[10, 12]` touch and merge), bookings that arrive out of order so you must sort first, and the empty input."
       },
       {
         "id": "edge-cases",
         "title": "Edge cases",
-        "description": "Ranges that nest, touch, or sit at unusual coordinates."
+        "description": "A range fully inside another must not shrink the merged end. Also zero-length ranges, including duplicates, and negative times."
       },
       {
         "id": "scale",
@@ -80,7 +80,6 @@
       {
         "name": "Example",
         "visible": true,
-        "description": "The example from the statement; `[8, 10]` and `[10, 12]` touch and merge.",
         "section": "basics",
         "input": {
           "args": [
@@ -122,7 +121,6 @@
       {
         "name": "Unsorted input",
         "visible": true,
-        "description": "Bookings arrive out of order, so sort before merging.",
         "section": "basics",
         "input": {
           "args": [
@@ -164,7 +162,6 @@
       {
         "name": "Empty",
         "visible": true,
-        "description": null,
         "section": "basics",
         "input": {
           "args": [
@@ -180,7 +177,6 @@
       {
         "name": "Nested ranges",
         "visible": false,
-        "description": "A range fully inside another must not shrink the merged end.",
         "section": "edge-cases",
         "input": {
           "args": [
@@ -218,7 +214,6 @@
       {
         "name": "Single point bookings",
         "visible": false,
-        "description": "Zero-length ranges, including duplicates.",
         "section": "edge-cases",
         "input": {
           "args": [
@@ -256,7 +251,6 @@
       {
         "name": "Negative times",
         "visible": false,
-        "description": null,
         "section": "edge-cases",
         "input": {
           "args": [
@@ -294,7 +288,6 @@
       {
         "name": "Large random",
         "visible": false,
-        "description": null,
         "section": "scale",
         "input": {
           "args": [],
@@ -452,13 +445,23 @@
       "build": [],
       "command": null
     },
-    "sections": [],
+    "sections": [
+      {
+        "id": "basics",
+        "title": "Basics",
+        "description": "Small shapes that mirror the statement, one sequence and a batch of two with four heads."
+      },
+      {
+        "id": "edges",
+        "title": "Edge shapes",
+        "description": "A single position, a 96-step sequence and wide heads (D = 128). The cache must stay correct as it grows."
+      }
+    ],
     "tests": [
       {
         "name": "Tiny (B=1, T=3, D=8, H=2)",
         "visible": true,
-        "description": null,
-        "section": null,
+        "section": "basics",
         "input": {
           "args": [],
           "kwargs": {
@@ -476,8 +479,7 @@
       {
         "name": "Batch of 2, four heads",
         "visible": true,
-        "description": null,
-        "section": null,
+        "section": "basics",
         "input": {
           "args": [],
           "kwargs": {
@@ -495,8 +497,7 @@
       {
         "name": "Single position",
         "visible": false,
-        "description": null,
-        "section": null,
+        "section": "edges",
         "input": {
           "args": [],
           "kwargs": {
@@ -514,8 +515,7 @@
       {
         "name": "Long sequence",
         "visible": false,
-        "description": null,
-        "section": null,
+        "section": "edges",
         "input": {
           "args": [],
           "kwargs": {
@@ -533,8 +533,7 @@
       {
         "name": "Wide heads",
         "visible": false,
-        "description": null,
-        "section": null,
+        "section": "edges",
         "input": {
           "args": [],
           "kwargs": {
@@ -560,7 +559,7 @@
     "schema_version": 1,
     "id": "cuda-vector-add",
     "title": "Your First CUDA Kernel",
-    "difficulty": "intro",
+    "difficulty": "easy",
     "tags": [
       "cuda",
       "gpu",
@@ -593,7 +592,7 @@
       {
         "path": "main.cu",
         "role": "hidden",
-        "content": "#include <cmath>\n#include <cstdio>\n#include <random>\n#include <string>\n#include <vector>\n\n#include <leegen/judge.h>\n#include \"kernel.h\"\n\nstatic bool run_case(const std::string& name, int n, bool visible) {\n    std::mt19937 rng(n);\n    std::uniform_real_distribution<float> dist(-100.f, 100.f);\n    std::vector<float> a(n), b(n), c(n, -1.f);\n    for (int i = 0; i < n; ++i) { a[i] = dist(rng); b[i] = dist(rng); }\n    float *da, *db, *dc;\n    size_t bytes = sizeof(float) * n;\n    cudaMalloc(&da, bytes); cudaMalloc(&db, bytes); cudaMalloc(&dc, bytes);\n    cudaMemcpy(da, a.data(), bytes, cudaMemcpyHostToDevice);\n    cudaMemcpy(db, b.data(), bytes, cudaMemcpyHostToDevice);\n    cudaMemset(dc, 0xff, bytes);  // NaN pattern: untouched elements fail\n    launch_vector_add(da, db, dc, n);\n    cudaError_t err = cudaDeviceSynchronize();\n    if (err == cudaSuccess) err = cudaGetLastError();\n    cudaMemcpy(c.data(), dc, bytes, cudaMemcpyDeviceToHost);\n    cudaFree(da); cudaFree(db); cudaFree(dc);\n    if (err != cudaSuccess) {\n        lc::error(name, std::string(\"CUDA error: \") + cudaGetErrorString(err), visible);\n        return false;\n    }\n    for (int i = 0; i < n; ++i) {\n        float want = a[i] + b[i];\n        if (!(std::fabs(c[i] - want) <= 1e-5f * std::fabs(want) + 1e-6f)) {\n            char msg[160];\n            std::snprintf(msg, sizeof msg, \"c[%d] = %g, expected %g\", i, c[i], want);\n            lc::test(name, false, \"every element equals a[i] + b[i]\", msg, \"\", visible);\n            return false;\n        }\n    }\n    lc::test(name, true, \"every element equals a[i] + b[i]\", \"all match\", \"\", visible);\n    return true;\n}\n\nint main() {\n    run_case(\"n = 1\", 1, true);\n    run_case(\"n = 1000\", 1000, true);\n    run_case(\"n = 256 (exactly one block)\", 256, false);\n    run_case(\"n = 12345 (partial last block)\", 12345, false);\n    run_case(\"n = 2^22\", 1 << 22, false);\n    return 0;\n}\n",
+        "content": "#include <cmath>\n#include <cstdio>\n#include <random>\n#include <string>\n#include <vector>\n\n#include <leegen/judge.h>\n#include \"kernel.h\"\n\nstatic bool run_case(const std::string& name, int n, bool visible) {\n    std::mt19937 rng(n);\n    std::uniform_real_distribution<float> dist(-100.f, 100.f);\n    std::vector<float> a(n), b(n), c(n, -1.f);\n    for (int i = 0; i < n; ++i) { a[i] = dist(rng); b[i] = dist(rng); }\n    float *da, *db, *dc;\n    size_t bytes = sizeof(float) * n;\n    cudaMalloc(&da, bytes); cudaMalloc(&db, bytes); cudaMalloc(&dc, bytes);\n    cudaMemcpy(da, a.data(), bytes, cudaMemcpyHostToDevice);\n    cudaMemcpy(db, b.data(), bytes, cudaMemcpyHostToDevice);\n    cudaMemset(dc, 0xff, bytes);  // NaN pattern: untouched elements fail\n    launch_vector_add(da, db, dc, n);\n    cudaError_t err = cudaDeviceSynchronize();\n    if (err == cudaSuccess) err = cudaGetLastError();\n    cudaMemcpy(c.data(), dc, bytes, cudaMemcpyDeviceToHost);\n    cudaFree(da); cudaFree(db); cudaFree(dc);\n    if (err != cudaSuccess) {\n        lc::error(name, std::string(\"CUDA error: \") + cudaGetErrorString(err), visible);\n        return false;\n    }\n    for (int i = 0; i < n; ++i) {\n        float want = a[i] + b[i];\n        if (!(std::fabs(c[i] - want) <= 1e-5f * std::fabs(want) + 1e-6f)) {\n            char msg[160];\n            std::snprintf(msg, sizeof msg, \"c[%d] = %g, expected %g\", i, c[i], want);\n            lc::test(name, false, \"every element equals a[i] + b[i]\", msg, \"\", visible);\n            return false;\n        }\n    }\n    lc::test(name, true, \"every element equals a[i] + b[i]\", \"all match\", \"\", visible);\n    return true;\n}\n\nint main() {\n    lc::section(\"basics\");\n    run_case(\"n = 1\", 1, true);\n    run_case(\"n = 1000\", 1000, true);\n    lc::section(\"block-boundaries\");\n    run_case(\"n = 256 (exactly one block)\", 256, false);\n    run_case(\"n = 12345 (partial last block)\", 12345, false);\n    lc::section(\"scale\");\n    run_case(\"n = 2^22\", 1 << 22, false);\n    return 0;\n}\n",
         "language": null
       }
     ],
@@ -632,7 +631,23 @@
         "./main"
       ]
     },
-    "sections": [],
+    "sections": [
+      {
+        "id": "basics",
+        "title": "Basics",
+        "description": "Tiny inputs, from a single element to a thousand. The first runs fewer threads than one block holds."
+      },
+      {
+        "id": "block-boundaries",
+        "title": "Block boundaries",
+        "description": "Sizes that land exactly on a block edge or leave a partial last block, where an unguarded `i < n` check reads or writes out of range."
+      },
+      {
+        "id": "scale",
+        "title": "Scale",
+        "description": "Four million elements. Every thread must pick up its own element and none may be skipped."
+      }
+    ],
     "tests": [],
     "limits": {
       "timeout_s": 30.0,
@@ -714,12 +729,12 @@
       {
         "id": "basics",
         "title": "Basics",
-        "description": "The example and a non-square product."
+        "description": "The 2 x 2 example from the statement and a rectangular (2 x 3) times (3 x 1) product."
       },
       {
         "id": "edges",
         "title": "Edges",
-        "description": "Sizes that are not multiples of the tile, thin matrices."
+        "description": "Sizes that cut a tile (37 x 23 times 23 x 41), a long inner dimension (k = 300 spans 19 tiles), and single rows and columns."
       },
       {
         "id": "scale",
@@ -731,7 +746,6 @@
       {
         "name": "Example",
         "visible": true,
-        "description": "The 2 x 2 example from the statement.",
         "section": "basics",
         "input": {
           "args": [
@@ -775,7 +789,6 @@
       {
         "name": "Rectangular",
         "visible": true,
-        "description": "(2 x 3) times (3 x 1).",
         "section": "basics",
         "input": {
           "args": [
@@ -820,7 +833,6 @@
       {
         "name": "Ragged tiles",
         "visible": false,
-        "description": "37 x 23 times 23 x 41, every dimension cuts a tile.",
         "section": "edges",
         "input": {
           "args": [],
@@ -838,7 +850,6 @@
       {
         "name": "Long inner dimension",
         "visible": false,
-        "description": "k = 300 spans 19 tiles.",
         "section": "edges",
         "input": {
           "args": [],
@@ -856,7 +867,6 @@
       {
         "name": "Single row and column",
         "visible": false,
-        "description": null,
         "section": "edges",
         "input": {
           "args": [],
@@ -874,7 +884,6 @@
       {
         "name": "256 x 256",
         "visible": false,
-        "description": null,
         "section": "scale",
         "input": {
           "args": [],

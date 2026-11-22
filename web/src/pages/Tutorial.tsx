@@ -141,7 +141,7 @@ export function TutorialPage({ id }: { id: string }) {
 
   return (
     <div className="list-page">
-      <header className="topbar">
+      <header className="topbar balanced">
         <div className="topbar-side">
           <Brand />
           <span className="topbar-divider" />
@@ -159,7 +159,13 @@ export function TutorialPage({ id }: { id: string }) {
           <div className="t-doc"><Skeleton w="50%" h={28} /><Skeleton /><Skeleton w="85%" /><Skeleton h={90} r={12} /></div>
         ) : (
           <article className="t-doc">
-            <h1 className="page-title">{tutorial.title}</h1>
+            <header className="t-head">
+              <h1 className="page-title">{tutorial.title}</h1>
+              {tutorial.summary && <p className="muted">{tutorial.summary}</p>}
+              <p className="t-count tabular">
+                {code.filter(done).length} of {code.length} steps done
+              </p>
+            </header>
             {tutorial.cells.map((c, i) => {
               if (c.type === "markdown") {
                 const next = tutorial.cells.slice(i + 1).find((x): x is CodeCell => x.type === "code");

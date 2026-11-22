@@ -1,6 +1,6 @@
 # Authoring leegen problems
 
-A problem is one YAML file, `problems/<id>.yaml`, validated against
+A problem is one YAML file, `data/problems/<id>.yaml`, validated against
 `schema/problem.schema.json`. It contains everything needed to show and grade the problem:
 - the description
 - the starter code
@@ -18,7 +18,7 @@ The loop:
 2. `validate_problem_yaml` (MCP) or `uv run leegen validate --file draft.yaml`
    (CLI) checks the schema, runs the **reference** (it must pass every test) and runs the
    **starter** (it must fail at least one test).
-3. Fix the issues, then `create_problem` (MCP), or save to `problems/` and run
+3. Fix the issues, then `create_problem` (MCP), or save to `data/problems/` and run
    `leegen validate <id>`.
 
 ## 1. Top-level fields
@@ -27,7 +27,7 @@ The loop:
 schema_version: 1
 id: two-pointer-pairs          # lowercase slug = file name
 title: Count Pairs Under a Budget
-difficulty: easy               # intro | easy | medium | hard
+difficulty: easy               # easy | medium | hard (introductions are tutorials, see tutorials.md)
 tags: [arrays, two-pointers]
 track: algorithms-basics       # optional curriculum id
 order: 3                       # optional position inside the track
@@ -40,7 +40,7 @@ hints:                         # revealed one at a time, most general first
 files: [...]                   # section 2
 reference: {files: [...]}      # section 2
 judge: {...}                   # section 3
-sections: [...]                # optional groups for tests, section 4
+sections: [...]                # test groups, required for function/script judges, section 4
 tests: [...]                   # section 4
 limits: {timeout_s: 10}        # whole run; GPU problems usually need 30-60
 benchmark: {...}               # optional, section 3.4
@@ -122,8 +122,7 @@ tests:
     input: {args: [[1, 2, 3, 4], 5]}          # count_pairs([1,2,3,4], 5)
     expected: 4
   - name: Keyword args
-    description: Same call with `budget` passed by keyword.   # optional, Markdown
-    section: basics                                           # optional, see section 4
+    section: basics                                           # required, see section 4
     input: {args: [[1, 1]], kwargs: {budget: 2}}
     expected: 1
   - name: Large random
@@ -187,23 +186,22 @@ files:
 
 - Every `test_*.py` file runs, unless `judge.test_files` lists them explicitly.
 - Tests in readonly files are marked visible; tests in hidden files are hidden.
-- The **first docstring line** of a test becomes its description in the UI. Write it as a
-  sentence ("breaking early still closes the connection") — every test, visible and hidden,
-  needs one; without it the learner sees only a number.
-- **Group tests in classes whenever the problem has more than one function or theme.** Write
-  one `class Test<Thing>:` per function/theme, and use the same class names in `test_visible.py`
-  and `test_hidden.py`; the UI merges them into one section per class. The class name is the
-  section title, so make it readable (`TestRotate`, not `TestMisc`). Plain functions stay
-  ungrouped and read as anonymous `Test 1..N` cases. Class docstrings are not shown — the
-  per-test docstring is.
+- **Every test lives in a `class Test<Thing>:`, and every class has a docstring.** This is
+  required: validation fails on a module-level `test_*` function and on a class without a
+  docstring. Write one class per function/theme and use the same class names in
+  `test_visible.py` and `test_hidden.py`; the UI merges them into one group per class. The class
+  name is the group title (`TestRotateRoster` shows as "Rotate roster"), so make it readable
+  (`TestRotate`, not `TestMisc`). The class docstring is the group's one description, shown above
+  the group's bar: say what the group checks and cover its edge cases there ("Rotating right by
+  k moves the tail to the front. Also k = 0, an empty roster and a negative k.").
+- Individual test docstrings are for you and for pytest output. The UI does not show them: a
+  case is just `Test <n>` inside its group.
 - `async def test_...` works without plugins.
 - Plain `assert` failures show as **fail**; other exceptions show as **error**.
 - Use it for async code, stateful classes, error behaviour (`pytest.raises`), multi-file
   applications, and anything that needs fixtures or several assertions per scenario.
 - The `tests:` list is not used. pytest discovers tests, so `sections:`/`section:` do not apply
   to pytest problems — classes are the grouping mechanism.
-- Tests inside a class (`class TestRetries:`) are grouped under that class name in the UI. Plain
-  functions stay ungrouped.
 
 ### 3.3 `script`: bring your own harness
 
@@ -225,8 +223,10 @@ judge:
   {"type": "metric", "name": "kernel_ms", "value": 0.42, "unit": "ms", "reference": 0.40}
   ```
 
-  `status` is one of `pass | fail | error | timeout | skipped`. Test events may also carry a
-  `description` and a `section` (a free-form group name; the result panel groups by it).
+  `status` is one of `pass | fail | error | timeout | skipped`. Every test event must carry a
+  `section`: the id of a group declared under `sections:` in the problem YAML (section 4).
+  Validation fails when a result names no declared group. In C++/CUDA call `lc::section("id")`
+  before the tests it applies to; `lc::test` and `lc::error` tag each result with it.
 - Validation runs the script with the reference files swapped in.
 
 ### 3.4 Benchmarks (`function` judge)
@@ -255,39 +255,42 @@ benchmark: {against: reference, repeats: 20, max_slowdown: 3.0}
   - large inputs that need the intended complexity (set `limits.timeout_s` so a brute-force
     solution actually times out)
   - error paths
-- **The UI shows no test titles.** Cases appear as `Test 1..N` (numbered by position across the
-  whole problem), and the only text the user sees for a case is its `description`. `name` stays
-  required and unique, but only identifies the case in the YAML, validation reports and the
-  tutor tools, so name it by what it checks ("Touching ranges merge").
-- Give every case a one-line `description` saying what it checks, in plain words the user can
-  act on ("Bookings arrive out of order, so sort before merging."). Without one the user sees
-  just a number, which matters most for hidden tests: a failing hidden test shows its input and
-  output, and the description is what explains why that input was there.
-- **Sections** group related cases. Declare them once, then tag tests:
+- **The UI shows no test titles and no per-test text.** Cases appear as `Test 1..N` inside their
+  group. `name` stays required and unique, but only identifies the case in the YAML, validation
+  reports and the tutor tools, so name it by what it checks ("Touching ranges merge"). There is
+  no per-test `description` field.
+- **Every case belongs to a group, and the group carries the only explanation.** A group has
+  an `id`, a `title` and a `description` (one or two plain sentences, Markdown allowed). Say what
+  the group checks and mention its edge cases there ("Bookings arrive out of order, so sort
+  before merging."). A failing hidden test shows its input and output; the group description is
+  what explains why that input was there. Declare the groups once, then tag every test:
 
   ```yaml
-  sections:
+  sections:                            # required for function and script judges
     - id: basics                       # slug that tests reference
       title: Basics
-      description: The examples from the statement.   # optional, Markdown
-    - {id: edge-cases, title: Edge cases}
+      description: The examples from the statement, plus the empty input.
+    - id: edge-cases
+      title: Edge cases
+      description: Ranges that nest or touch, and zero-length ranges.
   tests:
-    - {name: Example, section: basics, input: {...}, expected: ...}
+    - {name: Example, section: basics, input: {...}, expected: ...}      # section is required
     - {name: Empty, section: edge-cases, input: {...}, expected: ...}
   ```
 
-  Sections appear in the Testcase and Test Result panels in declaration order, each with its
-  description. Tests without a `section` land in an "Other" group. Use sections once a problem
-  has more than ~5 tests, or when cases fall into clear themes (basics, edge cases, scale).
-  Unknown section ids and duplicate ids fail validation. Hidden tests may use sections too; a
-  section of only hidden tests is shown in the result panel after a run.
+  Each group is shown as one segmented bar, in declaration order, with its description above it.
+  A group is always open. Declare at least one group, tag every test, and use no unknown or
+  duplicate ids, or validation fails. Hidden tests are grouped too: a group of only hidden
+  tests appears in the result panel after a run, with an eye on each of its segments. In the
+  Testcase panel a group appears once it has a visible case.
 - **For `pytest` problems, group with classes instead of `sections:`.** pytest discovers tests,
   so the `tests:`/`sections:` mechanism is not used there. Put each test in a
   `class Test<Thing>:` (one per function/theme), repeat the class names in the visible and
   hidden test files, and give every test a one-line first docstring. The class becomes the
   section, so learners can tell which function a case belongs to.
-- The user's own cases (Testcase panel `+`, or the `add_test_case` tool) are named `Test <n>`
-  automatically. They can carry a `description` and a `section` too.
+- The user's own cases (the `+` beside a group's bar, or the `add_test_case` tool) join that
+  group and are numbered like the rest. `add_test_case` needs a `section` unless the problem has
+  a single group.
 - Keep tests deterministic: seed everything and avoid wall-clock assertions.
 - Floats: `float` or `allclose`. Typical tolerances:
   - CPU float64: `rtol 1e-9`
@@ -307,7 +310,7 @@ Markdown (CommonMark + GFM tables and task lists), plus:
 | Math | `$O(n \log n)$`, display: `$$ ... $$` (KaTeX) |
 | Diagrams | a fenced code block with language `mermaid` (flowchart, sequenceDiagram, classDiagram, stateDiagram, ...) |
 | Figures | inline `<svg viewBox="..." ...>`. Use `stroke="currentColor"` / `fill="currentColor"` so it works in light and dark mode |
-| Images | `![alt](assets/fig.png)` with the file at `problems/<id>/assets/fig.png` |
+| Images | `![alt](assets/fig.png)` with the file at `data/problems/<id>/assets/fig.png` |
 | Callouts | `:::note` / `:::tip` / `:::warning` ... `:::` |
 | Collapsible | `:::details{summary="Why does this work?"}` ... `:::` |
 | Figure + caption | `:::figure{caption="..."}` around an SVG, image or diagram |
@@ -326,7 +329,7 @@ A good description has:
 
 ## 6. Problem archetypes
 
-- **Learning (language features):** `pytest` judge, `intro`/`easy`. Explain the concept in the
+- **Learning (language features):** `pytest` judge, `easy`. Explain the concept in the
   description, ask for 2–4 small functions, and test each property separately. Example:
   `iterators-and-await`.
 - **Algorithm (LeetCode-style):** `function` judge, literal expected values for small cases,

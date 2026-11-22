@@ -81,9 +81,9 @@ def main() -> None:
 
     # seed problems + the real schema module, for validation inside Pyodide
     (app / "problems").mkdir()
-    ids = sorted(p.stem for p in (REPO / "problems").glob("*.yaml"))
+    ids = sorted(p.stem for p in (REPO / "data" / "problems").glob("*.yaml"))
     for pid in ids:
-        shutil.copy(REPO / "problems" / f"{pid}.yaml", app / "problems" / f"{pid}.yaml")
+        shutil.copy(REPO / "data" / "problems" / f"{pid}.yaml", app / "problems" / f"{pid}.yaml")
     (app / "problems" / "index.json").write_text(json.dumps(ids))
     (app / "core").mkdir()
     shutil.copy(REPO / "server/src/leegen/core/models.py", app / "core" / "models.py")
@@ -92,7 +92,7 @@ def main() -> None:
     subprocess.run(
         ["uv", "run", "--project", str(REPO / "server"), "python", "-I",
          str(SPIKE / "tools" / "export_bundles.py"), "--out", str(app / "bundles"),
-         "--problems-dir", str(REPO / "problems"), *BUNDLE_PROBLEMS],
+         "--problems-dir", str(REPO / "data" / "problems"), *BUNDLE_PROBLEMS],
         check=True, cwd=REPO,
     )
 

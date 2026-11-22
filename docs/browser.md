@@ -17,7 +17,7 @@ expose corresponding agent tools, through WebMCP on the page or MCP over HTTP on
 | Environments | Python and WebGPU | Python, C++, PyTorch, Triton, CUDA |
 | Judges | `function`, `pytest` | `function`, `pytest`, `script` |
 | Agent | WebMCP in a supported browser | MCP over HTTP |
-| Storage | IndexedDB for this browser and origin | Files in `problems/` and `workspace/` |
+| Storage | IndexedDB for this browser and origin | Files in `data/problems/` and `data/workspace/` |
 
 Open the [hosted browser edition](https://leegen.frankshan.workers.dev), or see the
 [server quick start](../README.md#quick-start-server-edition). Use export/import or manual
@@ -113,18 +113,20 @@ page navigates (the app routes with `pushState` only). The tools also work in Ch
   Changing the domain or switching browsers does not move existing data automatically. The app
   asks for persistent storage the first time work is saved. Without it, Safari may evict a site's
   data after seven days without a visit.
-- **Export** (download icon on the problem list) writes a zip in the repo layout:
-  `problems/<id>.yaml`, `problems/<id>/assets/…`, `workspace/<id>/<files>` and
-  `workspace/<id>/.leegen/<state>.json`. Unzip it at the repo root and the local server sees
-  the same problems and work.
-- **Import** reads the same layout (also a zipped checkout with one top-level folder). Problems
+- **Export** (download icon on the problem list) writes a zip in the data layout,
+  the same tree as the local server's `data/` folder: `problems/<id>.yaml`,
+  `problems/<id>/assets/…`, `workspace/<id>/<files>` and `workspace/<id>/.leegen/<state>.json`.
+  Unzip it into `data/` and the local server sees the same problems and work.
+- **Import** reads the same layout, found wherever it sits in the zip: the data folder itself,
+  or a whole zipped checkout (its `data/`). Tutorials in the zip are ignored for now. Problems
   are schema-checked in the runner. Identical problems are skipped and changed ones replace the
   stored copy.
 - **Folder sync** (Chromium, File System Access API): the folder icons save everything to a
-  folder, or load from one, in the same layout. Pick your leegen checkout and the local
-  server and the browser edition share `problems/` and `workspace/`. The folder is remembered
+  folder, or load from one, in the same layout. Pick the local server's `data/` folder (or your
+  leegen checkout, whose `data/` is used) and the local server and the browser edition share
+  `problems/` and `workspace/`. The folder is remembered
   (shift-click to choose another). Saving rewrites only files that changed and never touches
-  anything outside `problems/` and `workspace/`. Sync is manual, not continuous.
+  anything outside `problems/` and `workspace/` of the data folder. Sync is manual, not continuous.
 - Shipped problems update with new builds unless the user changed or deleted them.
 
 ## Offline and multiple tabs

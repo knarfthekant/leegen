@@ -1,4 +1,4 @@
-// Browser edition: export everything (problems + work) as a repo-layout zip, or import one.
+// Browser edition: export everything (problems + work) as a data-layout zip, or import one.
 
 import { Download, FolderInput, FolderOutput, Upload, X } from "lucide-react";
 import { type MouseEvent, useRef, useState } from "react";
@@ -72,13 +72,13 @@ export function TransferButtons({
           />
           <IconButton
             icon={FolderInput}
-            label="Load from a folder (a leegen checkout; shift-click to choose another folder)"
+            label="Load from a folder (the data folder or a leegen checkout; shift-click to choose another folder)"
             onClick={withFolder(async (pickNew) => onImported?.(await folder.load(pickNew)))}
             disabled={busy}
           />
         </>
       )}
-      <IconButton icon={Download} label="Export problems and work (zip, repo layout)" onClick={doExport} disabled={busy} />
+      <IconButton icon={Download} label="Export problems and work (zip, data layout)" onClick={doExport} disabled={busy} />
       <IconButton icon={Upload} label="Import a zip (problems/ and workspace/)" onClick={() => input.current?.click()} disabled={busy} />
       <input ref={input} type="file" accept=".zip,application/zip" hidden onChange={(e) => doImport(e.target.files?.[0])} />
     </>

@@ -226,13 +226,13 @@ def build_mcp() -> MCPServer:
 
     @tool()
     async def add_test_case(args: list[Any], kwargs: dict[str, Any] | None = None,
-                            name: str | None = None, description: str | None = None,
-                            section: str | None = None,
+                            name: str | None = None, section: str | None = None,
                             problem_id: str | None = None) -> dict[str, Any]:
         """Add a custom test case to the user's Testcase panel (function-judge problems only).
-        The expected output is computed by the reference solution. Unnamed cases are called
-        `Test <n>`. `section` must be one of the problem's section ids (see get_problem)."""
-        return await _svc().add_test_case(args, kwargs, name, description, section, problem_id)
+        The expected output is computed by the reference solution. Every case belongs to a
+        group: `section` must be one of the problem's section ids (see get_problem), and may be
+        omitted only when the problem has a single group. Cases are shown as `Test <n>`."""
+        return await _svc().add_test_case(args, kwargs, name, section, problem_id)
 
     # ============================================================ resources
 

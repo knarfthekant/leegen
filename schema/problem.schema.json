@@ -317,31 +317,10 @@
           "title": "Visible",
           "type": "boolean"
         },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Shown with the case; Markdown allowed.",
-          "title": "Description"
-        },
         "section": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Id of an entry in the problem's `sections`; groups this case.",
-          "title": "Section"
+          "description": "Id of an entry in the problem's `sections`. Every case belongs to exactly one group; the group's description is the only explanation the user sees.",
+          "title": "Section",
+          "type": "string"
         },
         "input": {
           "anyOf": [
@@ -362,7 +341,8 @@
         }
       },
       "required": [
-        "name"
+        "name",
+        "section"
       ],
       "title": "TestCase",
       "type": "object"
@@ -429,26 +409,21 @@
           "type": "string"
         },
         "title": {
+          "description": "Short group name, shown above the group's segmented bar.",
           "title": "Title",
           "type": "string"
         },
         "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Shown under the section header.",
-          "title": "Description"
+          "description": "What this group checks, in one or two plain sentences (Markdown allowed). The one explanation for every case in the group; cases have no description of their own.",
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
         }
       },
       "required": [
         "id",
-        "title"
+        "title",
+        "description"
       ],
       "title": "TestSection",
       "type": "object"
@@ -475,7 +450,6 @@
     "difficulty": {
       "default": "medium",
       "enum": [
-        "intro",
         "easy",
         "medium",
         "hard"
@@ -572,7 +546,7 @@
       "$ref": "#/$defs/Judge"
     },
     "sections": {
-      "description": "Optional groups for tests. Each test opts in with `section: <id>`.",
+      "description": "Test groups, required for `function` and `script` judges. Every test names its group with `section: <id>`. (`pytest` groups come from `class Test<Thing>`.)",
       "items": {
         "$ref": "#/$defs/TestSection"
       },
