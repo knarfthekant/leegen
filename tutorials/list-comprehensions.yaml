@@ -1,0 +1,111 @@
+schema_version: 1
+id: list-comprehensions
+title: List comprehensions, built up in steps
+summary: Map, filter, then combine. Later cells reuse earlier ones.
+tags: [python, comprehension]
+environment: python
+order: 2
+cells:
+  - type: markdown
+    text: |
+      A **list comprehension** builds a list in one expression:
+
+      ```python
+      [n * 2 for n in range(4)]   # [0, 2, 4, 6]
+      ```
+
+      Run the cell below to see it.
+
+  - type: code
+    id: demo
+    starter: |
+      nums = [3, 8, 5, 12, 7, 10]
+      print("doubled:", [n * 2 for n in nums])
+      nums
+
+  - type: markdown
+    text: |
+      **Map.** Write `square_all(xs)` returning each number squared.
+
+  - type: code
+    id: squares
+    starter: |
+      def square_all(xs):
+          ...
+
+      square_all([1, 2, 3])
+    reference: |
+      def square_all(xs):
+          return [x * x for x in xs]
+
+      square_all([1, 2, 3])
+    checks:
+      - description: squares a few numbers
+        code: assert square_all([1, 2, 3]) == [1, 4, 9]
+      - description: empty in, empty out
+        code: assert square_all([]) == []
+      - description: negatives become positive
+        code: assert square_all([-4]) == [16]
+      - description: the input list is left alone
+        code: |
+          xs = [2, 3]
+          square_all(xs)
+          assert xs == [2, 3]
+
+  - type: markdown
+    text: |
+      **Filter.** Add an `if` at the end. Write `evens(xs)` keeping only the even numbers, in order.
+
+  - type: code
+    id: evens
+    starter: |
+      def evens(xs):
+          ...
+
+      evens(nums)
+    reference: |
+      def evens(xs):
+          return [x for x in xs if x % 2 == 0]
+
+      evens(nums)
+    checks:
+      - description: keeps evens, in order
+        code: assert evens([3, 8, 5, 12]) == [8, 12]
+      - description: zero is even
+        code: assert evens([0, 1]) == [0]
+      - description: nothing matches
+        code: assert evens([1, 3]) == []
+      - description: works on the notebook's nums
+        code: assert evens(nums) == [8, 12, 10]
+
+  - type: markdown
+    text: |
+      **Combine.** Reuse both functions: `even_squares(xs)` squares only the even numbers.
+      Then print the result for `nums`.
+
+  - type: code
+    id: combine
+    starter: |
+      def even_squares(xs):
+          ...
+
+      print(even_squares(nums))
+    reference: |
+      def even_squares(xs):
+          return square_all(evens(xs))
+
+      print(even_squares(nums))
+    checks:
+      - description: squares only the evens
+        code: assert even_squares([1, 2, 3, 4]) == [4, 16]
+      - description: reuses square_all
+        code: |
+          g = even_squares.__globals__
+          orig = g["square_all"]
+          g["square_all"] = lambda xs: ["via-helper"]
+          try:
+              assert even_squares([2]) == ["via-helper"], "call square_all"
+          finally:
+              g["square_all"] = orig
+      - description: the notebook's nums
+        code: assert even_squares(nums) == [64, 144, 100]

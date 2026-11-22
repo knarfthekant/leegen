@@ -116,6 +116,15 @@ export function createServerBackend(base = ""): Backend {
 
   return {
     edition: "server",
+    tutorials: {
+      list: () => call("GET", `${api}/tutorials`),
+      get: (id) => call("GET", `${api}/tutorials/${enc(id)}`),
+      saveFiles: (id, files) => call("PUT", `${api}/tutorials/${enc(id)}/files`, { files }),
+      runCell: (id, cell, files, run_id) =>
+        call<ConsoleResult>("POST", `${api}/tutorials/${enc(id)}/cells/${enc(cell)}/run`, { files, run_id }),
+      cancel: (runId) => call("POST", `${api}/run/${enc(runId)}/cancel`),
+      reset: (id, cell) => call("POST", `${api}/tutorials/${enc(id)}/reset`, { cell: cell ?? null }),
+    },
     getAgentStatus: () => call<AgentStatus>("GET", `${api}/agent-status`),
     listProblems: () => call<ProblemListing>("GET", `${api}/problems`),
     getProblem: (id) => call<Problem>("GET", `${api}/problems/${enc(id)}`),

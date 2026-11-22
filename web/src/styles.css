@@ -436,7 +436,8 @@ details[open] .hint-chevron { transform: rotate(180deg); }
 }
 .console-input:focus { box-shadow: 0 0 0 3px var(--accent-soft); background: var(--surface); }
 .console-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.console-actions .muted { margin-left: auto; }
+.icon-run { background: var(--primary); color: var(--primary-ink); }
+.icon-run:hover:not(:disabled) { background: var(--primary); color: var(--primary-ink); opacity: 0.86; }
 .console-stdin summary {
   display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none;
   font-size: 12px; color: var(--text-2); margin-bottom: 6px;
@@ -630,6 +631,80 @@ button.loc:hover { background: var(--accent-soft); color: var(--accent); }
   .wordmark, .topbar-side .btn-ghost { display: none; }
   .pr-meta { display: none; }
 }
+
+/* ------------------------------------------------------------------ tutorials */
+@keyframes pop { 0% { transform: scale(0.4); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
+@keyframes dot-in { from { transform: scale(0); opacity: 0; } 60% { transform: scale(1.25); opacity: 1; } to { transform: scale(1); opacity: 1; } }
+@keyframes ripple { from { transform: scale(1); opacity: 0.55; } to { transform: scale(2.6); opacity: 0; } }
+
+.hero-side { display: flex; align-items: center; gap: 16px; }
+.view-toggle { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-md); background: var(--surface-3); }
+.view-toggle .icon-btn { width: 30px; height: 28px; border-radius: var(--r-sm); }
+.view-toggle .icon-btn.active { background: var(--surface); color: var(--text); }
+
+.t-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.t-card { display: flex; flex-direction: row; align-items: center; gap: 14px; padding: 16px 18px; color: inherit; transition: transform var(--fast) var(--ease); }
+.t-card:hover { transform: translateY(-2px); }
+.t-card-ring { flex: none; transform: rotate(-90deg); }
+.t-card-ring .ring-track, .t-card-ring .ring-fill { stroke-width: 4; }
+.t-card-body { display: flex; flex-direction: column; min-width: 0; }
+.t-card-body strong { font-weight: 600; }
+
+.t-trail { flex: 1; min-width: 0; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+.t-trail-step { display: flex; align-items: center; }
+.t-trail-line { width: 26px; height: 2px; border-radius: 2px; background: var(--surface-3); transition: background 500ms var(--ease); }
+.t-trail-line.done { background: var(--pass); }
+.t-trail-node { width: 12px; height: 12px; border-radius: 50%; background: var(--surface-3); transition: background 300ms var(--ease), box-shadow 300ms var(--ease); }
+.t-trail-node:hover { background: var(--text-3); }
+.t-trail-node.done { background: var(--pass); animation: pop 400ms var(--ease); }
+.t-trail-node.next { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.t-trail-node.running { animation: pulse 0.9s ease-in-out infinite; }
+
+.t-doc { max-width: 780px; margin: 20px auto 0; padding-left: 38px; position: relative; }
+.t-doc > .page-title { margin-bottom: 22px; }
+.t-item { position: relative; padding-bottom: 22px; }
+.t-item::before {
+  content: ""; position: absolute; left: -26px; top: 0; bottom: 0; width: 2px; border-radius: 2px;
+  background: color-mix(in srgb, var(--text) 9%, transparent); transition: background 600ms var(--ease);
+}
+.t-item.done::before { background: var(--pass); }
+.t-item.md > :first-child { margin-top: 0; }
+.t-item.md > :last-child { margin-bottom: 0; }
+.t-node {
+  position: absolute; left: -34px; top: 16px; width: 18px; height: 18px; border-radius: 50%; z-index: 1;
+  background: var(--canvas); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--text) 22%, transparent);
+  transition: background 300ms var(--ease), box-shadow 300ms var(--ease);
+}
+.t-node.running { box-shadow: inset 0 0 0 2px var(--accent); animation: pulse 0.9s ease-in-out infinite; }
+.t-node.complete { background: var(--pass); box-shadow: none; animation: pop 450ms var(--ease); }
+.t-node.complete::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--pass); animation: ripple 700ms var(--ease) forwards; }
+
+.t-cell { position: relative; border-radius: var(--r-lg); background: var(--surface); overflow: hidden; transition: box-shadow 400ms var(--ease); }
+.t-cell.complete { box-shadow: 0 0 0 2px var(--pass-soft); }
+.t-cell.broken { box-shadow: 0 0 0 2px var(--fail-soft); }
+.t-editor { transition: height 120ms var(--ease); }
+.t-tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 2; }
+.t-tools .icon-btn { width: 28px; height: 28px; background: var(--surface-2); }
+.t-tools .icon-btn:hover:not(:disabled) { background: var(--surface-3); }
+.t-tools .t-run { border-radius: 50%; background: var(--primary); color: var(--primary-ink); }
+.t-tools .t-run:hover:not(:disabled) { background: var(--primary); color: var(--primary-ink); opacity: 0.86; }
+.t-progress { position: absolute; top: 0; left: 0; right: 0; height: 2px; overflow: hidden; z-index: 2; }
+.t-progress::after { content: ""; position: absolute; inset: 0; width: 32%; background: var(--accent); animation: slide 1.1s var(--ease) infinite; }
+
+.t-after { display: flex; flex-direction: column; gap: 10px; padding: 10px 16px 14px; border-top: 1px solid var(--line); animation: fade-in 220ms var(--ease); transition: opacity 300ms var(--ease); }
+.t-cell.stale .t-after { opacity: 0.45; }
+.t-out { display: flex; flex-direction: column; gap: 4px; }
+.t-out pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.t-out .warn { color: var(--warn); }
+.t-out .fail { color: var(--fail); }
+.t-out .result { color: var(--text-2); }
+.t-out .result::before { content: "\21B3  "; color: var(--text-3); }
+.t-checks { display: flex; align-items: center; gap: 6px; color: var(--text-3); }
+.t-dot { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; animation: dot-in 340ms var(--ease) both; }
+.t-dot.pass { background: var(--pass-soft); color: var(--pass); }
+.t-dot.fail, .t-dot.error { background: var(--fail-soft); color: var(--fail); }
+.t-fails { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--fail); }
+.t-fails .mono { color: var(--text-2); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

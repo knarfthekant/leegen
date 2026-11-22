@@ -125,14 +125,21 @@ MAX_SNIPPET_STDIN = 64_000
 
 def plan_snippet(problem: Problem, files: dict[str, str] | None = None, *, file: str | None,
                  code: str, stdin: str = "", device: str = "cpu",
-                 timeout_s: float = SNIPPET_TIMEOUT_S) -> RunPlan:
+                 timeout_s: float = SNIPPET_TIMEOUT_S, prior: list[str] | None = None,
+                 checks: list[dict[str, str]] | None = None) -> RunPlan:
     """A console run: the problem's files with the user's edits, plus one code snippet.
 
     `file` names the module the snippet runs inside (Jupyter-style); None means a bare namespace.
     There are no tests, so the run never goes through `assemble()`.
+
+    Tutorial cells add `prior` (code of the cells before this one, replayed silently in the same
+    namespace) and `checks` (`{description, code}`, run after `code` and reported as `check`
+    events). Either one switches the harness to the notebook namespace instead of a file module.
     """
     if len(code) > MAX_SNIPPET_CODE:
         raise ValueError(f"snippet is too long (max {MAX_SNIPPET_CODE} characters)")
+    if sum(len(c) for c in prior or []) > MAX_SNIPPET_CODE:
+        raise ValueError(f"the earlier cells are too long (max {MAX_SNIPPET_CODE} characters)")
     if len(stdin) > MAX_SNIPPET_STDIN:
         raise ValueError(f"stdin is too long (max {MAX_SNIPPET_STDIN} characters)")
     user = materialize(problem, files or {})
@@ -140,7 +147,9 @@ def plan_snippet(problem: Problem, files: dict[str, str] | None = None, *, file:
         raise ValueError(f"unknown file {file!r}")
     run_config = {
         "mode": "snippet",
-        "snippet": {"file": file, "code": code, "stdin": stdin},
+        "snippet": {"file": file, "code": code, "stdin": stdin,
+                    **({"prior": prior} if prior is not None else {}),
+                    **({"checks": checks} if checks else {})},
         "user_dir": "user",
         "ref_dir": None,
         "timeout_s": timeout_s,

@@ -1,13 +1,13 @@
-import { CircleAlert, Inbox, Search, X } from "lucide-react";
+import { BookOpen, CircleAlert, Inbox, ListChecks, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Brand, ConnectionDot, RepositoryLink, ThemeToggle } from "../components/Chrome";
 import { ImportReport, SavedReport, TransferButtons } from "../components/Transfer";
 import type { ImportSummary } from "../backend/types";
 import { filterProblems, ProblemRow } from "../components/ProblemRow";
-import { Chip, DIFFICULTY_TONE, IconButton, Skeleton } from "../components/ui";
+import { Chip, cx, DIFFICULTY_TONE, IconButton, Skeleton } from "../components/ui";
 import { getBackend, useBackendEvents } from "../backend";
-import { type Difficulty, type ProblemSummary } from "../lib/api";
-import { navigate } from "../lib/router";
+import { type Difficulty, type ProblemSummary, type TutorialSummary } from "../lib/api";
+import { href as appHref, navigate } from "../lib/router";
 
 const DIFFICULTIES: Difficulty[] = ["intro", "easy", "medium", "hard"];
 
@@ -21,6 +21,14 @@ export function ProblemList() {
   const [loading, setLoading] = useState(true);
   const [imported, setImported] = useState<(ImportSummary & { folder?: string }) | null>(null);
   const [saved, setSaved] = useState<{ folder: string; written: number } | null>(null);
+
+  const [tutorials, setTutorials] = useState<TutorialSummary[]>([]);
+  const [view, setView] = useState<"problems" | "tutorials">(
+    () => (new URLSearchParams(location.search).get("view") === "tutorials" ? "tutorials" : "problems"));
+
+  useEffect(() => {
+    getBackend().tutorials?.list().then((r) => setTutorials(r.tutorials), () => undefined);
+  }, []);
 
   const load = () =>
     getBackend().listProblems().then((r) => {
@@ -66,6 +74,10 @@ export function ProblemList() {
         <ThemeToggle />
       </header>
       <main className="list-main">
+        {view === "tutorials" && tutorials.length > 0 ? (
+          <TutorialList tutorials={tutorials} onBack={() => setView("problems")} />
+        ) : (
+        <>
         <div className="list-hero">
           <div>
             <h1 className="page-title">Problems</h1>
@@ -75,7 +87,15 @@ export function ProblemList() {
                 : "Written by your agents through MCP. Solved by you."}
             </p>
           </div>
-          <Progress problems={problems} loading={loading} />
+          <div className="hero-side">
+            {tutorials.length > 0 && (
+              <div className="view-toggle">
+                <IconButton icon={ListChecks} label="Problems" active />
+                <IconButton icon={BookOpen} label="Tutorials" onClick={() => setView("tutorials")} />
+              </div>
+            )}
+            <Progress problems={problems} loading={loading} />
+          </div>
         </div>
 
         {imported && <ImportReport summary={imported} onClose={() => setImported(null)} />}
@@ -158,8 +178,44 @@ export function ProblemList() {
             </div>
           )}
         </div>
+        </>
+        )}
       </main>
     </div>
+  );
+}
+
+function TutorialList({ tutorials, onBack }: { tutorials: TutorialSummary[]; onBack: () => void }) {
+  return (
+    <>
+      <div className="list-hero">
+        <h1 className="page-title">Tutorials</h1>
+        <div className="view-toggle">
+          <IconButton icon={ListChecks} label="Problems" onClick={onBack} />
+          <IconButton icon={BookOpen} label="Tutorials" active />
+        </div>
+      </div>
+      <div className="t-grid">
+        {tutorials.map((t) => {
+          const pct = t.cells ? t.passed / t.cells : 0;
+          const r = 15;
+          const c = 2 * Math.PI * r;
+          return (
+            <a key={t.id} className={cx("card t-card", pct >= 1 && "complete")} href={appHref(`/t/${t.id}`)}
+              onClick={(e) => { e.preventDefault(); navigate(`/t/${t.id}`); }}>
+              <svg className="t-card-ring" width="38" height="38" viewBox="0 0 38 38" aria-hidden>
+                <circle cx="19" cy="19" r={r} className="ring-track" />
+                <circle cx="19" cy="19" r={r} className="ring-fill" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} />
+              </svg>
+              <div className="t-card-body">
+                <strong>{t.title}</strong>
+                {t.summary && <span className="muted small">{t.summary}</span>}
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

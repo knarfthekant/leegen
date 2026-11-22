@@ -62,6 +62,7 @@ CLI, for agents without MCP. Run from `server/`:
 | `uv run leegen list` | List problems; invalid YAML files are reported |
 | `uv run leegen validate --all` / `<id>` / `--file x.yaml` | Schema check + reference must pass every test + starter must fail |
 | `uv run leegen run <id> [--reference] [--json]` | Run the user's workspace code (or the reference) |
+| `uv run leegen tutorial list` / `validate <id>\|--all` | List tutorials; replay references (checks pass) and starters (a check fails) |
 | `uv run leegen schema` | Regenerate `schema/problem.schema.json` from the Pydantic models |
 | `uv run leegen browser build` / `serve` | Build the browser edition's two static sites / serve them locally with their headers |
 
@@ -70,6 +71,7 @@ CLI, for agents without MCP. Run from `server/`:
 ```
 problems/<id>.yaml          problem bank (one self-contained file per problem)
 problems/<id>/assets/       optional images referenced from the description
+tutorials/<id>.yaml         tutorials: notebook-like pages of Markdown + code cells (docs/tutorials.md)
 environments/<id>.yaml      runtimes: language, python version, dependencies, hardware needs
 workspace/<id>/             the user's code (real files) + .leegen/*.json state (gitignored)
 docs/authoring.md           full authoring guide (also served by the get_authoring_guide tool)
@@ -263,6 +265,21 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   names; Monaco models override the snapshot, so unsaved edits are always fresh. The symbol
   hover is registered after the annotation hover so comments render first. `Ctrl/Cmd+Shift+Enter`
   in the editor runs the selection in the Console with the open file as context.
+
+### Tutorials
+
+- A tutorial (`core/tutorial.py`, `tutorials/<id>.yaml`, guide in `docs/tutorials.md`) is a list of
+  Markdown and code cells. It reuses the console pipeline, not a judge kind: `plan_snippet()` takes
+  `prior` (earlier cells' code, replayed silently in one namespace) and `checks`
+  (`{description, code}`); the harness (`snippet.py`) runs them after the cell and emits `check`
+  events; `assemble_console()` returns them as `ConsoleResult.checks`.
+- Each code cell is one editable file of a shim `Problem` (`shim_problem`, id `tut-<id>`), so the
+  workspace store keeps the learner's code. `tutorial_service.py` holds list/open/save/reset/run/
+  validate; `api/routes.py` exposes `/api/tutorials*`. Checks and references never reach the UI
+  (`public_tutorial`).
+- UI: `pages/Tutorial.tsx` + `components/TutorialCell.tsx` (one auto-height Monaco per cell, run
+  icon, tick row, progress trail). Server edition only: `Backend.tutorials` is absent in the
+  browser edition, and the list page hides the toggle when it is.
 
 ### Browser edition
 

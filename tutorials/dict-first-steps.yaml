@@ -1,0 +1,78 @@
+schema_version: 1
+id: dict-first-steps
+title: Dictionaries, one step at a time
+summary: Build, read and count with a dict.
+tags: [python, dict]
+environment: python
+order: 1
+cells:
+  - type: markdown
+    text: |
+      A **dict** maps keys to values. Lookups are O(1) on average.
+
+      ```python
+      ages = {"ada": 36, "alan": 41}
+      ages["ada"]      # 36
+      ```
+
+  - type: code
+    id: build
+    starter: |
+      # Make `ages` map "ada" to 36 and "alan" to 41.
+      ages = {}
+    reference: |
+      ages = {"ada": 36, "alan": 41}
+    checks:
+      - description: ada is 36
+        code: assert ages["ada"] == 36
+      - description: alan is 41
+        code: assert ages["alan"] == 41
+      - description: nothing else is in it
+        code: assert len(ages) == 2
+
+  - type: markdown
+    text: |
+      `d.get(key, default)` never raises. `d[key] = value` adds or replaces.
+
+  - type: code
+    id: update
+    starter: |
+      # Add "grace": 45 to `ages`, then set `oldest` to the name with the largest age.
+      oldest = None
+    reference: |
+      ages["grace"] = 45
+      oldest = max(ages, key=ages.get)
+    checks:
+      - description: grace was added
+        code: assert ages.get("grace") == 45
+      - description: oldest is grace
+        code: assert oldest == "grace"
+
+  - type: markdown
+    text: |
+      Counting is the classic dict job. Write `count_words(text)` returning `{word: n}`.
+
+  - type: code
+    id: count
+    starter: |
+      def count_words(text):
+          ...
+
+      count_words("a b a")
+    reference: |
+      def count_words(text):
+          counts = {}
+          for w in text.split():
+              counts[w] = counts.get(w, 0) + 1
+          return counts
+
+      count_words("a b a")
+    checks:
+      - description: repeated words add up
+        code: |
+          assert count_words("a b a") == {"a": 2, "b": 1}
+      - description: empty text gives an empty dict
+        code: assert count_words("") == {}
+      - description: case is kept
+        code: |
+          assert count_words("A a") == {"A": 1, "a": 1}

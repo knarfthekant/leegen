@@ -30,6 +30,13 @@ export interface AnnotationsChangedEvent {
   annotations: Annotation[];
 }
 
+/** One tutorial check, reported after its cell ran. */
+export interface CheckResult {
+  description: string;
+  status: "pass" | "fail" | "error";
+  message: string;
+}
+
 export interface ConsoleFinishedEvent {
   type: "console_finished";
   problem_id: string;
@@ -60,6 +67,7 @@ export interface ConsoleResult {
   stderr: string;
   result: string | null;
   error: string | null;
+  checks: CheckResult[];
 }
 
 export interface ConsoleStartedEvent {
@@ -338,6 +346,9 @@ export interface SnippetSpec {
   file?: string | null;
   code?: string;
   stdin?: string;
+  /** Tutorial cells: code replayed first. */
+  prior?: string[] | null;
+  checks?: Record<string, string>[];
 }
 
 export interface TestCase {

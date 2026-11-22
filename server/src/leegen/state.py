@@ -19,6 +19,7 @@ from leegen.envs.registry import EnvironmentRegistry
 from leegen.executors import ExecutorManager
 from leegen.runner import Orchestrator
 from leegen.store.problems import ProblemStore
+from leegen.store.tutorials import TutorialStore
 from leegen.store.workspace import Workspace
 
 
@@ -99,6 +100,12 @@ class AppState:
             events=self.hub, orchestrator=self.orchestrator, environments=self.environments,
             docs_dir=settings().docs_dir)
         self.run_lock: dict[str, asyncio.Lock] = self.service.run_lock
+        from leegen.tutorial_service import TutorialService
+
+        self.tutorials = TutorialStore()
+        self.tutorial_service = TutorialService(
+            tutorials=self.tutorials, workspace=self.workspace, orchestrator=self.orchestrator,
+            environments=self.environments, events=self.hub, run_lock=self.run_lock)
 
 
 @lru_cache

@@ -57,6 +57,8 @@ class SnippetRequest:
     stdin: str = ""
     executor: str | None = None
     timeout_s: float = SNIPPET_TIMEOUT_S
+    prior: list[str] | None = None                        # tutorial cells replayed first
+    checks: list[dict[str, str]] = field(default_factory=list)
 
 
 def _write_files(target: Path, files: dict[str, str]) -> None:
@@ -170,7 +172,8 @@ class Orchestrator:
         device = executor.device_for(requires)
         try:
             plan = plan_snippet(problem, req.files, file=req.file, code=req.code,
-                                stdin=req.stdin, device=device, timeout_s=req.timeout_s)
+                                stdin=req.stdin, device=device, timeout_s=req.timeout_s,
+                                prior=req.prior, checks=req.checks)
         except ValueError as exc:
             return fail(str(exc), executor.id, device)
 

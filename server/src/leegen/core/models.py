@@ -372,6 +372,14 @@ class RunResult(BaseModel):
 ConsoleStatus = Literal["ok", "error", "timeout", "cancelled"]
 
 
+class CheckResult(BaseModel):
+    """One tutorial check, reported after its cell ran."""
+
+    description: str
+    status: Literal["pass", "fail", "error"]
+    message: str = ""
+
+
 class ConsoleResult(BaseModel):
     """One quick-execution run: a snippet or a selection, never a graded test run."""
 
@@ -387,3 +395,4 @@ class ConsoleResult(BaseModel):
     stderr: str = ""
     result: str | None = None       # repr of the last expression, when it has a value
     error: str | None = None
+    checks: list[CheckResult] = Field(default_factory=list)   # tutorial cells only

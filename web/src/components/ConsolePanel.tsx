@@ -1,7 +1,7 @@
 import { ChevronDown, Play, Square, Trash2 } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import type { ConsoleResult } from "../lib/api";
-import { Button, Chip, IconButton, Select } from "./ui";
+import { Chip, IconButton, Select } from "./ui";
 import { Value } from "./Value";
 
 /** One console run, as shown in the history list. */
@@ -83,45 +83,32 @@ export function ConsolePanel({
     <div className="panel-body console">
       {disabledReason && <p className="muted small">{disabledReason}</p>}
 
-      {newestFirst.length > 0 && (
-        <div className="console-history">
-          {newestFirst.map((entry) => (
-            <article key={entry.runId} className="console-entry">
-              <div className="console-entry-head">
-                <Chip tone={STATUS_TONE[entry.status]}>
-                  <span className="cap">{entry.status === "running" ? entry.phase ?? "running" : entry.status}</span>
-                </Chip>
-                <span className="muted small">
-                  {entry.file ?? "no file context"}
-                  {entry.durationMs != null && ` · ${entry.durationMs.toFixed(0)} ms`}
-                </span>
-              </div>
-              {entry.stdout && <Value label="Stdout" value={entry.stdout} raw />}
-              {entry.stderr && <Value label="Stderr" value={entry.stderr} raw />}
-              {entry.result != null && <Value label="Result" value={entry.result} raw />}
-              {entry.error && <Value label="Error" value={entry.error} raw tone="fail" />}
-            </article>
-          ))}
-        </div>
-      )}
-
       <div className="console-composer">
         <div className="console-actions">
           <Select
             value={contextFile ?? ""}
             onChange={(e) => onChangeContextFile(e.target.value || null)}
-            title="The selected code runs inside this file's namespace"
+            title={contextFile ? "Runs inside this file's namespace" : "Standalone snippet"}
           >
             <option value="">No file context</option>
             {files.map((f) => (
               <option key={f.path} value={f.path}>{f.path}</option>
             ))}
           </Select>
-          <span className="muted small">
-            {contextFile ? "code runs with this file's definitions" : "standalone snippet"}
-          </span>
+          <span className="spacer" />
           {entries.length > 0 && (
-            <IconButton icon={Trash2} label="Clear console history" onClick={onClear} />
+            <IconButton icon={Trash2} label="Clear results" onClick={onClear} />
+          )}
+          {running ? (
+            <IconButton icon={Square} label="Cancel" className="icon-run" onClick={onCancel} />
+          ) : (
+            <IconButton
+              icon={Play}
+              label="Run (⌘↵)"
+              className="icon-run"
+              onClick={onRun}
+              disabled={!canRun || !code.trim()}
+            />
           )}
         </div>
         <textarea
@@ -136,28 +123,37 @@ export function ConsolePanel({
         <details className="console-stdin" open={!!stdin}>
           <summary>
             <ChevronDown size={13} strokeWidth={1.9} /> stdin
-            {stdin && <span className="muted small"> · {stdin.split("\n").length} line(s)</span>}
           </summary>
           <textarea
             className="console-input mono"
             value={stdin}
             onChange={(e) => onChangeStdin(e.target.value)}
-            placeholder="Text that input() will read, one line per call"
             rows={3}
             spellCheck={false}
           />
         </details>
-        <div className="console-actions">
-          {running ? (
-            <Button variant="soft" icon={Square} onClick={onCancel}>Cancel</Button>
-          ) : (
-            <Button variant="primary" icon={Play} onClick={onRun} disabled={!canRun || !code.trim()}>
-              Run snippet
-            </Button>
-          )}
-          <span className="muted small">⌘/Ctrl+Shift+Enter runs the editor selection here</span>
-        </div>
       </div>
+
+      {newestFirst.length > 0 && (
+        <div className="console-history">
+          {newestFirst.map((entry) => (
+            <article key={entry.runId} className="console-entry">
+              <div className="console-entry-head">
+                <Chip tone={STATUS_TONE[entry.status]}>
+                  <span className="cap">{entry.status === "running" ? entry.phase ?? "running" : entry.status}</span>
+                </Chip>
+                {entry.durationMs != null && (
+                  <span className="muted small tabular">{entry.durationMs.toFixed(0)} ms</span>
+                )}
+              </div>
+              {entry.stdout && <Value label="Stdout" value={entry.stdout} raw />}
+              {entry.stderr && <Value label="Stderr" value={entry.stderr} raw />}
+              {entry.result != null && <Value label="Result" value={entry.result} raw />}
+              {entry.error && <Value label="Error" value={entry.error} raw tone="fail" />}
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

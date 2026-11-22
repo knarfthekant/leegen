@@ -710,6 +710,32 @@
           "default": "",
           "title": "Stdin",
           "type": "string"
+        },
+        "prior": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tutorial cells: code replayed first.",
+          "title": "Prior"
+        },
+        "checks": {
+          "items": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "title": "Checks",
+          "type": "array"
         }
       },
       "title": "SnippetSpec",

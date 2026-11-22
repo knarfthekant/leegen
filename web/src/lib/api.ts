@@ -92,6 +92,38 @@ export interface ExecutorInfo {
   device: string;
 }
 
+/** Tutorials: one notebook-like page of Markdown and code cells (see docs/tutorials.md). */
+export interface TutorialSummary {
+  id: string;
+  title: string;
+  summary: string;
+  tags: string[];
+  environment: string;
+  track: string | null;
+  order: number | null;
+  cells: number;
+  checked: number;
+  passed: number;
+}
+
+export type TutorialCell =
+  | { type: "markdown"; text: string }
+  | { type: "code"; id: string; path: string; starter: string; has_checks: boolean; stdin: string };
+
+/** What a finished cell run leaves behind; the output itself is not kept. */
+export interface CellOutcome {
+  status: "ok" | "error" | "timeout" | "cancelled";
+  passed: boolean;
+  checks: { description: string; status: "pass" | "fail" | "error"; message: string }[];
+  ran_at: number;
+}
+
+export interface Tutorial extends Omit<TutorialSummary, "cells" | "checked" | "passed"> {
+  cells: TutorialCell[];
+  files: Record<string, string>;
+  results: Record<string, CellOutcome>;
+}
+
 export function newRunId(): string {
   return Math.random().toString(16).slice(2, 14);
 }

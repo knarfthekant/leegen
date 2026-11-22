@@ -748,6 +748,7 @@ export function consoleError(problemId: string, runId: string, error: string,
     stdout: "",
     stderr: "",
     result: null,
+    checks: [],
     error,
   };
 }

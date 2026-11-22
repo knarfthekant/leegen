@@ -188,6 +188,36 @@
       "title": "AnnotationsChangedEvent",
       "type": "object"
     },
+    "CheckResult": {
+      "description": "One tutorial check, reported after its cell ran.",
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "message": {
+          "default": "",
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "description",
+        "status",
+        "message"
+      ],
+      "title": "CheckResult",
+      "type": "object"
+    },
     "ConsoleFinishedEvent": {
       "properties": {
         "type": {
@@ -349,6 +379,13 @@
           ],
           "default": null,
           "title": "Error"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/CheckResult"
+          },
+          "title": "Checks",
+          "type": "array"
         }
       },
       "required": [
@@ -363,7 +400,8 @@
         "stdout",
         "stderr",
         "result",
-        "error"
+        "error",
+        "checks"
       ],
       "title": "ConsoleResult",
       "type": "object"

@@ -153,6 +153,54 @@ async def console(body: ConsoleBody) -> dict[str, Any]:
     return result.model_dump(mode="json")
 
 
+# ------------------------------------------------------------------ tutorials
+
+
+def _tut() -> Any:
+    return app_state().tutorial_service
+
+
+class TutorialRunBody(BaseModel):
+    files: dict[str, str] | None = None
+    executor: str | None = None
+    run_id: str | None = None
+
+
+class TutorialFilesBody(BaseModel):
+    files: dict[str, str]
+
+
+class TutorialResetBody(BaseModel):
+    cell: str | None = None
+
+
+@router.get("/tutorials")
+def list_tutorials() -> dict[str, Any]:
+    return _tut().list_view()
+
+
+@router.get("/tutorials/{tutorial_id}")
+def get_tutorial(tutorial_id: str) -> dict[str, Any]:
+    return _call(lambda: _tut().open(tutorial_id))
+
+
+@router.put("/tutorials/{tutorial_id}/files")
+def save_tutorial_files(tutorial_id: str, body: TutorialFilesBody) -> dict[str, Any]:
+    return _call(lambda: _tut().save_files(tutorial_id, body.files))
+
+
+@router.post("/tutorials/{tutorial_id}/reset")
+def reset_tutorial(tutorial_id: str, body: TutorialResetBody) -> dict[str, Any]:
+    return _call(lambda: _tut().reset(tutorial_id, body.cell))
+
+
+@router.post("/tutorials/{tutorial_id}/cells/{cell_id}/run")
+async def run_tutorial_cell(tutorial_id: str, cell_id: str, body: TutorialRunBody) -> dict[str, Any]:
+    result = await _acall(_tut().run_cell(tutorial_id, cell_id, files=body.files,
+                                          executor=body.executor, run_id=body.run_id))
+    return result.model_dump(mode="json")
+
+
 @router.get("/executors")
 def executors(problem_id: str | None = None) -> dict[str, Any]:
     return _call(lambda: _svc().executors_for(problem_id))

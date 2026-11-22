@@ -113,6 +113,42 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     return 1 if failed or (not args.file and store.errors()) else 0
 
 
+def _cmd_tutorial(args: argparse.Namespace) -> int:
+    from leegen.core.parse import format_error
+    from leegen.core.tutorial import parse_tutorial_yaml
+    from leegen.state import app_state
+    from leegen.store.tutorials import TutorialStore
+
+    store = TutorialStore()
+    if args.tutorial_cmd == "list":
+        for t in store.list():
+            print(f"{t.id}  {len(t.code_cells())} code cells  {t.title}")
+        for e in store.errors():
+            print(f"INVALID {e.path}\n  " + e.error.replace("\n", "\n  "))
+        return 1 if store.errors() else 0
+    if args.file:
+        try:
+            tutorials = [parse_tutorial_yaml(Path(args.file).read_text())]
+        except Exception as exc:  # noqa: BLE001
+            print(f"INVALID {args.file}\n{format_error(exc)}")
+            return 1
+    else:
+        tutorials = store.list() if args.all or not args.ids else [
+            t for t in store.list() if t.id in args.ids]
+        for e in store.errors():
+            print(f"INVALID {e.path}\n  " + e.error.replace("\n", "\n  "))
+    svc = app_state().tutorial_service
+    failed = 0
+    for t in tutorials:
+        report = asyncio.run(svc.validate(t, executor=args.executor))
+        print(("OK  " if report["ok"] else "FAIL") + f" {t.id}"
+              + (f" ({report['summary']})" if report.get("summary") else ""))
+        for issue in report["issues"]:
+            print(f"     - {issue}")
+        failed += 0 if report["ok"] else 1
+    return 1 if failed or (not args.file and store.errors()) else 0
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     from leegen.runner import Orchestrator, RunRequest
     from leegen.store.problems import ProblemStore
@@ -189,6 +225,16 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--file", help="validate a YAML file that is not in problems/ yet")
     s.add_argument("--executor")
     s.set_defaults(fn=_cmd_validate)
+
+    s = sub.add_parser("tutorial", help="list or validate tutorials (replays their references)")
+    tsub = s.add_subparsers(dest="tutorial_cmd", required=True)
+    tsub.add_parser("list", help="list tutorials").set_defaults(fn=_cmd_tutorial)
+    t = tsub.add_parser("validate", help="every check passes on the reference, fails on the starter")
+    t.add_argument("ids", nargs="*")
+    t.add_argument("--all", action="store_true")
+    t.add_argument("--file", help="validate a YAML file that is not in tutorials/ yet")
+    t.add_argument("--executor")
+    t.set_defaults(fn=_cmd_tutorial)
 
     s = sub.add_parser("run", help="run the workspace code (or --reference) for a problem")
     s.add_argument("id")

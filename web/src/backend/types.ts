@@ -8,6 +8,8 @@
 import type { AgentStatus, BackendEvent, ConsoleResult } from "../contracts/generated";
 import type {
   CustomTest,
+  Tutorial,
+  TutorialSummary,
   ExecutorInfo,
   Problem,
   ProblemSummary,
@@ -70,8 +72,21 @@ export interface ImportSummary {
   errors: { path: string; error: string }[];
 }
 
+/** Tutorials (server edition for now; absent where the backend cannot run them). */
+export interface TutorialApi {
+  list(): Promise<{ tutorials: TutorialSummary[]; errors: { path: string; error: string }[] }>;
+  get(id: string): Promise<Tutorial>;
+  saveFiles(id: string, files: Record<string, string>): Promise<unknown>;
+  /** Replay the learner's earlier cells, run this one, then its hidden checks. */
+  runCell(id: string, cell: string, files: Record<string, string>, runId: string): Promise<ConsoleResult>;
+  cancel(runId: string): Promise<unknown>;
+  /** One cell back to its starter, or (no cell) the whole tutorial. */
+  reset(id: string, cell?: string): Promise<{ files: Record<string, string>; results: Tutorial["results"] }>;
+}
+
 export interface Backend {
   readonly edition: "server" | "browser";
+  readonly tutorials?: TutorialApi;
 
   getAgentStatus(): Promise<AgentStatus>;
 

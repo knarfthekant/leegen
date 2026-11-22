@@ -17,6 +17,7 @@ def _default_root() -> Path:
 class Settings:
     root: Path
     problems_dir: Path
+    tutorials_dir: Path
     environments_dir: Path
     workspace_dir: Path
     cache_dir: Path
@@ -45,6 +46,7 @@ def settings() -> Settings:
     return Settings(
         root=root,
         problems_dir=Path(os.environ.get("LEEGEN_PROBLEMS", root / "problems")),
+        tutorials_dir=Path(os.environ.get("LEEGEN_TUTORIALS", root / "tutorials")),
         environments_dir=Path(os.environ.get("LEEGEN_ENVIRONMENTS", root / "environments")),
         workspace_dir=Path(os.environ.get("LEEGEN_WORKSPACE", root / "workspace")),
         cache_dir=Path(os.environ.get("LEEGEN_CACHE", Path.home() / ".cache" / "leegen")),

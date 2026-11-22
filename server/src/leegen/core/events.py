@@ -171,6 +171,8 @@ class SnippetSpec(BaseModel):
     file: str | None = None
     code: str = ""
     stdin: str = ""
+    prior: list[str] | None = Field(None, description="Tutorial cells: code replayed first.")
+    checks: list[dict[str, str]] = Field(default_factory=list)
 
 
 class RunnerRequest(BaseModel):

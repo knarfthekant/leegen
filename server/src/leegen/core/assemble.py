@@ -6,7 +6,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from leegen.core.models import (ConsoleResult, ConsoleStatus, Metric, Problem, RunResult,
+from leegen.core.models import (CheckResult, ConsoleResult, ConsoleStatus, Metric, Problem,
+                                RunResult,
                                 TestResult)
 
 
@@ -59,9 +60,14 @@ def assemble_console(run_id: str, problem: Problem, outcome: ExecOutcome, execut
     stdout: list[str] = []
     stderr: list[str] = []
     done: dict[str, Any] | None = None
+    checks: list[CheckResult] = []
     for ev in parse_events(outcome.results):
         kind = ev.get("type")
-        if kind == "output":
+        if kind == "check":
+            checks.append(CheckResult(description=str(ev.get("description") or ""),
+                                      status=ev.get("status") or "error",
+                                      message=str(ev.get("message") or "")))
+        elif kind == "output":
             text = str(ev.get("text") or "")
             (stderr if ev.get("stream") == "stderr" else stdout).append(text)
         elif kind == "console_done":
@@ -96,7 +102,7 @@ def assemble_console(run_id: str, problem: Problem, outcome: ExecOutcome, execut
         run_id=run_id, problem_id=problem.id, status=status, executor=executor_id,
         device=device, file=file, started_at=started,
         duration_ms=outcome.duration_ms, stdout=_cap("".join(stdout)),
-        stderr=_cap("".join(stderr)), result=value, error=error,
+        stderr=_cap("".join(stderr)), result=value, error=error, checks=checks,
     )
 
 

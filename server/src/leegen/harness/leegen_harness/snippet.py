@@ -79,6 +79,47 @@ def _exec_selection(code: str, ns: dict[str, Any]) -> str | None:
     return repr(value) if value is not None and echo else None
 
 
+def _run_prior(prior: list[str], ns: dict[str, Any]) -> None:
+    """Replay earlier tutorial cells silently. A failure names the cell that raised."""
+    sink = _Mute()
+    for i, code in enumerate(prior, 1):
+        with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+            try:
+                _exec_selection(code, ns)
+            except (KeyboardInterrupt, TestTimeout):
+                raise
+            except BaseException as exc:  # noqa: BLE001
+                raise _PriorFailed(i, user_traceback(exc)) from None
+
+
+class _Mute(io.StringIO):
+    def write(self, text: str) -> int:
+        return len(text)
+
+
+class _PriorFailed(Exception):
+    def __init__(self, number: int, trace: str) -> None:
+        super().__init__(f"an earlier cell failed (code cell {number}):\n{trace}")
+
+
+def _run_checks(checks: list[dict[str, Any]], ns: dict[str, Any]) -> None:
+    """Run each check on a copy of the namespace and emit one `check` event per check."""
+    for ck in checks:
+        status, message = "pass", ""
+        sink = _Mute()
+        try:
+            with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
+                exec(compile(textwrap.dedent(ck.get("code") or ""), "<check>", "exec"), dict(ns))
+        except (KeyboardInterrupt, TestTimeout):
+            raise
+        except AssertionError as exc:
+            status, message = "fail", str(exc)
+        except BaseException as exc:  # noqa: BLE001 - user objects may raise anything
+            status, message = "error", f"{type(exc).__name__}: {exc}"
+        emit({"type": "check", "description": ck.get("description") or "", "status": status,
+              "message": truncate(message, 2_000) or ""})
+
+
 def run(cfg: dict[str, Any]) -> None:
     started = time.perf_counter()
     spec = cfg.get("snippet") or {}
@@ -92,12 +133,20 @@ def run(cfg: dict[str, Any]) -> None:
               contextlib.redirect_stderr(_Stream("stderr")),
               module_scope(user_dir),
               alarm(max(deadline.remaining(), 0.001))):
-            ns = _load_context(user_dir, spec.get("file"))
+            notebook = spec.get("prior") is not None or bool(spec.get("checks"))
+            ns = ({"__name__": "__tutorial__"} if notebook
+                  else _load_context(user_dir, spec.get("file")))
+            if notebook:
+                _run_prior(spec.get("prior") or [], ns)
             value = _exec_selection(spec.get("code") or "", ns)
+            if notebook and spec.get("checks"):
+                _run_checks(spec["checks"], ns)
     except KeyboardInterrupt:
         raise   # the browser runner's soft stop: the caller assembles a timeout/cancel
     except TestTimeout:
         status, error = "timeout", "exceeded the time limit"
+    except _PriorFailed as exc:
+        status, error = "error", str(exc)
     except BaseException as exc:  # noqa: BLE001 - user code may raise anything
         status, error = "error", user_traceback(exc)
     finally:
