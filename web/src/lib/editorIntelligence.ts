@@ -5,6 +5,7 @@
 
 import type * as Monaco from "monaco-editor/editor";
 import { PY_BUILTINS, PY_KEYWORDS, PY_SNIPPETS } from "./pythonCatalog";
+import { libraryMembers } from "./pythonLibraries";
 import {
   buildSymbolIndex,
   findCallContext,
@@ -95,7 +96,7 @@ function collectSources(problemId: string, current: Monaco.editor.ITextModel | n
 function parsedFor(problemId: string, file: SourceFile): PyFileParse {
   const key = `${problemId}\0${file.path}`;
   const hit = parseCache.get(key);
-  const fresh = hit && (file.versionKey ? hit.versionKey === file.versionKey : hit.source === file.source);
+  const fresh = hit && hit.source === file.source;
   if (hit && fresh) {
     parseCache.delete(key);   // refresh LRU position
     parseCache.set(key, hit);
@@ -145,6 +146,7 @@ export function registerEditorIntelligence(monaco: MonacoApi): void {
   registered = true;
 
   monaco.languages.registerCompletionItemProvider("python", {
+    triggerCharacters: ["."],
     provideCompletionItems(model, position) {
       const index = indexFor(model);
       const currentPath = pathOf(model);
@@ -153,6 +155,21 @@ export function registerEditorIntelligence(monaco: MonacoApi): void {
         position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
       const out: Monaco.languages.CompletionItem[] = [];
       const seen = new Set<string>();
+      const before = model.getValue().slice(0, model.getOffsetAt(position) - word.word.length);
+      const receiver = /([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\.$/.exec(before);
+      const members = receiver ? libraryMembers(before, receiver[1]) : null;
+      if (members) {
+        return { suggestions: members.map((item) => ({
+          label: item.name,
+          kind: item.kind === "class" ? monaco.languages.CompletionItemKind.Class
+            : item.kind === "function" ? monaco.languages.CompletionItemKind.Function
+              : item.kind === "property" ? monaco.languages.CompletionItemKind.Property
+                : monaco.languages.CompletionItemKind.Method,
+          detail: item.detail,
+          insertText: item.name,
+          range,
+        })) };
+      }
       for (const sym of index.symbols) {
         if (seen.has(sym.name)) continue;
         seen.add(sym.name);
@@ -200,7 +217,10 @@ export function registerEditorIntelligence(monaco: MonacoApi): void {
           sortText: `4_${snippet.label}`,
         });
       }
-      return { suggestions: out.slice(0, MAX_SUGGESTIONS) };
+      const prefix = word.word.toLowerCase();
+      return { suggestions: out.filter((item) =>
+        typeof item.label === "string" && item.label.toLowerCase().includes(prefix))
+        .slice(0, MAX_SUGGESTIONS) };
     },
   });
 

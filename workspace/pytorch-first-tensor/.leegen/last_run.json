@@ -1,0 +1,123 @@
+{
+  "run_id": "de1f751cbe06",
+  "problem_id": "pytorch-first-tensor",
+  "mode": "user",
+  "status": "passed",
+  "executor": "local",
+  "device": "mps",
+  "started_at": 1793581910.988876,
+  "duration_ms": 3468.287333846092,
+  "passed": 4,
+  "total": 4,
+  "tests": [
+    {
+      "name": "Mixed activations in a batch",
+      "status": "pass",
+      "visible": true,
+      "custom": false,
+      "description": "Each row uses the same weight matrix, bias broadcasts, and negative outputs become zero.",
+      "section": null,
+      "input": {
+        "generated": "_setup.py:make_inputs(seed=0, x=[[1, 2], [-1, 3]], weight=[[1, -1], [2, 1], [0.5, 0.5]], bias=[0, 0.5, -2])",
+        "args": [],
+        "kwargs": {
+          "x": {
+            "__repr__": "tensor(shape=[2, 2], dtype=float32, device=mps:0) [1, 2, -1, 3]"
+          },
+          "weight": {
+            "__repr__": "tensor(shape=[3, 2], dtype=float32, device=mps:0) [1, -1, 2, 1, 0.5, 0.5]"
+          },
+          "bias": {
+            "__repr__": "tensor(shape=[3], dtype=float32, device=mps:0) [0, 0.5, -2]"
+          }
+        }
+      },
+      "expected": [
+        [
+          0,
+          4.5,
+          0
+        ],
+        [
+          0,
+          1.5,
+          0
+        ]
+      ],
+      "actual": {
+        "__repr__": "tensor(shape=[2, 3], dtype=float32, device=mps:0) [0, 4.5, 0, 0, 1.5, 0]"
+      },
+      "message": null,
+      "stdout": null,
+      "duration_ms": 706.651
+    },
+    {
+      "name": "One input row and two output features",
+      "status": "pass",
+      "visible": true,
+      "custom": false,
+      "description": "Matrix multiplication works when the batch has one row and output width differs from input width.",
+      "section": null,
+      "input": {
+        "generated": "_setup.py:make_inputs(seed=0, x=[[2, 0, -1]], weight=[[1, 0, 1], [-1, 2, 0]], bias=[0.5, -1])",
+        "args": [],
+        "kwargs": {
+          "x": {
+            "__repr__": "tensor(shape=[1, 3], dtype=float32, device=mps:0) [2, 0, -1]"
+          },
+          "weight": {
+            "__repr__": "tensor(shape=[2, 3], dtype=float32, device=mps:0) [1, 0, 1, -1, 2, 0]"
+          },
+          "bias": {
+            "__repr__": "tensor(shape=[2], dtype=float32, device=mps:0) [0.5, -1]"
+          }
+        }
+      },
+      "expected": [
+        [
+          1.5,
+          0
+        ]
+      ],
+      "actual": {
+        "__repr__": "tensor(shape=[1, 2], dtype=float32, device=mps:0) [1.5, 0]"
+      },
+      "message": null,
+      "stdout": null,
+      "duration_ms": 1.365
+    },
+    {
+      "name": "Single output feature",
+      "status": "pass",
+      "visible": false,
+      "custom": false,
+      "description": "The output keeps both batch and feature dimensions when there is one output feature.",
+      "section": null,
+      "input": null,
+      "expected": null,
+      "actual": null,
+      "message": null,
+      "stdout": null,
+      "duration_ms": 5.122
+    },
+    {
+      "name": "Bias turns a negative product positive",
+      "status": "pass",
+      "visible": false,
+      "custom": false,
+      "description": "Add bias before ReLU so a negative matrix product can become positive.",
+      "section": null,
+      "input": null,
+      "expected": null,
+      "actual": null,
+      "message": null,
+      "stdout": null,
+      "duration_ms": 3.86
+    }
+  ],
+  "metrics": [],
+  "compile_output": null,
+  "error": null,
+  "stdout": "",
+  "stderr": ""
+}

@@ -222,15 +222,20 @@ export function parsePythonFile(path: string, source: string): PyFileParse {
       continue;
     }
 
-    if (indent > 0) continue;
     const fromImport = /^from\s+([\w.]+)\s+import\s+(.+)$/.exec(trimmed);
     if (fromImport) {
       const module = fromImport[1];
-      for (const part of splitTopLevel(fromImport[2])) {
+      const importLine = i + 1;
+      let imported = fromImport[2];
+      if (imported.startsWith("(")) {
+        while (!imported.includes(")") && i + 1 < maskedLines.length) imported += ` ${maskedLines[++i].trim()}`;
+        imported = imported.replace(/^\(/, "").replace(/\).*$/, "");
+      }
+      for (const part of splitTopLevel(imported)) {
         const name = (part.split(/\s+as\s+/).pop() ?? "").trim();
         if (/^[A-Za-z_]\w*$/.test(name)) {
           symbols.push({
-            name, kind: "module", path, line: i + 1, indent, params: [], returns: null,
+            name, kind: "module", path, line: importLine, indent, params: [], returns: null,
             signature: `from ${module} import ${part.trim()}`.slice(0, MAX_SIGNATURE), doc: null,
           });
         }
@@ -250,6 +255,7 @@ export function parsePythonFile(path: string, source: string): PyFileParse {
       }
       continue;
     }
+    if (indent > 0) continue;
     const assign = /^([A-Za-z_]\w*)\s*(?::[^=]*)?=(?!=)/.exec(trimmed);
     if (assign) {
       symbols.push({
