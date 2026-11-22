@@ -22,6 +22,7 @@ from leegen.core.toolspec import TOOLS
 from leegen.schema.export import problem_json_schema
 from leegen.service import ToolService
 from leegen.state import app_state
+from leegen.tutorial_service import TutorialService
 from leegen.store.problems import dump_problem_yaml
 
 INSTRUCTIONS = """\
@@ -31,18 +32,29 @@ in a browser editor and runs tests on CPU or GPU executors.
 Authoring: call get_authoring_guide once, then validate_problem / create_problem with full YAML.
 create_problem only saves when the reference solution passes every test and the starter fails.
 
-Tutoring (helping the user with the problem they have open): call get_session first. Give hints
+Tutorials are notebook-like pages of Markdown and code cells with hidden checks. To write one:
+call get_tutorial_guide once, then validate_tutorial_yaml / create_tutorial with full YAML
+(create_tutorial only saves when every reference passes its checks and every starter fails one).
+
+Tutoring (helping the user with the problem or tutorial they have open): call get_session first. Give hints
 in small steps, and don't hand over a full solution unless the user asks for it. Use annotate to
 comment on specific lines, and propose_edit (never direct file writes) to suggest code changes,
 which the user accepts or rejects in the editor.
 
-Signal work with set_agent_status: reviewing or creating_problem, then idle when finished
+For a tutorial, annotate and propose_edit take problem_id="tut-<tutorial id>" and
+file="cells/<cell id>.py"; run_tutorial_cell runs a cell on the user's current code.
+
+Signal work with set_agent_status: reviewing or creating_problem (also for tutorials), then idle when finished
 (including on failure). Renew before five minutes if still working.
 """
 
 
 def _svc() -> ToolService:
     return app_state().service
+
+
+def _tut() -> TutorialService:
+    return app_state().tutorial_service
 
 
 class AnnotationIn(BaseModel):
@@ -173,13 +185,75 @@ def build_mcp() -> MCPServer:
         """Delete a problem file (and optionally the user's workspace for it)."""
         return await _svc().delete_problem(problem_id, delete_user_code)
 
+    # ============================================================ tutorials
+
+    @tool()
+    def get_tutorial_guide() -> str:
+        """How to write leegen tutorials: the YAML format (Markdown and code cells, hidden
+        checks, references), how cells run, and authoring rules. Read this before creating a
+        tutorial. Problems are a different thing: see get_authoring_guide."""
+        return _tut().guide()
+
+    @tool()
+    def list_tutorials(track: str | None = None) -> dict[str, Any]:
+        """All tutorials (optionally only one track) with cell counts and how many cells the
+        user has passed, plus files that failed to load."""
+        return _tut().agent_list(track)
+
+    @tool()
+    def get_tutorial(tutorial_id: str, include_hidden: bool = True) -> dict[str, Any]:
+        """A tutorial. With include_hidden (default) returns the full YAML, including the hidden
+        checks and the references. Otherwise returns only what the learner sees."""
+        return _tut().agent_get(tutorial_id, include_hidden)
+
+    @tool()
+    async def validate_tutorial_yaml(yaml: str) -> dict[str, Any]:
+        """Check a tutorial without saving it: the schema, then every cell's reference must pass
+        its checks and every starter must fail at least one."""
+        _, report = await _tut().validate_yaml(yaml)
+        return report
+
+    @tool()
+    async def create_tutorial(yaml: str, overwrite: bool = False) -> dict[str, Any]:
+        """Validate and save a tutorial to tutorials/<id>.yaml. Nothing is saved if validation
+        fails (a tutorial is saved unvalidated only when no executor can run it, and the
+        response says so). Use overwrite=true to replace an existing tutorial."""
+        return await _tut().create(yaml, overwrite)
+
+    @tool()
+    async def update_tutorial(tutorial_id: str, yaml: str) -> dict[str, Any]:
+        """Replace an existing tutorial with new YAML (validated the same way as
+        create_tutorial). The learner's saved code is kept, by cell id."""
+        return await _tut().update(tutorial_id, yaml)
+
+    @tool()
+    async def delete_tutorial(tutorial_id: str, delete_user_code: bool = False) -> dict[str, Any]:
+        """Delete a tutorial file (and optionally the learner's saved code and results)."""
+        return await _tut().delete(tutorial_id, delete_user_code)
+
+    @tool()
+    async def open_tutorial(tutorial_id: str) -> dict[str, Any]:
+        """Open a tutorial in the user's browser."""
+        return await _tut().navigate(tutorial_id)
+
+    @tool()
+    async def run_tutorial_cell(cell: str | None = None,
+                                tutorial_id: str | None = None) -> dict[str, Any]:
+        """Run one code cell of the tutorial on the learner's current code (earlier cells are
+        replayed first, then the cell's hidden checks run), as clicking Run does. The ticks
+        update in their page. Defaults: the open tutorial, and its active cell. Returns the
+        status, each check's result, and the output."""
+        return await _tut().run_for_agent(tutorial_id, cell)
+
     # ============================================================ tutoring
 
     @tool()
     def get_session() -> dict[str, Any]:
         """What the user is doing right now: the open problem, their current code (including
         unsaved edits), cursor and selection, the last run's results, custom tests, and existing
-        review comments and pending suggestions. Call this first when helping the user."""
+        review comments and pending suggestions. When a tutorial is open ("kind": "tutorial")
+        it lists the cells with the learner's code and each cell's last outcome instead. Call
+        this first when helping the user."""
         return _svc().get_session()
 
     @tool()
@@ -202,7 +276,8 @@ def build_mcp() -> MCPServer:
         clicking focuses it in the Review tab. Lines and columns are 1-based and refer to the
         current code from get_session; end_col is exclusive. Always prefer start_col/end_col
         that cover just the offending token or expression; without columns the whole text of
-        the line(s) is marked. Comments may overlap, and each stays visible."""
+        the line(s) is marked. Comments may overlap, and each stays visible. For a tutorial cell
+        pass problem_id="tut-<tutorial id>" and file="cells/<cell id>.py"."""
         created = await _svc().annotate([a.model_dump() for a in annotations], problem_id, author)
         return {"created": [c["id"] for c in created]}
 
@@ -218,7 +293,8 @@ def build_mcp() -> MCPServer:
                            author: str = "assistant") -> dict[str, Any]:
         """Suggest a change to one of the user's editable files. Shown as a diff the user accepts
         or rejects. Give either the full new `content` or a list of exact search/replace
-        `edits`. A newer proposal for the same file replaces the pending one."""
+        `edits`. A newer proposal for the same file replaces the pending one. For a tutorial cell
+        pass problem_id="tut-<tutorial id>" and file="cells/<cell id>.py"."""
         proposal = await _svc().propose_edit(
             file, content=content, edits=[e.model_dump() for e in edits] if edits else None,
             rationale=rationale, problem_id=problem_id, author=author)

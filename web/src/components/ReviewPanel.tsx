@@ -15,7 +15,7 @@ interface Props {
   onOpenProposal: (p: Proposal) => void;
 }
 
-const SEVERITY_ICON: Record<Severity, LucideIcon> = {
+export const SEVERITY_ICON: Record<Severity, LucideIcon> = {
   info: Info,
   hint: Lightbulb,
   warning: TriangleAlert,

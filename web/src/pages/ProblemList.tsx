@@ -1,13 +1,14 @@
 import { BookOpen, CircleAlert, Inbox, ListChecks, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Brand, ConnectionDot, RepositoryLink, ThemeToggle } from "../components/Chrome";
-import { ImportReport, SavedReport, TransferButtons } from "../components/Transfer";
+import { ImportReport, TransferButtons } from "../components/Transfer";
 import type { ImportSummary } from "../backend/types";
-import { filterProblems, ProblemRow, StatusIcon } from "../components/ProblemRow";
-import { Chip, cx, DIFFICULTY_TONE, IconButton, Segmented, Skeleton, type Tone } from "../components/ui";
+import { filterProblems, ProblemRow } from "../components/ProblemRow";
+import { filterTutorials, tutorialDone, TutorialRow } from "../components/TutorialRow";
+import { Chip, DIFFICULTY_TONE, IconButton, Segmented, Skeleton, type Tone } from "../components/ui";
 import { getBackend, useBackendEvents } from "../backend";
 import { type Difficulty, type ProblemSummary, type TutorialSummary } from "../lib/api";
-import { href as appHref, navigate } from "../lib/router";
+import { navigate } from "../lib/router";
 
 const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard"];
 
@@ -30,11 +31,10 @@ export function ProblemList() {
   const [errors, setErrors] = useState<{ path: string; error: string }[]>([]);
   const [errorsHidden, setErrorsHidden] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [imported, setImported] = useState<(ImportSummary & { folder?: string }) | null>(null);
-  const [saved, setSaved] = useState<{ folder: string; written: number } | null>(null);
+  const [imported, setImported] = useState<ImportSummary | null>(null);
   const [tutorials, setTutorials] = useState<TutorialSummary[] | null>(null);
 
-  // Tutorials exist only in the server edition for now; without them there is nothing to switch.
+  // A backend without tutorials has nothing to switch to.
   const tutorialApi = getBackend().tutorials;
   const [view, setViewState] = useState<View>(() => (tutorialApi ? initialView() : "practice"));
   const direction = useRef(0);
@@ -45,8 +45,11 @@ export function ProblemList() {
     rememberView(next);
   };
 
-  useEffect(() => {
+  const loadTutorials = () =>
     tutorialApi?.list().then((r) => setTutorials(r.tutorials), () => setTutorials([]));
+  useEffect(() => {
+    void loadTutorials();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tutorialApi]);
 
   const load = () =>
@@ -60,9 +63,11 @@ export function ProblemList() {
   }, []);
   useBackendEvents((e) => {
     if (e.type === "problems_changed" || e.type === "run_finished") load();
+    if (e.type === "problems_changed" || e.type === "tutorials_changed") void loadTutorials();
     if (e.type === "navigate") navigate(`/p/${e.problem_id}`);
   });
   const browser = getBackend().edition === "browser";
+  const notices = imported && <ImportReport summary={imported} onClose={() => setImported(null)} />;
 
   return (
     <div className="list-page">
@@ -72,16 +77,7 @@ export function ProblemList() {
         </div>
         <div className="spacer" />
         <div className="topbar-side end">
-          <TransferButtons
-            onImported={(s) => {
-              setSaved(null);
-              setImported(s);
-            }}
-            onSaved={(s) => {
-              setImported(null);
-              setSaved(s);
-            }}
-          />
+          <TransferButtons onImported={setImported} />
           <ConnectionDot />
           {browser && <RepositoryLink />}
           <ThemeToggle />
@@ -106,7 +102,7 @@ export function ProblemList() {
         {/* only this pane changes on a switch: it is keyed, so it re-enters from the switch's side */}
         <div className="view-pane" key={view} style={{ "--dir": direction.current } as CSSProperties}>
           {view === "tutorials" ? (
-            <TutorialsView tutorials={tutorials} />
+            <TutorialsView tutorials={tutorials} notices={notices} />
           ) : (
             <PracticeView
               problems={problems}
@@ -114,12 +110,7 @@ export function ProblemList() {
               browser={browser}
               errors={errorsHidden ? [] : errors}
               onDismissErrors={() => setErrorsHidden(true)}
-              notices={
-                <>
-                  {imported && <ImportReport summary={imported} onClose={() => setImported(null)} />}
-                  {saved && <SavedReport saved={saved} onClose={() => setSaved(null)} />}
-                </>
-              }
+              notices={notices}
             />
           )}
         </div>
@@ -354,24 +345,13 @@ function PracticeView({
 
 /* ------------------------------------------------------------------ tutorials */
 
-const tutorialDone = (t: TutorialSummary) => t.checked > 0 && t.passed >= t.checked;
-const tutorialStatus = (t: TutorialSummary): ProblemSummary["status"] =>
-  tutorialDone(t) ? "passed" : t.passed > 0 ? "attempted" : undefined;
-
-function TutorialsView({ tutorials }: { tutorials: TutorialSummary[] | null }) {
+function TutorialsView({ tutorials, notices }: { tutorials: TutorialSummary[] | null; notices: ReactNode }) {
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState<string | null>(null);
   const loading = tutorials === null;
   const all = tutorials ?? [];
   const tags = useMemo(() => [...new Set(all.flatMap((t) => t.tags))].slice(0, 8), [all]);
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return all.filter(
-      (t) =>
-        (!tag || t.tags.includes(tag)) &&
-        (!q || [t.title, t.id, t.summary, t.environment, ...t.tags].some((s) => s.toLowerCase().includes(q))),
-    );
-  }, [all, query, tag]);
+  const filtered = useMemo(() => filterTutorials(all, query).filter((t) => !tag || t.tags.includes(tag)), [all, query, tag]);
 
   const finished = all.filter(tutorialDone).length;
   const checked = all.reduce((n, t) => n + t.checked, 0);
@@ -393,6 +373,7 @@ function TutorialsView({ tutorials }: { tutorials: TutorialSummary[] | null }) {
         }
       />
 
+      {notices}
       <Toolbar query={query} onQuery={setQuery} placeholder="Search tutorials, topics">
         {tags.map((t) => (
           <Chip key={t} tone={tag === t ? "accent" : "neutral"} active={tag === t} onClick={() => setTag(tag === t ? null : t)}>
@@ -414,35 +395,5 @@ function TutorialsView({ tutorials }: { tutorials: TutorialSummary[] | null }) {
         )}
       </div>
     </>
-  );
-}
-
-function TutorialRow({ t, index }: { t: TutorialSummary; index: number }) {
-  const path = `/t/${t.id}`;
-  return (
-    <a
-      href={appHref(path)}
-      className="problem-row tutorial-row"
-      onClick={(e) => {
-        e.preventDefault();
-        navigate(path);
-      }}
-    >
-      <StatusIcon status={tutorialStatus(t)} />
-      <span className="tr-body">
-        <span className="pr-title">
-          <span className="pr-index">{index + 1}.</span> {t.title}
-        </span>
-        {t.summary && <span className="tr-summary">{t.summary}</span>}
-      </span>
-      <span className="pr-meta">
-        {t.tags.slice(0, 2).map((x) => (
-          <Chip key={x}>{x}</Chip>
-        ))}
-      </span>
-      <span className={cx("tr-progress tabular", tutorialDone(t) ? "tone-text-pass" : "muted")}>
-        {t.checked > 0 ? `${Math.min(t.passed, t.checked)}/${t.checked}` : `${t.cells} cells`}
-      </span>
-    </a>
   );
 }

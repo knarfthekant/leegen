@@ -37,6 +37,9 @@ from leegen.core.models import ConsoleResult, Environment, Metric, Problem, RunR
 from leegen.core.parse import parse_problem_yaml
 from leegen.core.plan import unique_test_name
 from leegen.core.toolspec import TOOLS
+from leegen.core.tutorial import (cell_run_inputs, parse_tutorial_yaml, public_tutorial,
+                                  reference_issues, session_cells, starter_issues,
+                                  tutorial_summary)
 from leegen.core.views import brief_run, problem_summary, public_problem, run_status
 from leegen.schema.export import problem_json_schema
 
@@ -334,6 +337,65 @@ def views_fixtures(problems: dict[str, Problem]) -> dict[str, Any]:
     return {"cases": cases}
 
 
+FIXTURE_TUTORIAL = """
+id: fixture-tutorial
+title: Fixture tutorial
+summary: Two code cells.
+tags: [python]
+cells:
+  - {type: markdown, text: Set x.}
+  - type: code
+    id: one
+    starter: "x = 1"
+    reference: "x = 2"
+    stdin: "ada\\n"
+    checks:
+      - {description: x is two, code: "assert x == 2"}
+  - {type: markdown, text: Use x.}
+  - type: code
+    id: two
+    starter: "x + 1"
+  - type: code
+    id: three
+    starter: "print(x)"
+"""
+
+
+def tutorial_fixtures() -> dict[str, Any]:
+    """One tutorial plus the views and run inputs the TypeScript port must reproduce."""
+    t = parse_tutorial_yaml(FIXTURE_TUTORIAL)
+    saved = {"cells/one.py": "x = 5"}       # `two` is unsaved: its starter must be used
+    cases = [{"fn": "public_tutorial", "args": {}, "result": public_tutorial(t)},
+             {"fn": "tutorial_summary", "args": {}, "result": tutorial_summary(t)}]
+    for cell in t.code_cells():
+        cases.append({"fn": "cell_run_inputs", "args": {"files": saved, "cell": cell.id},
+                      "result": cell_run_inputs(t, saved, cell.id)})
+
+    def console(status: str, checks: list[tuple[str, str, str]], error: str | None = None) -> Any:
+        return ConsoleResult(
+            run_id="r", problem_id="tut-fixture-tutorial", status=status,  # type: ignore[arg-type]
+            executor="browser", started_at=0.0, duration_ms=0.0, error=error,
+            checks=[{"description": d, "status": st, "message": m} for d, st, m in checks])
+
+    for label, result in {
+        "clean": console("ok", [("x is two", "pass", "")]),
+        "raised": console("error", [], "NameError: boom"),
+        "failing": console("ok", [("x is two", "fail", "x was 1"), ("no msg", "error", "")]),
+        "none": console("ok", []),
+    }.items():
+        dumped = result.model_dump(mode="json")
+        cases.append({"fn": "reference_issues", "args": {"cell": "one", "result": dumped, "label": label},
+                      "result": reference_issues("one", result)})
+        cases.append({"fn": "starter_issues", "args": {"cell": "one", "result": dumped, "label": label},
+                      "result": starter_issues("one", result)})
+    outcome = {"status": "ok", "passed": False, "ran_at": 1.0,
+               "checks": [{"description": "x is two", "status": "fail", "message": "x was 5"}]}
+    for results in ({}, {"one": outcome}):
+        cases.append({"fn": "session_cells", "args": {"files": saved, "results": results},
+                      "result": session_cells(t, saved, results)})
+    return {"tutorial": t.model_dump(mode="json"), "cases": cases}
+
+
 # ------------------------------------------------------------------ write / check
 
 
@@ -356,6 +418,7 @@ def outputs() -> dict[Path, str]:
         root / "contracts" / "fixtures" / "problems.json": _dump(problem_data),
         root / "contracts" / "fixtures" / "review.json": _dump(review_fixtures(problems)),
         root / "contracts" / "fixtures" / "views.json": _dump(views_fixtures(problems)),
+        root / "contracts" / "fixtures" / "tutorials.json": _dump(tutorial_fixtures()),
         root / "web" / "src" / "contracts" / "generated.ts": typescript(records, inputs),
     }
 

@@ -22,6 +22,7 @@ from leegen.core.events import AgentActivity, AgentStatus
 from leegen.core.models import ConsoleResult, Environment, Problem, RunResult
 from leegen.core.parse import dump_problem_yaml, format_error, parse_problem_yaml
 from leegen.core.toolspec import TUTORING_GUIDE
+from leegen.core.tutorial import is_shim_id
 from leegen.core.validation import ValidationReport, validate
 from leegen.core.views import brief_run, problem_summary, public_problem, run_status, sort_key
 from leegen.runner import Orchestrator, RunRequest, SnippetRequest
@@ -87,6 +88,8 @@ class ToolService:
         self.docs_dir = docs_dir
         self.run_lock: dict[str, asyncio.Lock] = {}
         self._agent_status = AgentStatus()
+        # wired by state.py: lets review comments and edits reach a tutorial's cells
+        self.tutorials: Any = None
 
     @property
     def executors(self):  # type: ignore[no-untyped-def]
@@ -102,6 +105,15 @@ class ToolService:
         if p is None:
             raise LookupError(f"no problem {pid!r}; call list_problems")
         return p
+
+    def target(self, problem_id: str | None = None) -> Problem:
+        """A problem, or a tutorial's stand-in (`tut-<id>`: each code cell is a file `cells/x.py`).
+        For review comments and edits, which work the same on both; run_tests and the authoring
+        tools still take real problems only."""
+        pid = problem_id or self.session.problem_id
+        if pid and is_shim_id(pid) and self.tutorials is not None and self.problems.get(pid) is None:
+            return self.tutorials.shim_for(pid)
+        return self.problem(problem_id)
 
     def current_files(self, problem: Problem) -> dict[str, str]:
         """The user's code as they see it: unsaved browser buffers win over disk."""
@@ -242,9 +254,12 @@ class ToolService:
     def get_session(self) -> dict[str, Any]:
         s = self.session
         p = self.problems.get(s.problem_id) if s.problem_id else None
+        if p is None and s.problem_id and is_shim_id(s.problem_id) and self.tutorials is not None:
+            return self.tutorials.session_view()
         if p is None:
             return {"problem_id": None, "message": "The user has no problem open."}
         return {
+            "kind": "problem",
             "problem_id": p.id,
             "title": p.title,
             "environment": p.environment,
@@ -288,7 +303,7 @@ class ToolService:
 
     async def annotate(self, items: list[dict[str, Any]], problem_id: str | None = None,
                        author: str = "assistant") -> list[dict[str, Any]]:
-        p = self.problem(problem_id)
+        p = self.target(problem_id)
         created = review.make_annotations(p, self.current_files(p), items, author)
         await self._save_annotations(p.id, self.list_annotations(p.id) + created)
         return created
@@ -301,7 +316,7 @@ class ToolService:
 
     async def clear_annotations(self, problem_id: str | None = None,
                                 file: str | None = None) -> int:
-        p = self.problem(problem_id)
+        p = self.target(problem_id)
         items = self.list_annotations(p.id)
         kept = review.without_annotations(items, file=file, clear=True)
         await self._save_annotations(p.id, kept)
@@ -322,7 +337,7 @@ class ToolService:
                            edits: list[dict[str, str]] | None = None,
                            problem_id: str | None = None, author: str = "assistant",
                            source: str = "mcp") -> dict[str, Any]:
-        p = self.problem(problem_id)
+        p = self.target(problem_id)
         proposal = review.make_proposal(p, self.current_files(p), file, content=content,
                                         edits=edits, rationale=rationale, author=author,
                                         source=source)
@@ -334,7 +349,7 @@ class ToolService:
                                action: Literal["accept", "reject"]) -> dict[str, str]:
         if action not in ("accept", "reject"):
             raise ValueError("action must be accept or reject")
-        p = self.problem(problem_id)
+        p = self.target(problem_id)
         items = self.list_proposals(p.id)
         proposal = next((x for x in items if x["id"] == proposal_id), None)
         if proposal is None:

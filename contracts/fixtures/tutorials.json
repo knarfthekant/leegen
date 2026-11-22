@@ -1,0 +1,516 @@
+{
+  "tutorial": {
+    "schema_version": 1,
+    "id": "fixture-tutorial",
+    "title": "Fixture tutorial",
+    "summary": "Two code cells.",
+    "tags": [
+      "python"
+    ],
+    "environment": "python",
+    "track": null,
+    "order": null,
+    "cells": [
+      {
+        "type": "markdown",
+        "text": "Set x."
+      },
+      {
+        "type": "code",
+        "id": "one",
+        "starter": "x = 1",
+        "reference": "x = 2",
+        "checks": [
+          {
+            "description": "x is two",
+            "code": "assert x == 2"
+          }
+        ],
+        "stdin": "ada\n"
+      },
+      {
+        "type": "markdown",
+        "text": "Use x."
+      },
+      {
+        "type": "code",
+        "id": "two",
+        "starter": "x + 1",
+        "reference": null,
+        "checks": [],
+        "stdin": ""
+      },
+      {
+        "type": "code",
+        "id": "three",
+        "starter": "print(x)",
+        "reference": null,
+        "checks": [],
+        "stdin": ""
+      }
+    ]
+  },
+  "cases": [
+    {
+      "fn": "public_tutorial",
+      "args": {},
+      "result": {
+        "id": "fixture-tutorial",
+        "title": "Fixture tutorial",
+        "summary": "Two code cells.",
+        "tags": [
+          "python"
+        ],
+        "environment": "python",
+        "track": null,
+        "order": null,
+        "cells": [
+          {
+            "type": "markdown",
+            "text": "Set x."
+          },
+          {
+            "type": "code",
+            "id": "one",
+            "starter": "x = 1",
+            "path": "cells/one.py",
+            "has_checks": true,
+            "stdin": "ada\n"
+          },
+          {
+            "type": "markdown",
+            "text": "Use x."
+          },
+          {
+            "type": "code",
+            "id": "two",
+            "starter": "x + 1",
+            "path": "cells/two.py",
+            "has_checks": false,
+            "stdin": ""
+          },
+          {
+            "type": "code",
+            "id": "three",
+            "starter": "print(x)",
+            "path": "cells/three.py",
+            "has_checks": false,
+            "stdin": ""
+          }
+        ]
+      }
+    },
+    {
+      "fn": "tutorial_summary",
+      "args": {},
+      "result": {
+        "id": "fixture-tutorial",
+        "title": "Fixture tutorial",
+        "summary": "Two code cells.",
+        "tags": [
+          "python"
+        ],
+        "environment": "python",
+        "track": null,
+        "order": null,
+        "cells": 3,
+        "checked": 1
+      }
+    },
+    {
+      "fn": "cell_run_inputs",
+      "args": {
+        "files": {
+          "cells/one.py": "x = 5"
+        },
+        "cell": "one"
+      },
+      "result": {
+        "code": "x = 5",
+        "prior": [],
+        "stdin": "ada\n",
+        "checks": [
+          {
+            "description": "x is two",
+            "code": "assert x == 2"
+          }
+        ]
+      }
+    },
+    {
+      "fn": "cell_run_inputs",
+      "args": {
+        "files": {
+          "cells/one.py": "x = 5"
+        },
+        "cell": "two"
+      },
+      "result": {
+        "code": "x + 1",
+        "prior": [
+          "x = 5"
+        ],
+        "stdin": "",
+        "checks": []
+      }
+    },
+    {
+      "fn": "cell_run_inputs",
+      "args": {
+        "files": {
+          "cells/one.py": "x = 5"
+        },
+        "cell": "three"
+      },
+      "result": {
+        "code": "print(x)",
+        "prior": [
+          "x = 5",
+          "x + 1"
+        ],
+        "stdin": "",
+        "checks": []
+      }
+    },
+    {
+      "fn": "reference_issues",
+      "args": {
+        "cell": "one",
+        "result": {
+          "run_id": "r",
+          "problem_id": "tut-fixture-tutorial",
+          "status": "ok",
+          "executor": "browser",
+          "device": null,
+          "file": null,
+          "started_at": 0.0,
+          "duration_ms": 0.0,
+          "stdout": "",
+          "stderr": "",
+          "result": null,
+          "error": null,
+          "checks": [
+            {
+              "description": "x is two",
+              "status": "pass",
+              "message": ""
+            }
+          ]
+        },
+        "label": "clean"
+      },
+      "result": []
+    },
+    {
+      "fn": "starter_issues",
+      "args": {
+        "cell": "one",
+        "result": {
+          "run_id": "r",
+          "problem_id": "tut-fixture-tutorial",
+          "status": "ok",
+          "executor": "browser",
+          "device": null,
+          "file": null,
+          "started_at": 0.0,
+          "duration_ms": 0.0,
+          "stdout": "",
+          "stderr": "",
+          "result": null,
+          "error": null,
+          "checks": [
+            {
+              "description": "x is two",
+              "status": "pass",
+              "message": ""
+            }
+          ]
+        },
+        "label": "clean"
+      },
+      "result": [
+        "cell one: the starter already passes every check"
+      ]
+    },
+    {
+      "fn": "reference_issues",
+      "args": {
+        "cell": "one",
+        "result": {
+          "run_id": "r",
+          "problem_id": "tut-fixture-tutorial",
+          "status": "error",
+          "executor": "browser",
+          "device": null,
+          "file": null,
+          "started_at": 0.0,
+          "duration_ms": 0.0,
+          "stdout": "",
+          "stderr": "",
+          "result": null,
+          "error": "NameError: boom",
+          "checks": []
+        },
+        "label": "raised"
+      },
+      "result": [
+        "cell one: reference raised: NameError: boom"
+      ]
+    },
+    {
+      "fn": "starter_issues",
+      "args": {
+        "cell": "one",
+        "result": {
+          "run_id": "r",
+          "problem_id": "tut-fixture-tutorial",
+          "status": "error",
+          "executor": "browser",
+          "device": null,
+          "file": null,
+          "started_at": 0.0,
+          "duration_ms": 0.0,
+          "stdout": "",
+          "stderr": "",
+          "result": null,
+          "error": "NameError: boom",
+          "checks": []
+        },
+        "label": "raised"
+      },
+      "result": []
+    },
+    {
+      "fn": "reference_issues",
+      "args": {
+        "cell": "one",
+        "result": {
+          "run_id": "r",
+          "problem_id": "tut-fixture-tutorial",
+          "status": "ok",
+          "executor": "browser",
+          "device": null,
+          "file": null,
+          "started_at": 0.0,
+          "duration_ms": 0.0,
+          "stdout": "",
+          "stderr": "",
+          "result": null,
+          "error": null,
+          "checks": [
+            {
+              "description": "x is two",
+              "status": "fail",
+              "message": "x was 1"
+            },
+            {
+              "description": "no msg",
+              "status": "error",
+              "message": ""
+            }
+          ]
+        },
+        "label": "failing"
+      },
+      "result": [
+        "cell one: reference fails check 'x is two' (x was 1)",
+        "cell one: reference fails check 'no msg' (error)"
+      ]
+    },
+    {
+      "fn": "starter_issues",
+      "args": {
+        "cell": "one",
+        "result": {
+          "run_id": "r",
+          "problem_id": "tut-fixture-tutorial",
+          "status": "ok",
+          "executor": "browser",
+          "device": null,
+          "file": null,
+          "started_at": 0.0,
+          "duration_ms": 0.0,
+          "stdout": "",
+          "stderr": "",
+          "result": null,
+          "error": null,
+          "checks": [
+            {
+              "description": "x is two",
+              "status": "fail",
+              "message": "x was 1"
+            },
+            {
+              "description": "no msg",
+              "status": "error",
+              "message": ""
+            }
+          ]
+        },
+        "label": "failing"
+      },
+      "result": []
+    },
+    {
+      "fn": "reference_issues",
+      "args": {
+        "cell": "one",
+        "result": {
+          "run_id": "r",
+          "problem_id": "tut-fixture-tutorial",
+          "status": "ok",
+          "executor": "browser",
+          "device": null,
+          "file": null,
+          "started_at": 0.0,
+          "duration_ms": 0.0,
+          "stdout": "",
+          "stderr": "",
+          "result": null,
+          "error": null,
+          "checks": []
+        },
+        "label": "none"
+      },
+      "result": []
+    },
+    {
+      "fn": "starter_issues",
+      "args": {
+        "cell": "one",
+        "result": {
+          "run_id": "r",
+          "problem_id": "tut-fixture-tutorial",
+          "status": "ok",
+          "executor": "browser",
+          "device": null,
+          "file": null,
+          "started_at": 0.0,
+          "duration_ms": 0.0,
+          "stdout": "",
+          "stderr": "",
+          "result": null,
+          "error": null,
+          "checks": []
+        },
+        "label": "none"
+      },
+      "result": []
+    },
+    {
+      "fn": "session_cells",
+      "args": {
+        "files": {
+          "cells/one.py": "x = 5"
+        },
+        "results": {}
+      },
+      "result": [
+        {
+          "type": "markdown",
+          "text": "Set x."
+        },
+        {
+          "type": "code",
+          "id": "one",
+          "path": "cells/one.py",
+          "code": "x = 5",
+          "modified": true,
+          "has_checks": true,
+          "outcome": null
+        },
+        {
+          "type": "markdown",
+          "text": "Use x."
+        },
+        {
+          "type": "code",
+          "id": "two",
+          "path": "cells/two.py",
+          "code": "x + 1",
+          "modified": false,
+          "has_checks": false,
+          "outcome": null
+        },
+        {
+          "type": "code",
+          "id": "three",
+          "path": "cells/three.py",
+          "code": "print(x)",
+          "modified": false,
+          "has_checks": false,
+          "outcome": null
+        }
+      ]
+    },
+    {
+      "fn": "session_cells",
+      "args": {
+        "files": {
+          "cells/one.py": "x = 5"
+        },
+        "results": {
+          "one": {
+            "status": "ok",
+            "passed": false,
+            "ran_at": 1.0,
+            "checks": [
+              {
+                "description": "x is two",
+                "status": "fail",
+                "message": "x was 5"
+              }
+            ]
+          }
+        }
+      },
+      "result": [
+        {
+          "type": "markdown",
+          "text": "Set x."
+        },
+        {
+          "type": "code",
+          "id": "one",
+          "path": "cells/one.py",
+          "code": "x = 5",
+          "modified": true,
+          "has_checks": true,
+          "outcome": {
+            "status": "ok",
+            "passed": false,
+            "checks": [
+              {
+                "description": "x is two",
+                "status": "fail",
+                "message": "x was 5"
+              }
+            ]
+          }
+        },
+        {
+          "type": "markdown",
+          "text": "Use x."
+        },
+        {
+          "type": "code",
+          "id": "two",
+          "path": "cells/two.py",
+          "code": "x + 1",
+          "modified": false,
+          "has_checks": false,
+          "outcome": null
+        },
+        {
+          "type": "code",
+          "id": "three",
+          "path": "cells/three.py",
+          "code": "print(x)",
+          "modified": false,
+          "has_checks": false,
+          "outcome": null
+        }
+      ]
+    }
+  ]
+}

@@ -3,31 +3,31 @@
 //
 //   problems/<id>.yaml
 //   problems/<id>/assets/...
+//   tutorials/<id>.yaml
 //   workspace/<id>/<editable files>
 //   workspace/<id>/.leegen/<state>.json      (custom_tests, last_run, annotations, ...)
+//   workspace/tut-<id>/cells/<cell>.py       (a tutorial's work; .leegen/cell_results.json too)
 //
-// Unzip an export into the data folder and the local server sees the same problems and work.
-// Import accepts that tree, the data folder itself, or a whole checkout (its `data/` is found).
-// `tutorials/` is not part of the browser edition yet, so it is ignored on import.
+// Unzip an export into the data folder and the local server sees the same problems, tutorials and
+// work. Import accepts that tree, the data folder itself, or a whole checkout (its `data/` is
+// found). Zip export and import are the only way data leaves or enters the browser store.
 
-import type { Db, ProblemRecord, WorkspaceRecord } from "./db.ts";
+import type { ImportSummary } from "../types";
+import type { Db, ProblemRecord, TutorialRecord, WorkspaceRecord } from "./db.ts";
 import type { RunnerClient } from "./runner.ts";
 import type { BrowserToolService } from "./service.ts";
+import { isShimId, SHIM_PREFIX } from "./tutorial.ts";
+import type { BrowserTutorialService } from "./tutorials.ts";
 import { readZip, writeZip, type ZipEntry } from "./zip.ts";
 
-export interface ImportSummary {
-  problems: string[];
-  unchanged: string[];
-  workspaces: string[];
-  errors: { path: string; error: string }[];
-}
+export type { ImportSummary };
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const STATE_DIR = ".leegen";
 const SAFE_SEGMENT = /^(?!\.\.?$)[^/\\\0]+$/;
 
-/** Everything in the data layout: problems, assets, the user's files and state. */
+/** Everything in the data layout: problems, assets, tutorials, the user's files and state. */
 export async function collectEntries(db: Db, seedAssets: (id: string, rel: string) => Promise<Blob | undefined>): Promise<ZipEntry[]> {
   const entries: ZipEntry[] = [];
   const problems = await db.all<ProblemRecord>("problems");
@@ -45,6 +45,9 @@ export async function collectEntries(db: Db, seedAssets: (id: string, rel: strin
         if (blob) entries.push({ path: `problems/${rec.id}/${rel}`, data: new Uint8Array(await blob.arrayBuffer()) });
       }
     }
+  }
+  for (const t of (await db.all<TutorialRecord>("tutorials")).sort((a, b) => a.id.localeCompare(b.id))) {
+    entries.push({ path: `tutorials/${t.id}.yaml`, data: enc.encode(t.yaml) });
   }
   for (const w of await db.all<WorkspaceRecord>("workspace")) {
     for (const [path, content] of Object.entries(w.files)) {
@@ -76,13 +79,20 @@ export function normalise(entries: ZipEntry[]): ZipEntry[] {
     .filter((e) => e.path.split("/").every((s) => SAFE_SEGMENT.test(s)) && !e.path.split("/").includes("__MACOSX"));
 }
 
-export async function importZip(blob: Blob, db: Db, runner: RunnerClient, service: BrowserToolService): Promise<ImportSummary> {
-  return importEntries(await readZip(blob), db, runner, service);
+export interface ImportDeps {
+  db: Db;
+  runner: RunnerClient;
+  service: BrowserToolService;
+  tutorials: BrowserTutorialService;
 }
 
-/** Import data-layout entries (from a zip or a folder). */
-export async function importEntries(raw: ZipEntry[], db: Db, runner: RunnerClient, service: BrowserToolService): Promise<ImportSummary> {
-  const summary: ImportSummary = { problems: [], unchanged: [], workspaces: [], errors: [] };
+export async function importZip(blob: Blob, deps: ImportDeps): Promise<ImportSummary> {
+  return importEntries(await readZip(blob), deps);
+}
+
+/** Import data-layout entries. */
+export async function importEntries(raw: ZipEntry[], { db, runner, service, tutorials }: ImportDeps): Promise<ImportSummary> {
+  const summary: ImportSummary = { problems: [], tutorials: [], unchanged: [], workspaces: [], errors: [] };
   const entries = normalise(raw);
 
   // problems first, so workspace files can be checked against them
@@ -114,13 +124,33 @@ export async function importEntries(raw: ZipEntry[], db: Db, runner: RunnerClien
     await db.put("assets", new Blob([e.data as BlobPart]), `${m[1]}/${m[2]}`);
   }
 
+  for (const e of entries) {
+    const m = e.path.match(/^tutorials\/([^/]+)\.ya?ml$/);
+    if (!m) continue;
+    const yaml = dec.decode(e.data);
+    if ((await db.get<TutorialRecord>("tutorials", m[1]))?.yaml === yaml) {
+      summary.unchanged.push(m[1]);
+      continue;
+    }
+    const parsed = await tutorials.parse(yaml);
+    if (!parsed.ok) {
+      summary.errors.push({ path: e.path, error: parsed.errors });
+    } else if (parsed.parsed.tutorial.id !== m[1]) {
+      summary.errors.push({ path: e.path, error: `id ${parsed.parsed.tutorial.id} must equal the file name` });
+    } else {
+      await tutorials.save(m[1], yaml, parsed.parsed);
+      summary.tutorials.push(m[1]);
+    }
+  }
+
   const touched = new Set<string>();
   for (const e of entries) {
     const m = e.path.match(/^workspace\/([^/]+)\/(.+)$/);
     if (!m) continue;
     const [, id, rel] = m;
-    if (!(await db.get("problems", id))) {
-      summary.errors.push({ path: e.path, error: `no problem ${id} for this workspace file` });
+    const owner = isShimId(id) ? await db.get("tutorials", id.slice(SHIM_PREFIX.length)) : await db.get("problems", id);
+    if (!owner) {
+      summary.errors.push({ path: e.path, error: `no ${isShimId(id) ? "tutorial" : "problem"} ${isShimId(id) ? id.slice(SHIM_PREFIX.length) : id} for this workspace file` });
       continue;
     }
     const state = rel.match(new RegExp(`^${STATE_DIR.replace(".", "\\.")}/([a-z_]+)\\.json$`));

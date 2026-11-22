@@ -1,8 +1,10 @@
 import { Editor as MonacoEditor, type OnMount } from "@monaco-editor/react";
 import { Check, CircleAlert, LoaderCircle, Play, RotateCcw, Square, X } from "lucide-react";
-import { useRef, useState } from "react";
-import type { CellOutcome } from "../lib/api";
+import { useEffect, useRef, useState } from "react";
+import { applyAnnotations, entriesByModel, registerAnnotationHover } from "../lib/annotations";
+import type { Annotation, CellOutcome, Proposal } from "../lib/api";
 import { monaco } from "../lib/monaco";
+import { CellNotes, CellProposal } from "./CellReview";
 import { cx, IconButton } from "./ui";
 
 const FONT = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace";
@@ -28,18 +30,57 @@ export const emptyCell = (outcome: CellOutcome | null = null): CellState => ({
 export const isComplete = (s: CellState | undefined, hasChecks: boolean): boolean =>
   !!s?.outcome && !s.stale && s.outcome.status === "ok" && (!hasChecks || (s.outcome.checks.length > 0 && s.outcome.checks.every((c) => c.status === "pass")));
 
+export interface CellCursor {
+  line: number;
+  column: number;
+  selection: { start_line: number; end_line: number; text: string } | null;
+}
+
 /** Monaco, sized to its content so a tutorial reads as one continuous page. */
-function CellEditor({ uri, value, onChange, onRun, dark }: {
-  uri: string; value: string; onChange: (v: string) => void; onRun: () => void; dark: boolean;
+function CellEditor({ uri, value, onChange, onRun, onFocus, onCursor, annotations, dark }: {
+  uri: string; value: string; onChange: (v: string) => void; onRun: () => void;
+  onFocus: () => void; onCursor: (c: CellCursor) => void; annotations: Annotation[]; dark: boolean;
 }) {
   const [height, setHeight] = useState(58);
   const run = useRef(onRun);
   run.current = onRun;
+  const handlers = useRef({ onFocus, onCursor });
+  handlers.current = { onFocus, onCursor };
+  const ed = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const coll = useRef<monaco.editor.IEditorDecorationsCollection | null>(null);
+  const notes = useRef(annotations);
+  notes.current = annotations;
+
+  const paint = () => {
+    const model = ed.current?.getModel();
+    if (coll.current && model) applyAnnotations(coll.current, model, notes.current.filter((a) => a.start_line != null), null, false);
+  };
+  useEffect(paint, [annotations]);
+  useEffect(() => () => {
+    const key = ed.current?.getModel()?.uri.toString();
+    if (key) entriesByModel.delete(key);
+  }, []);
+
   const onMount: OnMount = (editor) => {
+    ed.current = editor;
+    coll.current = editor.createDecorationsCollection();
+    registerAnnotationHover();
     const fit = () => setHeight(Math.min(Math.max(editor.getContentHeight(), 58), 520));
     editor.onDidContentSizeChange(fit);
     fit();
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => run.current());
+    editor.onDidFocusEditorText(() => handlers.current.onFocus());
+    editor.onDidChangeCursorSelection((e) => {
+      const sel = e.selection;
+      const model = editor.getModel();
+      handlers.current.onCursor({
+        line: sel.positionLineNumber,
+        column: sel.positionColumn,
+        selection: sel.isEmpty() || !model ? null
+          : { start_line: sel.startLineNumber, end_line: sel.endLineNumber, text: model.getValueInRange(sel).slice(0, 4000) },
+      });
+    });
+    paint();
   };
   return (
     <div className="t-editor" style={{ height }}>
@@ -79,18 +120,27 @@ function CellEditor({ uri, value, onChange, onRun, dark }: {
 
 const DOT_ICON = { pass: Check, fail: X, error: CircleAlert } as const;
 
-export function TutorialCell({ id, uri, code, modified, state, hasChecks, dark, onChange, onRun, onCancel, onReset }: {
+export function TutorialCell({ id, tutorialId, uri, code, modified, state, hasChecks, dark, annotations, proposal,
+  onChange, onRun, onCancel, onReset, onFocus, onCursor, onDismissAnnotation, onResolveProposal }: {
   id: string;
+  tutorialId: string;
   uri: string;
   code: string;
   modified: boolean;
   state: CellState;
   hasChecks: boolean;
   dark: boolean;
+  /** Review comments on this cell's file, and a pending suggested edit to it. */
+  annotations: Annotation[];
+  proposal: Proposal | null;
   onChange: (code: string) => void;
   onRun: () => void;
   onCancel: () => void;
   onReset: () => void;
+  onFocus: () => void;
+  onCursor: (c: CellCursor) => void;
+  onDismissAnnotation: (a: Annotation) => void;
+  onResolveProposal: (p: Proposal, action: "accept" | "reject") => void;
 }) {
   const { outcome, running } = state;
   const complete = isComplete(state, hasChecks);
@@ -102,7 +152,8 @@ export function TutorialCell({ id, uri, code, modified, state, hasChecks, dark, 
       className={cx("t-cell", running && "running", complete && "complete", outcome && !running && !complete && outcome.status !== "ok" && "broken", state.stale && "stale")}
     >
       {running && <span className="t-progress" />}
-      <CellEditor uri={uri} value={code} onChange={onChange} onRun={onRun} dark={dark} />
+      <CellEditor uri={uri} value={code} onChange={onChange} onRun={onRun} onFocus={onFocus} onCursor={onCursor}
+        annotations={annotations} dark={dark} />
       <div className="t-tools">
         {modified && !running && <IconButton icon={RotateCcw} label="Reset cell" size={14} onClick={onReset} />}
         {running ? (
@@ -111,6 +162,12 @@ export function TutorialCell({ id, uri, code, modified, state, hasChecks, dark, 
           <IconButton icon={Play} label="Run (⌘↵)" className="t-run" size={14} onClick={onRun} />
         )}
       </div>
+
+      {proposal && (
+        <CellProposal tutorialId={tutorialId} original={code} proposal={proposal} dark={dark}
+          onResolve={(action) => onResolveProposal(proposal, action)} />
+      )}
+      <CellNotes annotations={annotations} onDismiss={onDismissAnnotation} />
 
       {(out || (outcome && outcome.checks.length > 0)) && (
         <div className="t-after">

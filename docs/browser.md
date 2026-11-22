@@ -17,11 +17,11 @@ expose corresponding agent tools, through WebMCP on the page or MCP over HTTP on
 | Environments | Python and WebGPU | Python, C++, PyTorch, Triton, CUDA |
 | Judges | `function`, `pytest` | `function`, `pytest`, `script` |
 | Agent | WebMCP in a supported browser | MCP over HTTP |
-| Storage | IndexedDB for this browser and origin | Files in `data/problems/` and `data/workspace/` |
+| Storage | IndexedDB for this browser and origin | Files in `data/problems/`, `data/tutorials/` and `data/workspace/` |
 
 Open the [hosted browser edition](https://leegen.frankshan.workers.dev), or see the
-[server quick start](../README.md#quick-start-server-edition). Use export/import or manual
-folder sync to move work between them; changes do not sync automatically.
+[server quick start](../README.md#quick-start-server-edition). Use zip export/import to move
+work between them; changes do not sync automatically.
 
 ## Architecture
 
@@ -110,24 +110,42 @@ page navigates (the app routes with `pushState` only). The tools also work in Ch
 ## Storage, export and import
 
 - Everything is in this browser's IndexedDB (`leegen` database), scoped to the site's origin.
-  Changing the domain or switching browsers does not move existing data automatically. The app
-  asks for persistent storage the first time work is saved. Without it, Safari may evict a site's
-  data after seven days without a visit.
-- **Export** (download icon on the problem list) writes a zip in the data layout,
-  the same tree as the local server's `data/` folder: `problems/<id>.yaml`,
-  `problems/<id>/assets/…`, `workspace/<id>/<files>` and `workspace/<id>/.leegen/<state>.json`.
-  Unzip it into `data/` and the local server sees the same problems and work.
-- **Import** reads the same layout, found wherever it sits in the zip: the data folder itself,
-  or a whole zipped checkout (its `data/`). Tutorials in the zip are ignored for now. Problems
-  are schema-checked in the runner. Identical problems are skipped and changed ones replace the
-  stored copy.
-- **Folder sync** (Chromium, File System Access API): the folder icons save everything to a
-  folder, or load from one, in the same layout. Pick the local server's `data/` folder (or your
-  leegen checkout, whose `data/` is used) and the local server and the browser edition share
-  `problems/` and `workspace/`. The folder is remembered
-  (shift-click to choose another). Saving rewrites only files that changed and never touches
-  anything outside `problems/` and `workspace/` of the data folder. Sync is manual, not continuous.
-- Shipped problems update with new builds unless the user changed or deleted them.
+  There is no folder sync and nothing reads or writes your disk except the zip you export or
+  import. Changing the domain or switching browsers does not move existing data automatically.
+  The app asks for persistent storage the first time work is saved. Without it, Safari may evict
+  a site's data after seven days without a visit.
+- **Export** (download icon on the problem list) writes a zip in the data layout, the same tree
+  as the local server's `data/` folder:
+
+  ```
+  problems/<id>.yaml            problems/<id>/assets/…
+  tutorials/<id>.yaml
+  workspace/<id>/<files>        workspace/<id>/.leegen/<state>.json
+  workspace/tut-<id>/cells/<cell>.py    workspace/tut-<id>/.leegen/cell_results.json
+  ```
+
+  Unzip it into `data/` and the local server sees the same problems, tutorials and work.
+- **Import** (upload icon) reads the same layout, found wherever it sits in the zip: the data
+  folder itself, or a whole zipped checkout (its `data/`). Problems and tutorials are
+  schema-checked in the runner. Identical ones are skipped and changed ones replace the stored
+  copy. A workspace is imported only when its problem or tutorial exists. Tutorial references
+  and checks are not re-run on import; run `leegen tutorial validate` on the server for that.
+- Shipped problems and tutorials update with new builds unless the user changed or deleted them.
+
+## Tutorials
+
+The browser edition runs the same tutorials as the server (`data/tutorials/<id>.yaml`, guide in
+[tutorials.md](tutorials.md)). They are bundled at build time (`leegen browser build` fails on
+an invalid one), stored in IndexedDB's `tutorials` store, and added by importing a zip.
+
+A cell run is a console snippet: `browser/tutorials.ts` sends the runner the earlier cells as
+`prior`, the cell's code and its hidden `checks`, with the tutorial's stand-in problem
+(`core.tutorial.shim_problem`, produced by the runner's `parse_tutorial`) as `problem_yaml`.
+The learner's code and outcomes live in the workspace of `tut-<id>`, as on the server. The UI
+only receives `publicTutorial()`, so checks and references stay out of the page's state.
+Agents author and tutor through the same tutorial tools as on the server (`list_tutorials`,
+`create_tutorial`, `run_tutorial_cell`, …); `create_tutorial` validates in the runner and saves to
+IndexedDB. See [tutorials.md](tutorials.md#writing-a-tutorial-with-the-agent-tools).
 
 ## Offline and multiple tabs
 
@@ -187,3 +205,6 @@ code runs there in Pyodide (Python 3.14) on the CPU.
   extensions outside Pyodide's package set are unavailable.
 - `create_problem` validates in the browser runner, with the same rules as the server. The tools
   return the same shapes as the server's MCP tools.
+- Tutorials work the same way: `create_tutorial` validates every reference and starter in the
+  browser runner, and an environment without a `browser:` block is saved unvalidated. Read
+  `get_tutorial_guide` before writing one.

@@ -22,6 +22,15 @@ export interface ParseResult {
   problem?: import("./core.ts").FullProblem;
 }
 
+export interface ParseTutorialResult {
+  ok: boolean;
+  stage?: string;
+  errors?: string;
+  tutorial?: import("./tutorial.ts").FullTutorial;
+  /** The stand-in problem (JSON) that cell runs send as `problem_yaml`. */
+  shim?: string;
+}
+
 export type ValidationResult = Record<string, unknown> & { ok?: boolean; skipped?: boolean; stage?: string };
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void };
@@ -143,6 +152,10 @@ export class RunnerClient {
 
   parse(problemYaml: string): Promise<ParseResult> {
     return this.call("parse", { problem_yaml: problemYaml }) as Promise<ParseResult>;
+  }
+
+  parseTutorial(tutorialYaml: string): Promise<ParseTutorialResult> {
+    return this.call("parse_tutorial", { tutorial_yaml: tutorialYaml }) as Promise<ParseTutorialResult>;
   }
 
   validate(params: {

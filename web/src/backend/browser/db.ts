@@ -2,10 +2,14 @@
 //
 //   problems   problems/<id>.yaml           {id, yaml, problem (parsed), source, seed_version}
 //   assets     problems/<id>/assets/...     Blob, keyed "<id>/<path>"
-//   workspace  workspace/<id>/              {id, files, state: {custom_tests, last_run, ...}}
+//   tutorials  tutorials/<id>.yaml          {id, yaml, tutorial (parsed), shim, source, seed_version}
+//   workspace  workspace/<id>/              {id, files, state: {custom_tests, last_run, ...}};
+//                                           a tutorial's work is workspace/tut-<id>/ (cells/<cell>.py,
+//                                           .leegen/cell_results.json), as on the server
 //   meta       small key/value records (seed version, persistence asked, ...)
 
 import type { FullProblem } from "./core.ts";
+import type { FullTutorial } from "./tutorial.ts";
 
 export interface ProblemRecord {
   id: string;
@@ -20,6 +24,17 @@ export interface ProblemRecord {
   updated_at: number;
 }
 
+export interface TutorialRecord {
+  id: string;
+  yaml: string;
+  tutorial: FullTutorial;
+  /** `core.tutorial.shim_problem` as JSON: the `problem_yaml` that cell runs send the runner. */
+  shim: string;
+  source: "seed" | "user";
+  seed_version?: string;
+  updated_at: number;
+}
+
 export interface WorkspaceRecord {
   id: string;
   /** The user's editable files. Missing paths fall back to the starter code. */
@@ -29,8 +44,8 @@ export interface WorkspaceRecord {
 }
 
 const DB_NAME = "leegen";
-const DB_VERSION = 1;
-type StoreName = "problems" | "assets" | "workspace" | "meta";
+const DB_VERSION = 2;   // 2: tutorials
+type StoreName = "problems" | "tutorials" | "assets" | "workspace" | "meta";
 
 function req<T>(r: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -50,6 +65,7 @@ export class Db {
       r.onupgradeneeded = () => {
         const db = r.result;
         if (!db.objectStoreNames.contains("problems")) db.createObjectStore("problems", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("tutorials")) db.createObjectStore("tutorials", { keyPath: "id" });
         if (!db.objectStoreNames.contains("assets")) db.createObjectStore("assets");
         if (!db.objectStoreNames.contains("workspace")) db.createObjectStore("workspace", { keyPath: "id" });
         if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");

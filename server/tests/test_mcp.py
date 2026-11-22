@@ -143,3 +143,60 @@ async def test_resolve_proposal_accept_writes_file():
     written = await tutor.resolve_proposal(p, prop["id"], "accept")
     assert written and st.workspace.files(p)["solution.py"].endswith("return []\n")
     assert tutor.list_proposals(p.id) == []
+
+
+TUTORIAL_YAML = """
+id: mcp-demo
+title: MCP demo
+cells:
+  - {type: markdown, text: Set x to two.}
+  - type: code
+    id: one
+    starter: "x = 1"
+    reference: "x = 2"
+    checks:
+      - {description: x is two, code: "assert x == 2"}
+"""
+
+
+async def test_tutorial_tools_over_mcp():
+    async with connect() as client:
+        names = {t.name for t in (await client.list_tools()).tools}
+        assert {"get_tutorial_guide", "list_tutorials", "get_tutorial", "validate_tutorial_yaml",
+                "create_tutorial", "update_tutorial", "delete_tutorial", "open_tutorial",
+                "run_tutorial_cell"} <= names
+        tools = {t.name: t for t in (await client.list_tools()).tools}
+        assert tools["delete_tutorial"].annotations.destructive_hint is True
+        assert tools["list_tutorials"].annotations.read_only_hint is True
+
+        assert "hidden **checks**" in (await client.call_tool("get_tutorial_guide", {})).content[0].text
+        assert any(t["id"] == "dict-first-steps" for t in
+                   data(await client.call_tool("list_tutorials", {}))["tutorials"])
+        bad = data(await client.call_tool("validate_tutorial_yaml", {"yaml": "id: x\n"}))
+        assert bad["ok"] is False and bad["stage"] == "schema"
+        made = data(await client.call_tool("create_tutorial", {"yaml": TUTORIAL_YAML}))
+        assert made["saved"] is True and made["validated"] is True
+
+        st = app_state()
+        st.session.update(problem_id="tut-mcp-demo", active_file="cells/one.py",
+                          buffers={"cells/one.py": "x = 2"})
+        s = data(await client.call_tool("get_session", {}))
+        assert s["kind"] == "tutorial" and s["active_cell"] == "one"
+        ran = data(await client.call_tool("run_tutorial_cell", {}))
+        assert ran["passed"] is True and ran["cell"] == "one"
+
+        made = data(await client.call_tool("annotate", {
+            "problem_id": "tut-mcp-demo",
+            "annotations": [{"file": "cells/one.py", "start_line": 1, "message": "nice"}]}))
+        assert len(made["created"]) == 1
+        prop = data(await client.call_tool("propose_edit", {
+            "problem_id": "tut-mcp-demo", "file": "cells/one.py", "rationale": "r",
+            "content": "x = 3"}))
+        assert prop["status"] == "pending user review"
+        err = await client.call_tool("run_tutorial_cell", {"cell": "nope"})
+        assert err.is_error and "no cell 'nope'" in err.content[0].text
+
+        gone = data(await client.call_tool("delete_tutorial", {"tutorial_id": "mcp-demo",
+                                                               "delete_user_code": True}))
+        assert gone["deleted"] is True
+        st.session.update(problem_id=None, buffers={}, active_file=None)

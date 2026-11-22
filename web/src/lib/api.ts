@@ -120,6 +120,9 @@ export interface Tutorial extends Omit<TutorialSummary, "cells" | "checked" | "p
   cells: TutorialCell[];
   files: Record<string, string>;
   results: Record<string, CellOutcome>;
+  /** Review comments and pending edits from an agent, per cell file (`cells/<id>.py`). */
+  annotations: Annotation[];
+  proposals: Proposal[];
 }
 
 export function newRunId(): string {

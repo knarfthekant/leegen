@@ -2,6 +2,7 @@
 //
 // - ServerBackend (./server.ts): the local leegen server over REST + WebSocket.
 // - BrowserBackend (./browser/): IndexedDB + a separate-origin Pyodide runner + WebMCP tools.
+//   The browser store is its only storage; a zip export/import is the only way data moves.
 //
 // Components only talk to `getBackend()` (./index.ts); nothing else knows which edition runs.
 
@@ -67,12 +68,13 @@ export interface BackendStatus {
 
 export interface ImportSummary {
   problems: string[];
+  tutorials: string[];
   unchanged: string[];
   workspaces: string[];
   errors: { path: string; error: string }[];
 }
 
-/** Tutorials (server edition for now; absent where the backend cannot run them). */
+/** Tutorials: notebook-like pages of Markdown and code cells, in both editions. */
 export interface TutorialApi {
   list(): Promise<{ tutorials: TutorialSummary[]; errors: { path: string; error: string }[] }>;
   get(id: string): Promise<Tutorial>;
@@ -119,15 +121,9 @@ export interface Backend {
     subscribe(listener: () => void): () => void;
   };
 
-  /** Browser edition: move problems and work to and from a repo-layout zip. */
+  /** Browser edition: move problems, tutorials and work to and from a data-layout zip. */
   transfer?: {
     exportZip(): Promise<Blob>;
     importZip(file: Blob): Promise<ImportSummary>;
-    /** File System Access folder sync (Chromium); absent where unsupported. */
-    folder?: {
-      name(): Promise<string | null>;
-      save(pickNew?: boolean): Promise<{ folder: string; written: number }>;
-      load(pickNew?: boolean): Promise<ImportSummary & { folder: string }>;
-    };
   };
 }

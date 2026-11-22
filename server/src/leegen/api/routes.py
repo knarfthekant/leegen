@@ -271,7 +271,7 @@ async def resolve_proposal(problem_id: str, proposal_id: str, action: str) -> di
 
 @router.delete("/workspace/{problem_id}/annotations/{annotation_id}")
 async def delete_annotation(problem_id: str, annotation_id: str) -> dict[str, Any]:
-    _call(lambda: _svc().problem(problem_id))
+    _call(lambda: _svc().target(problem_id))
     return {"removed": await _svc().remove_annotation(problem_id, annotation_id)}
 
 

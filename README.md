@@ -60,12 +60,12 @@ edits. They differ in where code runs, where work is stored, and how the agent c
 | Execution | Python in Pyodide; WGSL kernels through WebGPU | Native local CPU, Apple MPS, or CUDA; remote SSH and Slurm executors |
 | Problems | Python and WebGPU; `function` and `pytest` judges | Python, C++, PyTorch, Triton, and CUDA; `function`, `pytest`, and `script` judges |
 | Agent connection | WebMCP tools on the page in a supported browser, such as Codex's built-in browser | MCP server over HTTP, usable by Codex, Claude Code, and other MCP clients |
-| Storage | Browser IndexedDB, scoped to the site and browser | YAML files in `data/problems/` and work in `data/workspace/` |
+| Storage | Browser IndexedDB, scoped to the site and browser | YAML files in `data/problems/` and `data/tutorials/`, work in `data/workspace/` |
 | Offline | Works offline after the required app and runtime files have been cached | Runs locally; remote execution needs a connection to the host |
 
 The problem list marks exercises that need the other edition. Browser data is separate from
 the server's files and from data at other site origins. Use the browser edition's export/import
-or manual folder sync to transfer problems and work; see [browser edition storage](docs/browser.md#storage-export-and-import).
+to transfer problems, tutorials and work (a zip in the same layout as `data/`); see [browser edition storage](docs/browser.md#storage-export-and-import).
 
 ## How it works with your coding agent
 
@@ -120,6 +120,11 @@ feedback with `annotate`, which appears as editor highlights and comments in the
 In this screenshot, the comments identify elementwise multiplication where matrix
 multiplication is needed, an incorrect activation name, and an undefined variable.
 
+The same works on a tutorial: `get_session` shows the agent every cell with your code and each
+cell's last result, `run_tutorial_cell` runs one on your current code, and `annotate` and
+`propose_edit` comment on or suggest changes to a cell. Agents can also write tutorials
+(`create_tutorial`, validated before saving).
+
 For changes, `propose_edit` presents a diff for you to accept or reject. The tutoring protocol
 asks agents to give hints in small steps and provide a complete solution only when requested.
 
@@ -154,7 +159,7 @@ See [executor configuration](docs/executors.md) for SSH and Slurm setup, and
 Open [leegen](https://leegen.frankshan.workers.dev) in a browser. Python exercises run in
 Pyodide; WebGPU exercises also require a browser and device with WebGPU support. Open the
 site in Codex's built-in browser to use its WebMCP tools with an agent. Your problems and work
-are stored in that browser; export them or sync to a folder when you want to share them with
+are stored in that browser; export them as a zip when you want to share them with
 another browser or the server edition.
 
 To build and serve the browser edition locally, see the [browser edition guide](docs/browser.md).

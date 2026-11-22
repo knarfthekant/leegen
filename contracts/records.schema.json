@@ -648,6 +648,25 @@
       "title": "NavigateEvent",
       "type": "object"
     },
+    "NavigateTutorialEvent": {
+      "properties": {
+        "type": {
+          "const": "navigate_tutorial",
+          "title": "Type",
+          "type": "string"
+        },
+        "tutorial_id": {
+          "title": "Tutorial Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "tutorial_id"
+      ],
+      "title": "NavigateTutorialEvent",
+      "type": "object"
+    },
     "ProblemChangedEvent": {
       "properties": {
         "type": {
@@ -1162,6 +1181,78 @@
       ],
       "title": "TestResult",
       "type": "object"
+    },
+    "TutorialCellFinishedEvent": {
+      "description": "A cell run finished (and its outcome is saved). Sent for every run, whoever started it.",
+      "properties": {
+        "type": {
+          "const": "tutorial_cell_finished",
+          "title": "Type",
+          "type": "string"
+        },
+        "tutorial_id": {
+          "title": "Tutorial Id",
+          "type": "string"
+        },
+        "cell": {
+          "title": "Cell",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/ConsoleResult"
+        }
+      },
+      "required": [
+        "type",
+        "tutorial_id",
+        "cell",
+        "run_id",
+        "source",
+        "result"
+      ],
+      "title": "TutorialCellFinishedEvent",
+      "type": "object"
+    },
+    "TutorialChangedEvent": {
+      "properties": {
+        "type": {
+          "const": "tutorial_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "tutorial_id": {
+          "title": "Tutorial Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "tutorial_id"
+      ],
+      "title": "TutorialChangedEvent",
+      "type": "object"
+    },
+    "TutorialsChangedEvent": {
+      "properties": {
+        "type": {
+          "const": "tutorials_changed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "TutorialsChangedEvent",
+      "type": "object"
     }
   },
   "properties": {
@@ -1201,12 +1292,16 @@
           "custom_tests_changed": "#/$defs/CustomTestsChangedEvent",
           "files_changed": "#/$defs/FilesChangedEvent",
           "navigate": "#/$defs/NavigateEvent",
+          "navigate_tutorial": "#/$defs/NavigateTutorialEvent",
           "problem_changed": "#/$defs/ProblemChangedEvent",
           "problems_changed": "#/$defs/ProblemsChangedEvent",
           "proposals_changed": "#/$defs/ProposalsChangedEvent",
           "run_finished": "#/$defs/RunFinishedEvent",
           "run_started": "#/$defs/RunStartedEvent",
-          "run_status": "#/$defs/RunStatusEvent"
+          "run_status": "#/$defs/RunStatusEvent",
+          "tutorial_cell_finished": "#/$defs/TutorialCellFinishedEvent",
+          "tutorial_changed": "#/$defs/TutorialChangedEvent",
+          "tutorials_changed": "#/$defs/TutorialsChangedEvent"
         },
         "propertyName": "type"
       },
@@ -1255,6 +1350,18 @@
         },
         {
           "$ref": "#/$defs/ConsoleFinishedEvent"
+        },
+        {
+          "$ref": "#/$defs/NavigateTutorialEvent"
+        },
+        {
+          "$ref": "#/$defs/TutorialsChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/TutorialChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/TutorialCellFinishedEvent"
         }
       ],
       "title": "Backend Event"

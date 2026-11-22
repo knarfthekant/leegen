@@ -18,7 +18,7 @@ This file is for any agent working in this repo. There are three jobs:
 3. **Developing**: change the app itself. See [Architecture](#architecture) and [Extending](#extending).
 
 For authoring and tutoring through MCP or WebMCP, call `set_agent_status` with
-`creating_problem` or `reviewing` while working, then `idle` when finished (including on
+`creating_problem` (also for tutorials) or `reviewing` while working, then `idle` when finished (including on
 failure). The UI highlights that the user should wait. Active status expires after five
 minutes; call again to renew it for longer work. This is app-wide and does not lock the editor.
 
@@ -99,8 +99,8 @@ its own. `server/`, `web/`, `environments/`, `contracts/`, `schema/` and `docs/`
 `workspace/`. Settings derive all three from it (`config.py`: `data_dir`, `problems_dir`,
 `tutorials_dir`, `workspace_dir`); `LEEGEN_PROBLEMS`, `LEEGEN_TUTORIALS` and `LEEGEN_WORKSPACE`
 still override one part. Never hard-code `problems/` or `workspace/` relative to the repo root;
-read the path from `settings()`. The browser edition's export zip and folder sync use the same
-tree, so a data folder and a browser export are interchangeable.
+read the path from `settings()`. The browser edition's export zip uses the same tree (problems,
+tutorials and workspace), so a data folder and a browser export are interchangeable.
 
 ## Authoring protocol
 
@@ -156,11 +156,13 @@ as the regression fixture `server/tests/fixtures/rate-limiter-service.yaml`.
 
 ## Tutoring protocol
 
-When the user asks for help with the problem they have open:
+When the user asks for help with the problem or tutorial they have open:
 
 1. **Call `get_session` first.** It returns the open problem, the user's *current* code
    (including unsaved edits), their cursor and selection, the last run's failing tests, existing
-   comments and pending suggestions.
+   comments and pending suggestions. On a tutorial page it returns `"kind": "tutorial"` instead:
+   the cells in order, with the learner's code and each cell's last outcome (see
+   [Tutorials through the tools](#tutorials-through-the-tools)).
 2. **Diagnose from evidence.** Read the failing tests' input, expected and actual values and the
    message. Use `run_tests` to check a hypothesis on their current code. `get_problem` with
    `include_hidden=true` shows the reference and hidden tests. Use them to understand the
@@ -185,6 +187,21 @@ When the user asks for help with the problem they have open:
    `open_problem` moves the browser to a problem.
 7. For a code review: do correctness first (point at failing cases), then complexity, then
    style. Praise what is good.
+
+### Tutorials through the tools
+
+Tutorials have their own tools, identical over MCP and WebMCP (`core/toolspec.py` lists all
+28): `get_tutorial_guide`, `list_tutorials`, `get_tutorial` (`include_hidden` for the checks and
+references), `validate_tutorial_yaml`, `create_tutorial`, `update_tutorial`, `delete_tutorial`,
+`open_tutorial` and `run_tutorial_cell` (a cell on the learner's current code, hidden checks
+included). Authoring follows `docs/tutorials.md` (also returned by `get_tutorial_guide`):
+`create_tutorial` saves only when every reference passes its checks and every starter fails one.
+
+Tutoring on a cell reuses the review tools: a tutorial's cells are the files `cells/<id>.py` of
+its stand-in problem `tut-<id>`, so `annotate`, `clear_annotations` and `propose_edit` take
+`problem_id="tut-<tutorial id>"` (the session's `problem_id`) and `file="cells/<id>.py"`. The
+page shows comments under and inside the cell and an edit as an accept/reject diff.
+`run_tests`, `get_problem` and the other problem tools reject `tut-` ids.
 
 ## Architecture
 
@@ -291,8 +308,10 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   validate; `api/routes.py` exposes `/api/tutorials*`. Checks and references never reach the UI
   (`public_tutorial`).
 - UI: `pages/Tutorial.tsx` + `components/TutorialCell.tsx` (one auto-height Monaco per cell, run
-  icon, tick row, progress trail). Server edition only: `Backend.tutorials` is absent in the
-  browser edition, and the list page hides the toggle when it is.
+  icon, tick row, progress trail). The top bar mirrors a problem's: a Tutorial List drawer
+  (`TutorialDrawer`) and previous/next (no shuffle). Both editions implement `Backend.tutorials`;
+  the browser's is `browser/tutorials.ts` (see Browser edition below). A `Backend` without it
+  hides the Tutorials toggle on the list page.
 
 ### Browser edition
 
@@ -304,9 +323,12 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   `contracts/fixtures`. `browser/tools.ts` registers every tool in `contracts/tools.json` with
   `document.modelContext` and validates inputs itself. Storage is `browser/db.ts` (IndexedDB) and
   cross-tab events are `browser/events.ts` (BroadcastChannel). `browser/transfer.ts` exports and
-  imports zips in the repo layout, and `browser/folder.ts` saves to and loads from a folder
-  (File System Access). Service workers (`web/sw/app-sw.js`, `web/runner/sw.js`; the build fills
-  in their precache lists) make both origins work offline.
+  imports zips in the data layout, the only way data enters or leaves the browser store (there
+  is no folder sync). `browser/tutorials.ts` is the browser's `TutorialService` (checks and
+  references stay inside it) and `browser/tutorial.ts` ports the pure parts of
+  `core/tutorial.py`, checked against `contracts/fixtures/tutorials.json`. Service workers
+  (`web/sw/app-sw.js`, `web/runner/sw.js`; the build fills in their precache lists) make both
+  origins work offline.
 - **Runner origin** (`web/runner/`): stateless and allow-listed. It runs `browser_runner.py`
   (core `plan_run` → harness → core `assemble`) in Pyodide. Validation follows the
   `core.validation` steps (`precheck`, `after_reference`, `after_starter`), with a deadline per
@@ -334,7 +356,8 @@ Problem YAML ─► Judge kind ─► Language adapter ─► Environment ─►
   config allows extra fields.
 - **Schema changes:** edit `core/models.py`, then run `uv run leegen schema`, and update
   `docs/authoring.md` and the seed problems.
-- **New agent tool:** add the operation to `ToolService`, an MCP tool in `mcp_server/server.py`
+- **New agent tool:** add the operation to `ToolService` (tutorial operations live in
+  `TutorialService` and `BrowserTutorialService`), an MCP tool in `mcp_server/server.py`
   (its docstring is the description), an entry in `core/toolspec.py`, then regenerate contracts and
   add the browser implementation (`web/src/backend/browser/`).
 

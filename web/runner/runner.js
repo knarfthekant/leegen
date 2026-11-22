@@ -236,6 +236,11 @@ const methods = {
     return JSON.parse(await w.py("parse", problem_yaml));
   },
 
+  async parse_tutorial({ tutorial_yaml }) {
+    const w = await worker();
+    return JSON.parse(await w.py("parse_tutorial", tutorial_yaml));
+  },
+
   // The server's validation rules (leegen.core.validation), one deadline per run.
   validate({ problem_yaml, environments, capabilities, packages, run_id }, notify) {
     return serial(async () => {

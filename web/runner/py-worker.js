@@ -11,7 +11,7 @@ const loaded = new Set();
 
 // Only these browser_runner functions can be called, always with string arguments.
 const PY_FUNCS = new Set([
-  "prepare", "finish", "error_result", "read_results", "cleanup", "parse",
+  "prepare", "finish", "error_result", "read_results", "cleanup", "parse", "parse_tutorial",
   "validate_precheck", "validate_after_reference", "validate_after_starter",
 ]);
 

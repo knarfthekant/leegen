@@ -2,6 +2,7 @@ import { DiffEditor, Editor as MonacoEditor, type OnMount } from "@monaco-editor
 import { Check, CircleAlert, CloudCheck, CodeXml, LoaderCircle, Lock, Maximize2, Minimize2, Redo2, RotateCcw, Sparkles, Undo2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Annotation, Proposal } from "../lib/api";
+import { applyAnnotations, entriesAt, entriesByModel, registerAnnotationHover, type Entry } from "../lib/annotations";
 import { registerSymbolHover, setProblemFiles } from "../lib/editorIntelligence";
 import { languageFor, monaco } from "../lib/monaco";
 import { Button, cx, IconButton } from "./ui";
@@ -60,83 +61,6 @@ interface Props {
 const EDITOR_FONT = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace";
 
 type Ed = monaco.editor.IStandaloneCodeEditor;
-
-// --- annotations -------------------------------------------------------------------------------
-// Each editor publishes its annotations here, keyed by model URI, so the hover provider (one for
-// all models) and the click handler can find them. `range` reads the *tracked* decoration range,
-// so it follows the user's edits instead of the position the annotation was created at.
-
-interface Entry {
-  a: Annotation;
-  range: () => monaco.Range;
-  lane: monaco.editor.GlyphMarginLane;
-}
-
-const entriesByModel = new Map<string, Entry[]>();
-
-/**
- * The exact characters an annotation covers. The server always sends columns; annotations saved
- * before that (or created without them) fall back to the text of the line(s) minus indentation.
- */
-function resolveRange(a: Annotation, model: monaco.editor.ITextModel): monaco.Range {
-  const last = model.getLineCount();
-  const startLine = Math.min(Math.max(a.start_line ?? 1, 1), last);
-  const endLine = Math.min(Math.max(a.end_line ?? startLine, startLine), last);
-  const startCol = a.start_col ?? (model.getLineFirstNonWhitespaceColumn(startLine) || model.getLineMaxColumn(startLine));
-  let endCol = a.end_col ?? (model.getLineLastNonWhitespaceColumn(endLine) || startCol);
-  if (startLine === endLine) endCol = Math.max(endCol, startCol);
-  return new monaco.Range(startLine, startCol, endLine, endCol);
-}
-
-/** Smaller ranges first, so the most specific comment comes first at a click or hover. */
-function weight(r: monaco.Range) {
-  return (r.endLineNumber - r.startLineNumber) * 10000 + (r.endColumn - r.startColumn);
-}
-
-function entriesAt(uri: string, pos: monaco.IPosition): Entry[] {
-  return (entriesByModel.get(uri) ?? [])
-    .filter((e) => e.range().containsPosition(pos))
-    .sort((x, y) => weight(x.range()) - weight(y.range()));
-}
-
-/** Each comment owns one gutter lane at its lines; comments that overlap in lines take other lanes. */
-function assignLanes(items: { startLine: number; endLine: number }[]): monaco.editor.GlyphMarginLane[] {
-  const lanes = [
-    monaco.editor.GlyphMarginLane.Left,
-    monaco.editor.GlyphMarginLane.Center,
-    monaco.editor.GlyphMarginLane.Right,
-  ];
-  const taken: [number, number][][] = lanes.map(() => []);
-  const order = items.map((_, i) => i).sort((x, y) => items[x].startLine - items[y].startLine || x - y);
-  const out = new Array<monaco.editor.GlyphMarginLane>(items.length);
-  for (const i of order) {
-    const { startLine, endLine } = items[i];
-    let lane = taken.findIndex((spans) => spans.every(([s, e]) => endLine < s || startLine > e));
-    if (lane < 0) lane = lanes.length - 1; // more than three at once: the last lane is shared
-    taken[lane].push([startLine, endLine]);
-    out[i] = lanes[lane];
-  }
-  return out;
-}
-
-let hoverRegistered = false;
-function registerAnnotationHover() {
-  if (hoverRegistered) return;
-  hoverRegistered = true;
-  monaco.languages.registerHoverProvider("*", {
-    provideHover(model, position) {
-      const hits = entriesAt(model.uri.toString(), position);
-      if (!hits.length) return null;
-      return {
-        range: hits[0].range(),
-        contents: hits.flatMap(({ a }) => [
-          { value: `**${a.severity}** · ${a.author}\n\n${a.message}` },
-          { value: "_Click to focus in Review_" },
-        ]),
-      };
-    },
-  });
-}
 
 export function Editor(props: Props) {
   const { files, active, annotations, proposal, dark, problemId } = props;
@@ -257,53 +181,7 @@ export function Editor(props: Props) {
     const coll = decorations.current;
     const model = editorRef.current?.getModel();
     if (!coll || !model || !file) return;
-    const uri = model.uri.toString();
-    const mine = annotations.filter((a) => a.file === file.path && a.start_line != null);
-    const ranges = mine.map((a) => resolveRange(a, model));
-    const lanes = assignLanes(ranges.map((r) => ({ startLine: r.startLineNumber, endLine: r.endLineNumber })));
-
-    // Per comment: one translucent highlight layer (layers blend, so overlaps stay visible), then
-    // one gutter mark per line: a dot for a single line, a connected bar for several.
-    const items: monaco.editor.IModelDeltaDecoration[] = [];
-    const slots: { entry: number; kind: "text" | "glyph" }[] = [];
-    mine.forEach((a, i) => {
-      const r = ranges[i];
-      const sel = a.id === props.selectedAnnotationId ? " lc-sel" : "";
-      const sev = `lc-sev-${a.severity}`;
-      items.push({
-        range: r,
-        options: {
-          className: `lc-ann ${sev}${sel}`,
-          overviewRuler: { color: severityColor(a.severity), position: monaco.editor.OverviewRulerLane.Right },
-          stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
-        },
-      });
-      slots.push({ entry: i, kind: "text" });
-      for (let line = r.startLineNumber; line <= r.endLineNumber; line++) {
-        const part = r.startLineNumber === r.endLineNumber ? "dot" : line === r.startLineNumber ? "start" : line === r.endLineNumber ? "end" : "mid";
-        items.push({
-          range: new monaco.Range(line, 1, line, 1),
-          options: {
-            glyphMargin: { position: lanes[i] },
-            glyphMarginClassName: `lc-glyph lc-glyph-${part} ${sev}${sel}`,
-            glyphMarginHoverMessage: { value: a.message },
-          },
-        });
-        slots.push({ entry: i, kind: "glyph" });
-      }
-    });
-    coll.set(items);
-    const textIndex = new Map<number, number>();
-    slots.forEach((s, k) => s.kind === "text" && textIndex.set(s.entry, k));
-    entriesByModel.set(
-      uri,
-      mine.map((a, i) => ({
-        a,
-        lane: lanes[i],
-        // the text layer's tracked range, which moves with the user's edits
-        range: () => (coll.getRange(textIndex.get(i)!) ?? ranges[i]),
-      })),
-    );
+    applyAnnotations(coll, model, annotations.filter((a) => a.file === file.path && a.start_line != null), props.selectedAnnotationId);
   }
 
   useEffect(applyDecorations, [annotations, file?.path, props.selectedAnnotationId]);
@@ -488,6 +366,3 @@ function diffUri(problemId: string, proposalId: string, side: "original" | "modi
   return `inmemory://${problemId}/diff-${proposalId}-${side}/${path}`;
 }
 
-function severityColor(s: Annotation["severity"]): string {
-  return { info: "#8a8a86", hint: "#5b7fd6", warning: "#d19a2a", error: "#d9534f", praise: "#3f9a63" }[s];
-}

@@ -105,7 +105,9 @@ class AppState:
         self.tutorials = TutorialStore()
         self.tutorial_service = TutorialService(
             tutorials=self.tutorials, workspace=self.workspace, orchestrator=self.orchestrator,
-            environments=self.environments, events=self.hub, run_lock=self.run_lock)
+            environments=self.environments, events=self.hub, run_lock=self.run_lock,
+            session=self.session, docs_dir=settings().docs_dir)
+        self.service.tutorials = self.tutorial_service
 
 
 @lru_cache

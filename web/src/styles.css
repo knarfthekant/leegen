@@ -679,6 +679,9 @@ button.loc:hover { background: var(--accent-soft); color: var(--accent); }
 
 .t-after { display: flex; flex-direction: column; gap: 10px; padding: 10px 16px 14px; border-top: 1px solid var(--line); animation: fade-in 220ms var(--ease); transition: opacity 300ms var(--ease); }
 .t-cell.stale .t-after { opacity: 0.45; }
+.t-notes { padding: 10px 12px 12px; border-top: 1px solid var(--line); animation: fade-in 220ms var(--ease); }
+.t-general .t-notes { border-top: 0; padding: 0 0 8px; }
+.t-proposal { display: flex; flex-direction: column; border-top: 1px solid var(--line); animation: fade-in 220ms var(--ease); }
 .t-out { display: flex; flex-direction: column; gap: 4px; }
 .t-out pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
 .t-out .warn { color: var(--warn); }
@@ -734,6 +737,7 @@ button.loc:hover { background: var(--accent-soft); color: var(--accent); }
 
 .hero-text { min-width: 0; }
 .tutorial-row { grid-template-columns: 18px minmax(0, 1fr) auto 64px; height: 58px; }
+.tutorial-row.compact { grid-template-columns: 16px minmax(0, 1fr) auto; height: 40px; gap: 10px; padding: 0 10px; font-size: 13.5px; }
 .tr-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
 .tr-summary { color: var(--text-2); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tr-progress { text-align: right; font-size: 13px; font-weight: 550; }

@@ -118,6 +118,11 @@ export interface NavigateEvent {
   problem_id: string;
 }
 
+export interface NavigateTutorialEvent {
+  type: "navigate_tutorial";
+  tutorial_id: string;
+}
+
 export interface ProblemChangedEvent {
   type: "problem_changed";
   problem_id: string;
@@ -214,7 +219,26 @@ export interface TestResult {
   duration_ms: number | null;
 }
 
-export type BackendEvent = RunStartedEvent | RunStatusEvent | RunFinishedEvent | AnnotationsChangedEvent | ProposalsChangedEvent | FilesChangedEvent | CustomTestsChangedEvent | NavigateEvent | ProblemsChangedEvent | ProblemChangedEvent | AgentStatusChangedEvent | ConsoleStartedEvent | ConsoleStatusEvent | ConsoleOutputEvent | ConsoleFinishedEvent;
+/** A cell run finished (and its outcome is saved). Sent for every run, whoever started it. */
+export interface TutorialCellFinishedEvent {
+  type: "tutorial_cell_finished";
+  tutorial_id: string;
+  cell: string;
+  run_id: string;
+  source: string;
+  result: ConsoleResult;
+}
+
+export interface TutorialChangedEvent {
+  type: "tutorial_changed";
+  tutorial_id: string;
+}
+
+export interface TutorialsChangedEvent {
+  type: "tutorials_changed";
+}
+
+export type BackendEvent = RunStartedEvent | RunStatusEvent | RunFinishedEvent | AnnotationsChangedEvent | ProposalsChangedEvent | FilesChangedEvent | CustomTestsChangedEvent | NavigateEvent | ProblemsChangedEvent | ProblemChangedEvent | AgentStatusChangedEvent | ConsoleStartedEvent | ConsoleStatusEvent | ConsoleOutputEvent | ConsoleFinishedEvent | NavigateTutorialEvent | TutorialsChangedEvent | TutorialChangedEvent | TutorialCellFinishedEvent;
 
 export interface Benchmark {
   against?: "reference";

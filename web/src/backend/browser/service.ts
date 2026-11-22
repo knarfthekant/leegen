@@ -37,7 +37,8 @@ import {
   withProposal,
   withoutAnnotations,
 } from "./core.ts";
-import type { Db, ProblemRecord, WorkspaceRecord } from "./db.ts";
+import type { Db, ProblemRecord, TutorialRecord, WorkspaceRecord } from "./db.ts";
+import { isShimId, SHIM_PREFIX } from "./tutorial.ts";
 import type { EventHub } from "./events.ts";
 import type { RunnerClient } from "./runner.ts";
 
@@ -47,6 +48,21 @@ export interface Guides {
   authoring: string;
   tutoring: string;
   browser: string;
+  /** docs/tutorials.md */
+  tutorials: string;
+}
+
+/** What the problem service and the WebMCP layer need of the tutorial service (tutorials.ts). */
+export interface TutorialAgentApi {
+  sessionView(): Promise<Dict>;
+  agentList(track?: string | null): Promise<Dict>;
+  agentGet(id: string, includeHidden?: boolean): Promise<Dict>;
+  validateYaml(yaml: string): Promise<{ report: Dict }>;
+  create(yaml: string, overwrite?: boolean): Promise<Dict>;
+  update(id: string, yaml: string): Promise<Dict>;
+  delete(id: string, deleteUserCode?: boolean): Promise<Dict>;
+  navigate(id: string): Promise<Dict>;
+  runForAgent(tutorialId?: string | null, cell?: string | null): Promise<Dict>;
 }
 
 export interface Session {
@@ -93,6 +109,8 @@ export class BrowserToolService {
   private clock: Clock;
   private localLocks = new Map<string, Promise<unknown>>();
   private persistAsked = false;
+  /** Wired by index.ts: lets review comments and edits reach a tutorial's cells. */
+  tutorials: TutorialAgentApi | null = null;
 
   constructor(deps: ServiceDeps) {
     this.db = deps.db;
@@ -120,6 +138,19 @@ export class BrowserToolService {
 
   async problem(problemId?: string | null): Promise<FullProblem> {
     return (await this.record(problemId)).problem;
+  }
+
+  /** A problem, or a tutorial's stand-in (`tut-<id>`: each code cell is a file `cells/x.py`).
+   * For review comments and edits, which work the same on both; run_tests and the authoring
+   * tools still take real problems only. */
+  async target(problemId?: string | null): Promise<FullProblem> {
+    const pid = problemId || this.session.problem_id;
+    if (pid && isShimId(pid) && !(await this.db.get("problems", pid))) {
+      const rec = await this.db.get<TutorialRecord>("tutorials", pid.slice(SHIM_PREFIX.length));
+      if (!rec) throw new NotFoundError(`no tutorial for ${pyRepr(pid)}; call list_tutorials`);
+      return JSON.parse(rec.shim) as FullProblem;
+    }
+    return this.problem(problemId);
   }
 
   private async ws(id: string): Promise<WorkspaceRecord> {
@@ -157,6 +188,15 @@ export class BrowserToolService {
 
   environment(p: FullProblem): Environment | null {
     return this.envs.get(p.environment) ?? null;
+  }
+
+  environmentById(id: string): Environment | null {
+    return this.envs.get(id) ?? null;
+  }
+
+  /** Seconds, on the clock that stamps the session. */
+  now(): number {
+    return this.clock.now();
   }
 
   /** What this browser offers: always cpu, plus webgpu when the runner has an adapter. */
@@ -198,6 +238,15 @@ export class BrowserToolService {
 
   tutoringGuide(): string {
     return this.guides.tutoring;
+  }
+
+  tutorialsApi(): TutorialAgentApi {
+    if (!this.tutorials) throw new NotFoundError("tutorials are not available");
+    return this.tutorials;
+  }
+
+  tutorialGuide(): string {
+    return this.guides.tutorials || "docs/tutorials.md is missing";
   }
 
   problemSchema(): unknown {
@@ -325,11 +374,13 @@ export class BrowserToolService {
   async getSession(): Promise<Dict> {
     const s = this.session;
     const rec = s.problem_id ? await this.db.get<ProblemRecord>("problems", s.problem_id) : undefined;
+    if (!rec && s.problem_id && isShimId(s.problem_id) && this.tutorials) return this.tutorials.sessionView();
     if (!rec) return { problem_id: null, message: "The user has no problem open." };
     const p = rec.problem;
     const w = await this.ws(p.id);
     const proposals = (w.state.proposals as ProposalRecord[] | undefined) ?? [];
     return {
+      kind: "problem",
       problem_id: p.id,
       title: p.title,
       environment: p.environment,
@@ -377,7 +428,7 @@ export class BrowserToolService {
 
   async annotate(items: AnnotationRequest[], problemId?: string | null, author = "assistant") {
     if (!Array.isArray(items)) throw new InvalidError("items must be a list of annotations");
-    const p = await this.problem(problemId);
+    const p = await this.target(problemId);
     const created = makeAnnotations(p, await this.currentFiles(p), items, author, this.clock);
     await this.saveAnnotations(p.id, [...(await this.listAnnotations(p.id)), ...created]);
     return created;
@@ -391,7 +442,7 @@ export class BrowserToolService {
   }
 
   async clearAnnotations(problemId?: string | null, file?: string | null): Promise<number> {
-    const p = await this.problem(problemId);
+    const p = await this.target(problemId);
     const items = await this.listAnnotations(p.id);
     const kept = withoutAnnotations(items, { file, clear: true });
     await this.saveAnnotations(p.id, kept);
@@ -413,7 +464,7 @@ export class BrowserToolService {
     file: string,
     opts: { rationale?: string; content?: string | null; edits?: { old?: string; new?: string }[] | null; problemId?: string | null; author?: string; source?: Source },
   ) {
-    const p = await this.problem(opts.problemId);
+    const p = await this.target(opts.problemId);
     const proposal = makeProposal(
       p,
       await this.currentFiles(p),
@@ -427,7 +478,7 @@ export class BrowserToolService {
 
   async resolveProposal(problemId: string, proposalId: string, action: string): Promise<Record<string, string>> {
     if (action !== "accept" && action !== "reject") throw new InvalidError("action must be accept or reject");
-    const p = await this.problem(problemId);
+    const p = await this.target(problemId);
     const items = await this.listProposals(p.id);
     const proposal = items.find((x) => x.id === proposalId);
     if (!proposal) throw new NotFoundError(`no pending proposal ${pyRepr(proposalId)}`);
@@ -616,6 +667,11 @@ export class BrowserToolService {
       executor?: string | null;
       runId?: string | null;
       source?: string;
+      /** Tutorial cells: earlier cells' code replayed first, then hidden checks run after `code`. */
+      prior?: string[];
+      checks?: { description: string; code: string }[];
+      /** For a stand-in problem (a tutorial's shim) that has no problem record. */
+      problemYaml?: string;
     },
   ): Promise<ConsoleResult> {
     const runId = opts.runId || this.clock.newId() + this.clock.newId().slice(0, 2);
@@ -655,13 +711,17 @@ export class BrowserToolService {
         } else if (!canRun(caps, "pyodide", requires, env)) {
           result = consoleError(p.id, runId, this.cannotRunReason(env, requires, caps), started);
         } else {
-          const rec = await this.record(p.id);
+          const yaml = opts.problemYaml ?? (await this.record(p.id)).yaml;
           result = await this.runner.runSnippet({
             run_id: runId,
-            problem_yaml: rec.yaml,
+            problem_yaml: yaml,
             files,
             mode: "snippet",
-            snippet: { file: opts.file ?? null, code: opts.code, stdin: opts.stdin ?? "" },
+            snippet: {
+              file: opts.file ?? null, code: opts.code, stdin: opts.stdin ?? "",
+              ...(opts.prior ? { prior: opts.prior } : {}),
+              checks: opts.checks ?? [],
+            },
             custom_tests: [],
             only_visible: false,
             packages: env.browser?.packages ?? [],
@@ -687,7 +747,7 @@ export class BrowserToolService {
     }
   }
 
-  private withRunLock<T>(problemId: string, fn: () => Promise<T>): Promise<T> {
+  withRunLock<T>(problemId: string, fn: () => Promise<T>): Promise<T> {
     const name = `leegen-run:${problemId}`;
     const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
     if (locks) return locks.request(name, fn) as Promise<T>;
@@ -699,7 +759,7 @@ export class BrowserToolService {
 
   /** Ask once for persistent storage, when the user first saves work (Safari evicts after
    * 7 days of no visits otherwise). */
-  private requestPersistence() {
+  requestPersistence() {
     if (this.persistAsked || typeof navigator === "undefined" || !navigator.storage?.persist) return;
     this.persistAsked = true;
     navigator.storage.persisted().then((done) => done || navigator.storage.persist()).catch(() => undefined);

@@ -1,26 +1,36 @@
 import { ListTree, Search, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ProblemSummary } from "../lib/api";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import type { ProblemSummary, TutorialSummary } from "../lib/api";
 import { navigate } from "../lib/router";
 import { filterProblems, ProblemRow } from "./ProblemRow";
+import { filterTutorials, tutorialDone, TutorialRow } from "./TutorialRow";
 import { IconButton } from "./ui";
 
-/** Slide-over problem list (LeetCode's "Problem List" drawer). */
-export function ProblemDrawer({
+/** The slide-over shell both lists share: a title that opens the full list, a count, search. */
+function ListDrawer({
   open,
   onClose,
-  problems,
-  currentId,
+  title,
+  homePath,
+  count,
+  placeholder,
+  query,
+  onQuery,
+  empty,
+  children,
 }: {
   open: boolean;
   onClose: () => void;
-  problems: ProblemSummary[];
-  currentId: string;
+  title: string;
+  homePath: string;
+  count: string;
+  placeholder: string;
+  query: string;
+  onQuery: (q: string) => void;
+  empty: boolean;
+  children: ReactNode;
 }) {
-  const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement>(null);
-  const filtered = useMemo(() => filterProblems(problems, query), [problems, query]);
-  const solved = problems.filter((p) => p.status === "passed").length;
 
   useEffect(() => {
     if (!open) return;
@@ -36,22 +46,20 @@ export function ProblemDrawer({
   return (
     <div className={"drawer-root" + (open ? " open" : "")} aria-hidden={!open}>
       <div className="drawer-backdrop" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-label="Problem list">
+      <aside className="drawer" role="dialog" aria-label={title}>
         <div className="drawer-head">
           <button
             className="drawer-title"
             onClick={() => {
               onClose();
-              navigate("/");
+              navigate(homePath);
             }}
-            title="Open the full problem list"
+            title={`Open the full ${title.toLowerCase()}`}
           >
             <ListTree size={16} strokeWidth={1.8} />
-            Problem List
+            {title}
           </button>
-          <span className="muted small tabular">
-            {solved}/{problems.length} solved
-          </span>
+          <span className="muted small tabular">{count}</span>
           <div className="spacer" />
           <IconButton icon={X} label="Close" onClick={onClose} />
         </div>
@@ -59,26 +67,87 @@ export function ProblemDrawer({
           <Search size={15} strokeWidth={1.8} />
           <input
             ref={input}
-            placeholder="Search problems"
+            placeholder={placeholder}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => onQuery(e.target.value)}
             tabIndex={open ? 0 : -1}
           />
         </label>
         <div className="drawer-list zebra">
-          {filtered.map((p) => (
-            <ProblemRow
-              key={p.id}
-              p={p}
-              index={problems.indexOf(p)}
-              compact
-              current={p.id === currentId}
-              onOpen={onClose}
-            />
-          ))}
-          {filtered.length === 0 && <p className="muted small drawer-empty">No matching problems.</p>}
+          {children}
+          {empty && <p className="muted small drawer-empty">No matching {placeholder.replace("Search ", "")}.</p>}
         </div>
       </aside>
     </div>
+  );
+}
+
+/** Slide-over problem list (LeetCode's "Problem List" drawer). */
+export function ProblemDrawer({
+  open,
+  onClose,
+  problems,
+  currentId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  problems: ProblemSummary[];
+  currentId: string;
+}) {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => filterProblems(problems, query), [problems, query]);
+  const solved = problems.filter((p) => p.status === "passed").length;
+
+  return (
+    <ListDrawer
+      open={open}
+      onClose={onClose}
+      title="Problem List"
+      homePath="/"
+      count={`${solved}/${problems.length} solved`}
+      placeholder="Search problems"
+      query={query}
+      onQuery={setQuery}
+      empty={filtered.length === 0}
+    >
+      {filtered.map((p) => (
+        <ProblemRow key={p.id} p={p} index={problems.indexOf(p)} compact current={p.id === currentId} onOpen={onClose} />
+      ))}
+    </ListDrawer>
+  );
+}
+
+/** The same drawer for tutorials. Its title opens the Tutorials page. */
+export function TutorialDrawer({
+  open,
+  onClose,
+  tutorials,
+  currentId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  tutorials: TutorialSummary[];
+  currentId: string;
+}) {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => filterTutorials(tutorials, query), [tutorials, query]);
+  const finished = tutorials.filter(tutorialDone).length;
+
+  return (
+    <ListDrawer
+      open={open}
+      onClose={onClose}
+      title="Tutorial List"
+      homePath="/?view=tutorials"
+      count={`${finished}/${tutorials.length} finished`}
+      placeholder="Search tutorials"
+      query={query}
+      onQuery={setQuery}
+      empty={filtered.length === 0}
+    >
+      {filtered.map((t) => (
+        <TutorialRow key={t.id} t={t} index={tutorials.indexOf(t)} compact current={t.id === currentId} onOpen={onClose} />
+      ))}
+    </ListDrawer>
   );
 }

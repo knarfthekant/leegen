@@ -2,9 +2,9 @@
 
 import json
 
-from leegen.browser_runner import (execute, finish, parse, prepare, read_results,
-                                       validate_after_reference, validate_after_starter,
-                                       validate_precheck)
+from leegen.browser_runner import (execute, finish, parse, parse_tutorial, prepare,
+                                   read_results, validate_after_reference,
+                                   validate_after_starter, validate_precheck)
 from leegen.envs.registry import EnvironmentRegistry
 from leegen.runner.orchestrator import HARNESS_ROOT
 from leegen.store.problems import ProblemStore
@@ -98,3 +98,55 @@ def test_snippet_run_streams_output_and_echoes(tmp_path):
         {"exit_code": 0 if not crash else 1, "stderr": crash})))
     assert out["status"] == "ok" and out["stdout"] == "hi\n" and out["result"] == "42"
     assert out["executor"] == "browser" and out["file"] == "solution.py"
+
+
+TUTORIAL = """
+id: demo
+title: Demo
+cells:
+  - {type: markdown, text: hi}
+  - type: code
+    id: one
+    starter: "x = 1"
+    reference: "x = 2"
+    checks:
+      - {description: x is two, code: "assert x == 2"}
+  - type: code
+    id: two
+    starter: "y = x + 1\\ny"
+    reference: "y = x + 1\\ny"
+    checks:
+      - {description: y is three, code: "assert y == 3, 'y is wrong'"}
+"""
+
+
+def test_parse_tutorial_returns_full_public_and_shim_views():
+    out = json.loads(parse_tutorial(TUTORIAL))
+    assert out["ok"] and out["tutorial"]["id"] == "demo"
+    assert "assert" not in repr(out["public"])                 # checks never reach the learner
+    shim = json.loads(out["shim"])
+    assert shim["id"] == "tut-demo"
+    assert [f["path"] for f in shim["files"] if f["role"] == "editable"] == [
+        "cells/one.py", "cells/two.py"]
+    bad = json.loads(parse_tutorial("id: x\ntitle: t\ncells: []\n"))
+    assert not bad["ok"] and bad["stage"] == "schema" and bad["errors"]
+
+
+def test_tutorial_cell_replays_prior_cells_and_runs_checks(tmp_path):
+    from leegen.core.tutorial import cell_run_inputs, parse_tutorial_yaml
+
+    t = parse_tutorial_yaml(TUTORIAL)
+    shim = json.loads(parse_tutorial(TUTORIAL))["shim"]
+    files = {"cells/one.py": "x = 2", "cells/two.py": "y = x + 1\ny"}
+    inputs = cell_run_inputs(t, files, "two")
+    req = json.dumps({"run_id": "r-cell", "problem_yaml": shim, "files": files,
+                      "mode": "snippet",
+                      "snippet": {"file": None, "stdin": inputs["stdin"], "code": inputs["code"],
+                                  "prior": inputs["prior"], "checks": inputs["checks"]}})
+    base = str(tmp_path / "cell")
+    prepared = prepare(req, base)
+    crash = execute(base, str(HARNESS_ROOT))
+    out = json.loads(finish(req, prepared, read_results(base), json.dumps(
+        {"exit_code": 0 if not crash else 1, "stderr": crash})))
+    assert out["status"] == "ok" and out["result"] == "3"
+    assert [(c["description"], c["status"]) for c in out["checks"]] == [("y is three", "pass")]

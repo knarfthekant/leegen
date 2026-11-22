@@ -121,6 +121,10 @@ def reference_files(t: Tutorial) -> dict[str, str]:
             for c in t.code_cells()}
 
 
+def is_shim_id(problem_id: str) -> bool:
+    return problem_id.startswith(SHIM_PREFIX)
+
+
 def public_tutorial(t: Tutorial) -> dict[str, Any]:
     """What the learner may see: no reference, no checks (only whether a cell has any)."""
     cells: list[dict[str, Any]] = []
@@ -140,6 +144,53 @@ def tutorial_summary(t: Tutorial) -> dict[str, Any]:
     return {"id": t.id, "title": t.title, "summary": t.summary, "tags": t.tags,
             "environment": t.environment, "track": t.track, "order": t.order,
             "cells": len(code), "checked": sum(1 for c in code if c.checks)}
+
+
+# ------------------------------------------------------------------ validation and agent views
+
+
+def reference_issues(cell_id: str, result: Any) -> list[str]:
+    """What is wrong with a cell's reference run (a `ConsoleResult`): it must run, and pass."""
+    issues: list[str] = []
+    if result.status != "ok":
+        issues.append(f"cell {cell_id}: reference raised: {(result.error or '')[-300:]}")
+    for ck in result.checks:
+        if ck.status != "pass":
+            issues.append(f"cell {cell_id}: reference fails check "
+                          f"{ck.description!r} ({ck.message or ck.status})")
+    return issues
+
+
+def starter_issues(cell_id: str, result: Any) -> list[str]:
+    """A cell must not be passable by doing nothing: its starter has to fail a check."""
+    if result.status == "ok" and result.checks and all(ck.status == "pass" for ck in result.checks):
+        return [f"cell {cell_id}: the starter already passes every check"]
+    return []
+
+
+def outcome_brief(outcome: dict[str, Any] | None) -> dict[str, Any] | None:
+    """A saved cell outcome as the agent sees it (no timestamps)."""
+    if not outcome:
+        return None
+    return {"status": outcome.get("status"), "passed": bool(outcome.get("passed")),
+            "checks": [{"description": c.get("description", ""), "status": c.get("status"),
+                        "message": c.get("message", "")} for c in outcome.get("checks", [])]}
+
+
+def session_cells(t: Tutorial, files: dict[str, str],
+                  results: dict[str, Any]) -> list[dict[str, Any]]:
+    """The tutorial as the learner has it now: the text, and each code cell with their code and
+    the outcome of their last run. For `get_session`; hidden checks are not included."""
+    cells: list[dict[str, Any]] = []
+    for c in t.cells:
+        if isinstance(c, MarkdownCell):
+            cells.append({"type": "markdown", "text": c.text})
+            continue
+        code = files.get(cell_path(c.id), c.starter)
+        cells.append({"type": "code", "id": c.id, "path": cell_path(c.id), "code": code,
+                      "modified": code != c.starter, "has_checks": bool(c.checks),
+                      "outcome": outcome_brief(results.get(c.id))})
+    return cells
 
 
 # ------------------------------------------------------------------ YAML

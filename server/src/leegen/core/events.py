@@ -150,11 +150,38 @@ class ProblemChangedEvent(BaseModel):
     problem_id: str
 
 
+class NavigateTutorialEvent(BaseModel):
+    type: Literal["navigate_tutorial"]
+    tutorial_id: str
+
+
+class TutorialsChangedEvent(BaseModel):
+    type: Literal["tutorials_changed"]
+
+
+class TutorialChangedEvent(BaseModel):
+    type: Literal["tutorial_changed"]
+    tutorial_id: str
+
+
+class TutorialCellFinishedEvent(BaseModel):
+    """A cell run finished (and its outcome is saved). Sent for every run, whoever started it."""
+
+    type: Literal["tutorial_cell_finished"]
+    tutorial_id: str
+    cell: str
+    run_id: str
+    source: str
+    result: ConsoleResult
+
+
 BackendEvent = Annotated[
     RunStartedEvent | RunStatusEvent | RunFinishedEvent | AnnotationsChangedEvent
     | ProposalsChangedEvent | FilesChangedEvent | CustomTestsChangedEvent | NavigateEvent
     | ProblemsChangedEvent | ProblemChangedEvent | AgentStatusChangedEvent
-    | ConsoleStartedEvent | ConsoleStatusEvent | ConsoleOutputEvent | ConsoleFinishedEvent,
+    | ConsoleStartedEvent | ConsoleStatusEvent | ConsoleOutputEvent | ConsoleFinishedEvent
+    | NavigateTutorialEvent | TutorialsChangedEvent | TutorialChangedEvent
+    | TutorialCellFinishedEvent,
     Field(discriminator="type"),
 ]
 

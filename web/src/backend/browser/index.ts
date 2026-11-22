@@ -1,15 +1,17 @@
-// The browser edition's Backend: IndexedDB + the separate-origin Pyodide runner (+ WebMCP tools,
-// registered on this top-level page so Codex and other in-browser agents can tutor and author).
+// The browser edition's Backend: IndexedDB (its only store; zip export/import move data) + the
+// separate-origin Pyodide runner (+ WebMCP tools, registered on this top-level page so Codex and
+// other in-browser agents can tutor and author).
 
 import type { Problem, WorkspaceState } from "../../lib/api";
 import type { Backend, BackendStatus, ExecutorListing, ProblemListing } from "../types";
 import { publicProblem, type Environment, type FullProblem } from "./core.ts";
-import { Db, type ProblemRecord } from "./db.ts";
+import { Db, type ProblemRecord, type TutorialRecord } from "./db.ts";
 import { EventHub } from "./events.ts";
 import { RunnerClient } from "./runner.ts";
 import { BrowserToolService, type Guides } from "./service.ts";
-import { folderName, folderSupported, readFolder, saveToFolder } from "./folder.ts";
-import { collectEntries, exportZip, importEntries, importZip } from "./transfer.ts";
+import type { FullTutorial } from "./tutorial.ts";
+import { BrowserTutorialService } from "./tutorials.ts";
+import { exportZip, importZip } from "./transfer.ts";
 
 interface AppConfig {
   runner_origin: string;
@@ -19,6 +21,7 @@ interface AppConfig {
 export interface SeedBundle {
   version: string;
   problems: { id: string; yaml: string; problem: FullProblem; assets: string[] }[];
+  tutorials: { id: string; yaml: string; tutorial: FullTutorial; shim: string }[];
   environments: Environment[];
   guides: Guides;
   schema: unknown;
@@ -33,8 +36,8 @@ async function fetchJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-/** Bring shipped problems up to date. User-created or imported problems are never touched, and
- * shipped problems the user deleted stay deleted. */
+/** Bring shipped problems and tutorials up to date. User-created or imported ones are never
+ * touched, and shipped problems the user deleted stay deleted. */
 async function syncSeeds(db: Db, bundle: SeedBundle) {
   if ((await db.get<string>("meta", "seed_version")) === bundle.version) return;
   const deleted = new Set((await db.get<string[]>("meta", "deleted_seeds")) ?? []);
@@ -55,11 +58,30 @@ async function syncSeeds(db: Db, bundle: SeedBundle) {
   for (const rec of await db.all<ProblemRecord>("problems")) {
     if (rec.source === "seed" && !shipped.has(rec.id)) await db.delete("problems", rec.id);
   }
+
+  const shippedTutorials = new Set(bundle.tutorials.map((t) => t.id));
+  for (const t of bundle.tutorials) {
+    const existing = await db.get<TutorialRecord>("tutorials", t.id);
+    if (existing && existing.source !== "seed") continue;
+    await db.put("tutorials", {
+      id: t.id,
+      yaml: t.yaml,
+      tutorial: t.tutorial,
+      shim: t.shim,
+      source: "seed",
+      seed_version: bundle.version,
+      updated_at: Date.now() / 1000,
+    } satisfies TutorialRecord);
+  }
+  for (const rec of await db.all<TutorialRecord>("tutorials")) {
+    if (rec.source === "seed" && !shippedTutorials.has(rec.id)) await db.delete("tutorials", rec.id);
+  }
   await db.put("meta", bundle.version, "seed_version");
 }
 
 export interface BrowserBackend extends Backend {
   service: BrowserToolService;
+  tutorials: BrowserTutorialService;
   bundle: SeedBundle;
 }
 
@@ -70,6 +92,7 @@ export async function createBrowserBackend(): Promise<BrowserBackend> {
     Db.open(),
   ]);
   await syncSeeds(db, bundle);
+  await db.delete("meta", "folder_handle");   // left by the removed folder sync
 
   const hub = new EventHub();
   const runner = new RunnerClient(config.runner_origin);
@@ -81,6 +104,9 @@ export async function createBrowserBackend(): Promise<BrowserBackend> {
     guides: bundle.guides,
     schema: bundle.schema,
   });
+
+  const tutorials = new BrowserTutorialService({ db, hub, runner, service });
+  service.tutorials = tutorials;
 
   // ------------------------------------------------------------ service status
   const statusListeners = new Set<() => void>();
@@ -124,6 +150,7 @@ export async function createBrowserBackend(): Promise<BrowserBackend> {
     edition: "browser",
     getAgentStatus: () => service.getAgentStatus(),
     service,
+    tutorials,
     bundle,
 
     listProblems: () => service.problemListView() as Promise<ProblemListing>,
@@ -185,22 +212,10 @@ export async function createBrowserBackend(): Promise<BrowserBackend> {
     transfer: {
       exportZip: () => exportZip(db, seedAsset),
       async importZip(file) {
-        const summary = await importZip(file, db, runner, service);
+        const summary = await importZip(file, { db, runner, service, tutorials });
         hub.broadcast({ type: "problems_changed" });
         return summary;
       },
-      folder: folderSupported()
-        ? {
-            name: () => folderName(db),
-            save: async (pickNew) => saveToFolder(db, await collectEntries(db, seedAsset), pickNew),
-            async load(pickNew) {
-              const { folder, entries } = await readFolder(db, pickNew);
-              const summary = await importEntries(entries, db, runner, service);
-              hub.broadcast({ type: "problems_changed" });
-              return { ...summary, folder };
-            },
-          }
-        : undefined,
     },
   };
 

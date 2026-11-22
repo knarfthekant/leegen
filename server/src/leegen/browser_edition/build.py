@@ -2,8 +2,8 @@
 
     uv run leegen browser build --app-origin https://app.example --runner-origin https://run.example
 
-<out>/app      the web UI built with `vite build --mode browser`, plus data/ (seed problems,
-               environments, guides, tool manifest) and assets
+<out>/app      the web UI built with `vite build --mode browser`, plus data/ (seed problems and
+               tutorials, environments, guides, tool manifest) and assets
 <out>/runner   the stateless runner page, Pyodide, and the Python it loads (leegen.core,
                the browser runner glue and the harness)
 
@@ -101,7 +101,9 @@ def app_data() -> tuple[dict, list[tuple[Path, str]]]:
     """data/bundle.json for the app, plus (source, dest) asset copies."""
     from leegen.envs.registry import EnvironmentRegistry
     from leegen.schema.export import problem_json_schema
+    from leegen.core.tutorial import public_tutorial, shim_problem
     from leegen.store.problems import ProblemStore
+    from leegen.store.tutorials import TutorialStore
 
     cfg = settings()
     store = ProblemStore()
@@ -117,14 +119,25 @@ def app_data() -> tuple[dict, list[tuple[Path, str]]]:
         assets += [(store.dir / p.id / n, f"assets/{p.id}/{n}") for n in names]
         problems.append({"id": p.id, "yaml": yaml_text, "problem": p.model_dump(mode="json"),
                          "assets": names})
+    tutorial_store = TutorialStore()
+    if tutorial_store.errors():
+        bad = ", ".join(e.path for e in tutorial_store.errors())
+        raise SystemExit(f"invalid tutorial files: {bad} (run `leegen tutorial validate --all`)")
+    tutorials = [{"id": t.id, "yaml": (tutorial_store.dir / f"{t.id}.yaml").read_text(),
+                  "tutorial": t.model_dump(mode="json"), "public": public_tutorial(t),
+                  "shim": json.dumps(shim_problem(t).model_dump(mode="json"))}
+                 for t in tutorial_store.list()]
     guide = cfg.docs_dir / "authoring.md"
+    tutorial_guide = cfg.docs_dir / "tutorials.md"
     browser_guide = cfg.docs_dir / "browser.md"
     data = {
         "problems": problems,
+        "tutorials": tutorials,
         "environments": [e.model_dump(mode="json") for e in EnvironmentRegistry().all().values()],
         "guides": {
             "authoring": guide.read_text() if guide.exists() else "",
             "tutoring": TUTORING_GUIDE,
+            "tutorials": tutorial_guide.read_text() if tutorial_guide.exists() else "",
             "browser": _section(browser_guide, "## Notes for agents"),
         },
         "schema": problem_json_schema(),
@@ -212,4 +225,4 @@ def build(app_origin: str, runner_origin: str, out: Path, *, skip_vite: bool = F
 
     print(f"app     {app_origin:<40} {size(app):6.1f} MB  {app}")
     print(f"runner  {runner_origin:<40} {size(runner):6.1f} MB  {runner}")
-    print(f"problems: {len(data['problems'])}; pyodide packages: {', '.join(packages)}")
+    print(f"problems: {len(data['problems'])}; tutorials: {len(data['tutorials'])}; pyodide packages: {', '.join(packages)}")

@@ -29,6 +29,7 @@ from leegen.core.events import RunnerRequest
 from leegen.core.models import ConsoleResult, Environment, RunResult
 from leegen.core.parse import format_error, parse_problem_yaml
 from leegen.core.plan import RunPlan, plan_run, plan_snippet
+from leegen.core.tutorial import parse_tutorial_yaml, public_tutorial, shim_problem
 from leegen.core.views import public_problem
 
 EXECUTOR_ID = "browser"
@@ -63,7 +64,8 @@ def prepare(request_json: str, base: str) -> str:
         if spec is None:
             raise ValueError("a snippet run needs a snippet")
         plan = plan_snippet(problem, req.files, file=spec.file, code=spec.code,
-                            stdin=spec.stdin, device=req.device)
+                            stdin=spec.stdin, device=req.device, prior=spec.prior,
+                            checks=spec.checks)
         _write_plan(base, plan)
         return json.dumps({"tests": [], "timeout_s": plan.run_config["timeout_s"],
                            "judge": "snippet", "started": time.time()})
@@ -176,6 +178,18 @@ def parse(problem_yaml: str) -> str:
         return json.dumps({"ok": False, "stage": "schema", "errors": format_error(exc)})
     return json.dumps({"ok": True, "problem": p.model_dump(mode="json"),
                        "public": public_problem(p)})
+
+
+def parse_tutorial(tutorial_yaml: str) -> str:
+    """Schema-check a tutorial. {"ok", "tutorial" (full), "public", "shim" (the stand-in problem,
+    as JSON, that cell runs use as `problem_yaml`), "errors"}."""
+    try:
+        t = parse_tutorial_yaml(tutorial_yaml)
+    except Exception as exc:  # noqa: BLE001
+        return json.dumps({"ok": False, "stage": "schema", "errors": format_error(exc)})
+    return json.dumps({"ok": True, "tutorial": t.model_dump(mode="json"),
+                       "public": public_tutorial(t),
+                       "shim": json.dumps(shim_problem(t).model_dump(mode="json"))})
 
 
 def validate_precheck(problem_yaml: str, environments_json: str, capabilities_json: str) -> str:

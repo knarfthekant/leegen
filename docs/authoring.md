@@ -27,7 +27,7 @@ The loop:
 schema_version: 1
 id: two-pointer-pairs          # lowercase slug = file name
 title: Count Pairs Under a Budget
-difficulty: easy               # easy | medium | hard (introductions are tutorials, see tutorials.md)
+difficulty: easy               # easy | medium | hard (introductions are tutorials, see tutorials.md; agents read get_tutorial_guide)
 tags: [arrays, two-pointers]
 track: algorithms-basics       # optional curriculum id
 order: 3                       # optional position inside the track

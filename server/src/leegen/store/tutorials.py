@@ -52,3 +52,28 @@ class TutorialStore:
 
     def get(self, tutorial_id: str) -> Tutorial | None:
         return next((t for t in self.list() if t.id == tutorial_id), None)
+
+    # ---------------------------------------------------------------- agent edits
+
+    def path_for(self, tutorial_id: str) -> Path:
+        return self.dir / f"{tutorial_id}.yaml"
+
+    def read_yaml(self, tutorial_id: str) -> str | None:
+        path = self.path_for(tutorial_id)
+        return path.read_text() if path.is_file() else None
+
+    def save_yaml(self, tutorial_id: str, text: str) -> Path:
+        """Write the author's YAML as given: comments and block scalars survive."""
+        self.dir.mkdir(parents=True, exist_ok=True)
+        path = self.path_for(tutorial_id)
+        tmp = path.with_suffix(".yaml.tmp")
+        tmp.write_text(text if text.endswith("\n") else text + "\n")
+        tmp.replace(path)
+        return path
+
+    def delete(self, tutorial_id: str) -> bool:
+        path = self.path_for(tutorial_id)
+        if path.exists():
+            path.unlink()
+            return True
+        return False

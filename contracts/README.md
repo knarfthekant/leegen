@@ -9,7 +9,7 @@ is **generated** by `cd server && uv run leegen schema` from `server/src/leegen/
 | `records.schema.json` | Wire records (`RunResult`, `TestResult`, `Annotation`, `Proposal`, `CustomTest`) and the `BackendEvent` union the UI listens to (WebSocket in the server, BroadcastChannel in the browser) |
 | `inputs.schema.json` | Input shapes: `Problem`, `Environment`, and `RunnerRequest` (app origin → browser runner) |
 | `tools.json` | Agent tools: names, descriptions and input schemas from the MCP server, plus WebMCP hints (`readOnlyHint`, `consequentialHint`, `untrustedContentHint`) from `core/toolspec.py`. The browser edition registers its WebMCP tools from this file, so both editions expose the same tools |
-| `fixtures/*.json` | Golden cases produced by the Python core (review logic, views). The browser edition's TypeScript ports must reproduce them exactly (`cd web && npm test`) |
+| `fixtures/*.json` | Golden cases produced by the Python core (review logic, views, tutorial views and run inputs). The browser edition's TypeScript ports must reproduce them exactly (`cd web && npm test`) |
 
 The TypeScript types for the same records live in `web/src/contracts/generated.ts` (also generated).
 

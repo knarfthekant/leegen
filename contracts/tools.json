@@ -78,7 +78,7 @@
     {
       "name": "annotate",
       "title": "Annotate code",
-      "description": "Comment on the user's code. Each annotation marks an exact character range in a\nvisible file (or is a general comment when file is omitted). In the editor it shows as a\nhighlight plus one gutter dot (a bar for several lines); hovering peeks at it and\nclicking focuses it in the Review tab. Lines and columns are 1-based and refer to the\ncurrent code from get_session; end_col is exclusive. Always prefer start_col/end_col\nthat cover just the offending token or expression; without columns the whole text of\nthe line(s) is marked. Comments may overlap, and each stays visible.",
+      "description": "Comment on the user's code. Each annotation marks an exact character range in a\nvisible file (or is a general comment when file is omitted). In the editor it shows as a\nhighlight plus one gutter dot (a bar for several lines); hovering peeks at it and\nclicking focuses it in the Review tab. Lines and columns are 1-based and refer to the\ncurrent code from get_session; end_col is exclusive. Always prefer start_col/end_col\nthat cover just the offending token or expression; without columns the whole text of\nthe line(s) is marked. Comments may overlap, and each stays visible. For a tutorial cell\npass problem_id=\"tut-<tutorial id>\" and file=\"cells/<cell id>.py\".",
       "inputSchema": {
         "type": "object",
         "$defs": {
@@ -283,6 +283,35 @@
       "browser": true
     },
     {
+      "name": "create_tutorial",
+      "title": "Create tutorial",
+      "description": "Validate and save a tutorial to tutorials/<id>.yaml. Nothing is saved if validation\nfails (a tutorial is saved unvalidated only when no executor can run it, and the\nresponse says so). Use overwrite=true to replace an existing tutorial.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "yaml": {
+            "title": "Yaml",
+            "type": "string"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "yaml"
+        ],
+        "title": "create_tutorialArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
       "name": "delete_problem",
       "title": "Delete problem",
       "description": "Delete a problem file (and optionally the user's workspace for it).",
@@ -303,6 +332,35 @@
           "problem_id"
         ],
         "title": "delete_problemArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": true,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "delete_tutorial",
+      "title": "Delete tutorial",
+      "description": "Delete a tutorial file (and optionally the learner's saved code and results).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tutorial_id": {
+            "title": "Tutorial Id",
+            "type": "string"
+          },
+          "delete_user_code": {
+            "default": false,
+            "title": "Delete User Code",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tutorial_id"
+        ],
+        "title": "delete_tutorialArguments"
       },
       "annotations": {
         "readOnlyHint": false,
@@ -375,7 +433,7 @@
     {
       "name": "get_session",
       "title": "Get the user's session",
-      "description": "What the user is doing right now: the open problem, their current code (including\nunsaved edits), cursor and selection, the last run's results, custom tests, and existing\nreview comments and pending suggestions. Call this first when helping the user.",
+      "description": "What the user is doing right now: the open problem, their current code (including\nunsaved edits), cursor and selection, the last run's results, custom tests, and existing\nreview comments and pending suggestions. When a tutorial is open (\"kind\": \"tutorial\")\nit lists the cells with the learner's code and each cell's last outcome instead. Call\nthis first when helping the user.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -385,6 +443,51 @@
         "readOnlyHint": true,
         "consequentialHint": false,
         "untrustedContentHint": true
+      },
+      "browser": true
+    },
+    {
+      "name": "get_tutorial",
+      "title": "Get tutorial",
+      "description": "A tutorial. With include_hidden (default) returns the full YAML, including the hidden\nchecks and the references. Otherwise returns only what the learner sees.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tutorial_id": {
+            "title": "Tutorial Id",
+            "type": "string"
+          },
+          "include_hidden": {
+            "default": true,
+            "title": "Include Hidden",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tutorial_id"
+        ],
+        "title": "get_tutorialArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": true
+      },
+      "browser": true
+    },
+    {
+      "name": "get_tutorial_guide",
+      "title": "Tutorial authoring guide",
+      "description": "How to write leegen tutorials: the YAML format (Markdown and code cells, hidden\nchecks, references), how cells run, and authoring rules. Read this before creating a\ntutorial. Problems are a different thing: see get_authoring_guide.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "get_tutorial_guideArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": false
       },
       "browser": true
     },
@@ -466,6 +569,35 @@
       "browser": true
     },
     {
+      "name": "list_tutorials",
+      "title": "List tutorials",
+      "description": "All tutorials (optionally only one track) with cell counts and how many cells the\nuser has passed, plus files that failed to load.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "track": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Track"
+          }
+        },
+        "title": "list_tutorialsArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
       "name": "open_problem",
       "title": "Open problem",
       "description": "Open a problem in the user's browser.",
@@ -490,9 +622,33 @@
       "browser": true
     },
     {
+      "name": "open_tutorial",
+      "title": "Open tutorial",
+      "description": "Open a tutorial in the user's browser.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tutorial_id": {
+            "title": "Tutorial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tutorial_id"
+        ],
+        "title": "open_tutorialArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
       "name": "propose_edit",
       "title": "Propose an edit",
-      "description": "Suggest a change to one of the user's editable files. Shown as a diff the user accepts\nor rejects. Give either the full new `content` or a list of exact search/replace\n`edits`. A newer proposal for the same file replaces the pending one.",
+      "description": "Suggest a change to one of the user's editable files. Shown as a diff the user accepts\nor rejects. Give either the full new `content` or a list of exact search/replace\n`edits`. A newer proposal for the same file replaces the pending one. For a tutorial cell\npass problem_id=\"tut-<tutorial id>\" and file=\"cells/<cell id>.py\".",
       "inputSchema": {
         "type": "object",
         "$defs": {
@@ -619,6 +775,47 @@
       "browser": true
     },
     {
+      "name": "run_tutorial_cell",
+      "title": "Run a tutorial cell",
+      "description": "Run one code cell of the tutorial on the learner's current code (earlier cells are\nreplayed first, then the cell's hidden checks run), as clicking Run does. The ticks\nupdate in their page. Defaults: the open tutorial, and its active cell. Returns the\nstatus, each check's result, and the output.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cell": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cell"
+          },
+          "tutorial_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tutorial Id"
+          }
+        },
+        "title": "run_tutorial_cellArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": true
+      },
+      "browser": true
+    },
+    {
       "name": "set_agent_status",
       "title": "Set agent status",
       "description": "Show the user that the agent is working and they should wait. Set reviewing before\nreviewing code, or creating_problem before authoring a problem. Set idle when finished,\nincluding on failure. Active status expires after five minutes; call again to renew.\nApplies across the app, even when no problem is open. Does not lock the editor.",
@@ -677,6 +874,35 @@
       "browser": true
     },
     {
+      "name": "update_tutorial",
+      "title": "Update tutorial",
+      "description": "Replace an existing tutorial with new YAML (validated the same way as\ncreate_tutorial). The learner's saved code is kept, by cell id.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tutorial_id": {
+            "title": "Tutorial Id",
+            "type": "string"
+          },
+          "yaml": {
+            "title": "Yaml",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tutorial_id",
+          "yaml"
+        ],
+        "title": "update_tutorialArguments"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
       "name": "validate_problem_yaml",
       "title": "Validate problem YAML",
       "description": "Check a problem without saving it: the schema, then the reference solution must pass\nevery test and the starter code must fail at least one.",
@@ -692,6 +918,30 @@
           "yaml"
         ],
         "title": "validate_problem_yamlArguments"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "consequentialHint": false,
+        "untrustedContentHint": false
+      },
+      "browser": true
+    },
+    {
+      "name": "validate_tutorial_yaml",
+      "title": "Validate tutorial YAML",
+      "description": "Check a tutorial without saving it: the schema, then every cell's reference must pass\nits checks and every starter must fail at least one.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "yaml": {
+            "title": "Yaml",
+            "type": "string"
+          }
+        },
+        "required": [
+          "yaml"
+        ],
+        "title": "validate_tutorial_yamlArguments"
       },
       "annotations": {
         "readOnlyHint": true,

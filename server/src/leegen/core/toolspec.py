@@ -36,6 +36,16 @@ TOOLS: dict[str, ToolSpec] = {
     "create_problem": ToolSpec("Create problem"),
     "update_problem": ToolSpec("Update problem"),
     "delete_problem": ToolSpec("Delete problem", consequential=True),
+    # tutorials
+    "get_tutorial_guide": ToolSpec("Tutorial authoring guide", read_only=True),
+    "list_tutorials": ToolSpec("List tutorials", read_only=True),
+    "get_tutorial": ToolSpec("Get tutorial", read_only=True, untrusted_output=True),
+    "validate_tutorial_yaml": ToolSpec("Validate tutorial YAML", read_only=True),
+    "create_tutorial": ToolSpec("Create tutorial"),
+    "update_tutorial": ToolSpec("Update tutorial"),
+    "delete_tutorial": ToolSpec("Delete tutorial", consequential=True),
+    "open_tutorial": ToolSpec("Open tutorial"),
+    "run_tutorial_cell": ToolSpec("Run a tutorial cell", untrusted_output=True),
     # tutoring
     "get_session": ToolSpec("Get the user's session", read_only=True, untrusted_output=True),
     "open_problem": ToolSpec("Open problem"),
@@ -50,11 +60,12 @@ TUTORING_GUIDE = """\
 # Tutoring with leegen
 
 leegen is a LeetCode-style trainer. The user solves a problem in the editor (description on
-the left, code and tests on the right). You are their tutor.
+the left, code and tests on the right), or works through a tutorial (a notebook-like page of
+Markdown and code cells). You are their tutor.
 
-1. **Call `get_session` first.** It returns the open problem, the user's *current* code (with
-   unsaved edits), cursor and selection, the last run's failing tests, existing comments and
-   pending suggestions.
+1. **Call `get_session` first.** It returns what is open: for a problem, the user's *current*
+   code (with unsaved edits), cursor and selection, the last run's failing tests, existing
+   comments and pending suggestions; for a tutorial (`"kind": "tutorial"`), see the last section.
    Signal `set_agent_status(status="reviewing")` while working, then `idle` when finished
    (including on failure). Renew before five minutes if needed.
 2. **Diagnose from evidence.** Read the failing tests' input, expected, actual and message. Use
@@ -73,4 +84,25 @@ the left, code and tests on the right). You are their tutor.
    `open_problem` moves the editor to another problem.
 7. Code review order: correctness (point at failing cases), then complexity, then style. Praise
    what is good.
+
+## Tutorials
+
+When `get_session` returns `"kind": "tutorial"` the user is on a tutorial page. The result
+lists every `cells` entry in order: Markdown text, and code cells with the learner's current
+`code`, whether it differs from the starter (`modified`), and the `outcome` of their last run
+(each check's description, status and message). `active_cell`, `cursor` and `selection` say where
+they are. The hidden checks are not in the session; `get_tutorial` with `include_hidden=true`
+shows them with the references, to understand a cell, never to paste to the learner.
+
+- Cells run in order in one shared namespace, so a cell often fails because an *earlier* cell is
+  wrong or was never run: look at earlier outcomes first.
+- `run_tutorial_cell` runs a cell (default: the active one) on their current code, like the Run
+  button, and returns the check results and output. The ticks update in their page.
+- `annotate`, `clear_annotations` and `propose_edit` work on a cell: pass
+  `problem_id="tut-<tutorial id>"` (it is the session's `problem_id`) and
+  `file="cells/<cell id>.py"`. Comments show under the cell; an edit is a diff the learner
+  accepts or rejects.
+- Hint in small steps, as for problems: name the concept, then the cell, then the fix.
+- `open_tutorial` moves the learner to another tutorial. To write or fix a tutorial, read
+  `get_tutorial_guide`.
 """

@@ -1,8 +1,8 @@
 import { ProblemList } from "./pages/ProblemList";
 import { WorkspacePage } from "./pages/Workspace";
 import { TutorialPage } from "./pages/Tutorial";
-import { usePath } from "./lib/router";
-import { getBackend } from "./backend";
+import { navigate, usePath } from "./lib/router";
+import { getBackend, useBackendEvents } from "./backend";
 import { CodexGuide } from "./components/CodexGuide";
 import { AgentStatusBanner } from "./components/AgentStatusBanner";
 import { useAgentStatus } from "./lib/agentStatus";
@@ -10,6 +10,7 @@ import { useAgentStatus } from "./lib/agentStatus";
 export function App() {
   const path = usePath();
   const activity = useAgentStatus();
+  useBackendEvents((e) => e.type === "navigate_tutorial" && navigate(`/t/${e.tutorial_id}`));
   const m = path.match(/^\/p\/([^/]+)/);
   const t = path.match(/^\/t\/([^/]+)/);
   return (

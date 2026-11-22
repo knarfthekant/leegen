@@ -4,6 +4,10 @@
 //   node tests/browser-smoke.mjs                                          (from web/)
 //
 // Fresh Chrome profile (empty IndexedDB). Uses the installed Chrome via playwright-core.
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { chromium } from "playwright-core";
 
 const APP = process.env.LEEGEN_APP ?? "http://localhost:13380";
@@ -285,6 +289,160 @@ try {
   await page.getByText("Merge Copy").first().waitFor();
   console.log("  " + (await page.locator(".soft-alert").first().innerText()).split("\n")[0]);
   await page.screenshot({ path: `${SHOTS}/lc-browser-import.png` });
+
+  step("tutorials: run cells with hidden checks, navigate with prev/next and the list, export/import them");
+  const TUT = "dict-first-steps";
+  const setCell = (cell, code) => page.evaluate(([c, v]) => {
+    const ed = window.monaco.editor.getEditors().find((e) => e.getModel()?.uri.path.endsWith(`/cells/${c}.py`));
+    ed.getModel().setValue(v);
+  }, [cell, code]);
+  const runCell = (n) => page.locator(".t-run").nth(n).click();
+  await page.goto(APP + "/?view=tutorials");
+  const row = page.locator(".tutorial-row", { hasText: "Dictionaries, one step at a time" });
+  await row.waitFor();
+  if ((await page.locator(".tutorial-row").count()) !== 6) throw new Error("expected 6 bundled tutorials");
+  await row.click();
+  await page.locator(".t-cell").first().waitFor();
+  await page.waitForFunction(() => window.monaco.editor.getEditors().length >= 3);
+  // the starter fails its checks; the reference passes, and cell 2 sees cell 1's `ages` (replay)
+  await runCell(0);
+  await page.locator(".t-dot.fail, .t-dot.error").first().waitFor({ timeout: 90_000 });
+  await setCell("build", 'ages = {"ada": 36, "alan": 41}');
+  await runCell(0);
+  await page.waitForFunction(() => document.querySelectorAll(".t-cell.complete").length === 1, null, { timeout: 90_000 });
+  await setCell("update", 'ages["grace"] = 45\noldest = max(ages, key=ages.get)');
+  await runCell(1);
+  await page.waitForFunction(() => document.querySelectorAll(".t-cell.complete").length === 2, null, { timeout: 90_000 });
+  console.log("  2 cells complete; the later cell ran on the earlier cell's namespace");
+
+  await page.reload();
+  await page.locator(".t-cell").first().waitFor();
+  await page.waitForFunction(() => window.monaco.editor.getEditors().some((e) => e.getValue().includes('"alan": 41')));
+  if (await page.getByRole("button", { name: /Random/ }).count()) throw new Error("tutorials have no shuffle button");
+  await page.getByRole("button", { name: "Next tutorial" }).click();
+  await page.waitForFunction((id) => !location.pathname.endsWith(id) && location.pathname.includes("/t/"), TUT);
+  await page.getByRole("button", { name: "Previous tutorial" }).click();
+  await page.waitForFunction((id) => location.pathname.endsWith(id), TUT);
+  await page.getByRole("button", { name: "Tutorial List" }).click();
+  await page.locator(".drawer .tutorial-row.current").waitFor();
+  if ((await page.locator(".drawer .tutorial-row").count()) !== 6) throw new Error("the drawer should list every tutorial");
+  await page.locator(".drawer .tutorial-row:not(.current)").first().click();
+  await page.waitForFunction((id) => !location.pathname.endsWith(id), TUT);
+  console.log("  prev/next and the drawer navigate; progress survives a reload");
+
+  await page.goto(APP + "/?view=tutorials");
+  await page.locator(".tutorial-row").first().waitFor();
+  const tutDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: /^Export/ }).click();
+  const tutZip = `${SHOTS}/lc-browser-export-tutorials.zip`;
+  await (await tutDownload).saveAs(tutZip);
+  const listing = execFileSync("unzip", ["-Z1", tutZip], { encoding: "utf8" });
+  for (const want of [`tutorials/${TUT}.yaml`, `workspace/tut-${TUT}/cells/build.py`, `workspace/tut-${TUT}/.leegen/cell_results.json`]) {
+    if (!listing.split("\n").includes(want)) throw new Error(`export is missing ${want}:\n${listing}`);
+  }
+  await page.locator('input[type="file"]').setInputFiles(tutZip);
+  await page.getByText(/^Imported \d+ problems?/).waitFor({ timeout: 30_000 });
+  if (await page.locator(".soft-alert.tone-warn").count()) throw new Error("re-importing the export reported errors");
+  console.log("  export has tutorials/ and tut-<id> work; re-import is clean");
+
+  // a changed tutorial is parsed by the Python core in the runner; a broken one is reported
+  const dir = mkdtempSync(join(tmpdir(), "lc-tutorial-import-"));
+  mkdirSync(join(dir, "data", "tutorials"), { recursive: true });
+  const src = readFileSync(new URL("../../data/tutorials/dict-first-steps.yaml", import.meta.url), "utf8");
+  writeFileSync(join(dir, "data", "tutorials", "dict-first-steps.yaml"), src.replace("Dictionaries, one step at a time", "Dictionaries, edited"));
+  writeFileSync(join(dir, "data", "tutorials", "broken.yaml"), "id: broken\ntitle: x\ncells: []\n");
+  const editedZip = join(dir, "edited.zip");
+  execFileSync("zip", ["-qr", editedZip, "data"], { cwd: dir });
+  await page.locator('input[type="file"]').setInputFiles(editedZip);
+  await page.getByText(/Imported 0 problems and 1 tutorial/).waitFor({ timeout: 30_000 });
+  await page.locator(".soft-alert.tone-warn summary", { hasText: "tutorials/broken.yaml" }).waitFor();
+  await page.locator(".tutorial-row", { hasText: "Dictionaries, edited" }).waitFor();
+  console.log("  a changed tutorial was re-parsed and imported; a broken one was reported");
+
+  step("tutorial tools: author, open, tutor on a cell (session, comments, edits, runs), clean up");
+  const TUT_YAML = `schema_version: 1
+id: agent-demo
+title: Agent demo
+summary: Written by an agent.
+cells:
+  - type: markdown
+    text: Set x to two.
+  - type: code
+    id: one
+    starter: |
+      x = 1
+    reference: |
+      x = 2
+    checks:
+      - description: x is two
+        code: assert x == 2
+  - type: code
+    id: two
+    starter: |
+      y = 0
+    reference: |
+      y = x + 1
+    checks:
+      - description: y is three
+        code: assert y == 3
+`;
+  const tutList = await tool("list_tutorials");
+  if (tutList.tutorials.length !== 6 || !tutList.tutorials.every((t) => "passed" in t)) throw new Error("list_tutorials: " + JSON.stringify(tutList).slice(0, 300));
+  if (!(await tool("get_tutorial_guide")).includes("hidden **checks**")) throw new Error("get_tutorial_guide is missing the guide");
+  const hidden = await tool("get_tutorial", { tutorial_id: "dict-first-steps" });
+  const visible = await tool("get_tutorial", { tutorial_id: "dict-first-steps", include_hidden: false });
+  if (!hidden.yaml.includes("assert ages") || JSON.stringify(visible).includes("assert ")) throw new Error("get_tutorial: hidden checks must be in the YAML only");
+
+  const cheating = TUT_YAML.replace("x = 1", "x = 2");
+  const refusedTutorial = await tool("create_tutorial", { yaml: cheating });
+  if (refusedTutorial.saved || !refusedTutorial.issues.some((i) => i.includes("starter already passes"))) {
+    throw new Error("a passing starter must be refused: " + JSON.stringify(refusedTutorial));
+  }
+  if ((await tool("validate_tutorial_yaml", { yaml: "id: x\n" })).stage !== "schema") throw new Error("schema errors come first");
+  const madeTutorial = await tool("create_tutorial", { yaml: TUT_YAML });
+  if (!madeTutorial.saved || !madeTutorial.validated) throw new Error("create_tutorial: " + JSON.stringify(madeTutorial));
+  if ((await tool("list_tutorials")).tutorials.length !== 7) throw new Error("the new tutorial should be listed");
+
+  await tool("open_tutorial", { tutorial_id: "agent-demo" });
+  await page.waitForFunction(() => location.pathname.endsWith("/t/agent-demo"));
+  await page.locator(".t-cell").nth(1).waitFor();
+  await page.waitForFunction(() => window.monaco.editor.getEditors().length >= 2);
+  await setCell("one", "x = 5");
+  await page.locator(".t-cell").first().locator(".monaco-editor").click();
+  let tutSession;
+  for (let i = 0; i < 40; i++) {
+    tutSession = await tool("get_session");
+    if (tutSession.kind === "tutorial" && tutSession.cells.some((c) => c.code === "x = 5")) break;
+    await page.waitForTimeout(150);
+  }
+  if (tutSession.kind !== "tutorial" || tutSession.problem_id !== "tut-agent-demo" || tutSession.active_cell !== "one") {
+    throw new Error("get_session should describe the open tutorial: " + JSON.stringify(tutSession).slice(0, 400));
+  }
+  if (JSON.stringify(tutSession).includes("assert x")) throw new Error("the session must not carry hidden checks");
+
+  const wrong = await tool("run_tutorial_cell", { cell: "one" });          // runs the unsaved x = 5
+  if (wrong.status !== "ok" || wrong.passed || wrong.checks[0].status !== "fail") throw new Error("x = 5 should fail: " + JSON.stringify(wrong));
+  await page.locator(".t-cell").first().locator(".t-dot.fail").waitFor();   // the page shows the agent's run
+
+  await tool("annotate", { problem_id: "tut-agent-demo", annotations: [{ file: "cells/one.py", start_line: 1, start_col: 5, end_col: 6, severity: "hint", message: "What should **x** be?" }] });
+  await page.locator(".t-cell").first().locator(".t-notes .review-item", { hasText: "What should" }).waitFor();
+  await page.locator(".t-cell").first().locator(".lc-ann").waitFor();
+  await tool("propose_edit", { problem_id: "tut-agent-demo", file: "cells/one.py", rationale: "x must be two", edits: [{ old: "x = 5", new: "x = 2" }] });
+  await page.locator(".t-proposal").waitFor();
+  await page.getByRole("button", { name: "Accept" }).click();
+  await page.waitForFunction(() => window.monaco.editor.getEditors().some((e) => e.getValue().trim() === "x = 2"));
+  const right = await tool("run_tutorial_cell", { cell: "one" });
+  if (!right.passed) throw new Error("x = 2 should pass: " + JSON.stringify(right));
+  await page.waitForFunction(() => document.querySelectorAll(".t-cell.complete").length === 1, null, { timeout: 30_000 });
+  if ((await tool("clear_annotations", { problem_id: "tut-agent-demo" })).removed !== 1) throw new Error("clear_annotations should remove the comment");
+  await page.locator(".t-notes").waitFor({ state: "detached" });
+  await toolError("run_tests", { problem_id: "tut-agent-demo" });           // tests are for problems only
+  console.log("  authored, opened, read the session, ran cells, commented and edited a cell");
+
+  await tool("delete_tutorial", { tutorial_id: "agent-demo", delete_user_code: true });
+  if ((await tool("list_tutorials")).tutorials.length !== 6) throw new Error("delete_tutorial should remove it");
+  await page.goto(APP + "/");
+  await page.waitForFunction(() => window.leegenTools);
 
   step("WebGPU: WGSL editor, compile errors with locations, a passing kernel, GPU timing");
   const hasGpu = (await tool("list_executors")).executors[0].capabilities.includes("webgpu");
